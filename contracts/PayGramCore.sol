@@ -87,6 +87,9 @@ contract PayGramCore is ZamaEthereumConfig, Ownable2Step {
     /// @dev Employee data scoped by employer.
     mapping(address => mapping(address => Employee)) private _employerEmployeeData;
 
+    /// @notice Reverse lookup: employee wallet -> employer address.
+    mapping(address => address) public employerOf;
+
     /// @dev Number of payroll runs per employer.
     mapping(address => uint256) public employerPayrollCount;
 
@@ -616,6 +619,7 @@ contract PayGramCore is ZamaEthereumConfig, Ownable2Step {
             role:            role
         });
         _employerEmployees[employer].push(wallet);
+        employerOf[wallet] = employer;
 
         emit EmployeeAdded(employer, wallet, role, block.timestamp);
     }

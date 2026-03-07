@@ -18,7 +18,6 @@ export default function SalaryView() {
 
   async function fetchMyInfo() {
     if (!payGramCore || !trustScoring || !address) {
-      // Use mock data
       setUseMock(true);
       setIsActive(true);
       setRole("Senior Engineer");
@@ -29,33 +28,36 @@ export default function SalaryView() {
 
     setIsLoading(true);
     try {
-      // Check across all employers by reading contract events or using
-      // a known employer address. For now, we check if the connected
-      // user has any employer that lists them.
-      // Since multi-employer scoping means we need to know which employer,
-      // we attempt to see if user is listed by any employer.
-      // As a simplified approach, we try the payGramCore deployer first.
-      let active = false;
-      let empRole = "";
+      // Reverse lookup: find which employer registered this wallet
+      const employer: string = await payGramCore.employerOf(address);
+      const isRegistered =
+        employer !== "0x0000000000000000000000000000000000000000";
 
-      // Try to find any employer that has this address as employee
-      // by checking the getEmployee call (it will revert if not found)
-      try {
-        // Self-check: the address might also be an employer
-        const empData = await payGramCore.getEmployee(address, address);
-        active = empData.isActive;
-        empRole = empData.role;
-      } catch {
-        // Not an employee of self -- this is expected
+      if (!isRegistered) {
+        setIsActive(false);
+        setHasChecked(true);
+        setIsLoading(false);
+        return;
       }
 
-      setIsActive(active);
-      if (active) {
-        setRole(empRole);
+      const empData = await payGramCore.getEmployee(employer, address);
+      setIsActive(empData.isActive);
+      if (empData.isActive) {
+        setRole(empData.role);
       }
 
       const hasScore = await trustScoring.hasScore(address);
-      setTier(hasScore ? "MEDIUM" : "LOW");
+      if (hasScore) {
+        try {
+          const plainTier = await trustScoring.getTrustTierPlaintext(address);
+          const tierNum = Number(plainTier);
+          setTier(tierNum >= 2 ? "HIGH" : tierNum === 1 ? "MEDIUM" : "LOW");
+        } catch {
+          setTier("MEDIUM");
+        }
+      } else {
+        setTier("LOW");
+      }
     } catch {
       setUseMock(true);
       setIsActive(true);
