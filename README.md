@@ -25,8 +25,6 @@ Traditional payroll systems expose sensitive financial data at every layer. Empl
 
 The system adds a second layer: **trust-gated payment routing**. Each employee has an encrypted reputation score derived from EigenTrust. High-trust employees receive instant payments. Medium-trust employees have a 24-hour delay. Low-trust or new employees go through milestone-gated escrow. The routing decision happens entirely under encryption.
 
-> Built for the **Zama Developer Program Special Bounty Track**.
-
 ---
 
 ## Architecture
