@@ -96,6 +96,9 @@ contract PayGramCore is ZamaEthereumConfig, Ownable2Step {
     mapping(uint256 => PendingPayment) public pendingPayments;
     uint256 public nextPaymentId;
 
+    /// @notice Plaintext salary mirror for frontend reads (set by plaintext helpers).
+    mapping(address => mapping(address => uint256)) public plaintextSalaries;
+
     /// @dev Simple reentrancy lock for payroll execution.
     bool private _payrollLock;
 
@@ -247,6 +250,7 @@ contract PayGramCore is ZamaEthereumConfig, Ownable2Step {
 
         euint64 encrypted = FHE.asEuint64(salary);
         _storeEmployee(msg.sender, wallet, encrypted, role);
+        plaintextSalaries[msg.sender][wallet] = salary;
     }
 
     /**
@@ -296,6 +300,7 @@ contract PayGramCore is ZamaEthereumConfig, Ownable2Step {
         euint64 encrypted = FHE.asEuint64(salary);
         _setSalaryPermissions(msg.sender, wallet, encrypted);
         _employerEmployeeData[msg.sender][wallet].encryptedSalary = encrypted;
+        plaintextSalaries[msg.sender][wallet] = salary;
 
         emit SalaryUpdated(msg.sender, wallet);
     }
@@ -438,6 +443,18 @@ contract PayGramCore is ZamaEthereumConfig, Ownable2Step {
         Employee storage emp = _employerEmployeeData[employer][wallet];
         if (emp.wallet == address(0)) revert EmployeeNotFound();
         return (emp.wallet, emp.isActive, emp.hireDate, emp.lastPayDate, emp.role);
+    }
+
+    /**
+     * @notice Returns the plaintext salary stored by addEmployeePlaintext / updateSalaryPlaintext.
+     * @param employer Employer address.
+     * @param wallet   Employee address.
+     */
+    function getPlaintextSalary(
+        address employer,
+        address wallet
+    ) external view returns (uint256) {
+        return plaintextSalaries[employer][wallet];
     }
 
     /**

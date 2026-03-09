@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import { Eye, EyeOff, Lock, Calendar, AlertCircle } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { Eye, EyeOff, Lock, Calendar, AlertCircle, RefreshCw } from "lucide-react";
 import { useWeb3 } from "@/providers/Web3Provider";
 import { type TrustTier } from "@/lib/constants";
+import { formatTimestamp } from "@/lib/contracts";
 import Button from "@/components/ui/Button";
 
 export default function SalaryView() {
@@ -11,24 +12,19 @@ export default function SalaryView() {
   const [isActive, setIsActive] = useState<boolean | null>(null);
   const [role, setRole] = useState<string | null>(null);
   const [tier, setTier] = useState<TrustTier | null>(null);
+  const [salary, setSalary] = useState<string | null>(null);
+  const [lastPayDate, setLastPayDate] = useState<string>("Never");
   const [hasChecked, setHasChecked] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [decrypted, setDecrypted] = useState(false);
-  const [useMock, setUseMock] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  async function fetchMyInfo() {
-    if (!payGramCore || !trustScoring || !address) {
-      setUseMock(true);
-      setIsActive(true);
-      setRole("Senior Engineer");
-      setTier("HIGH");
-      setHasChecked(true);
-      return;
-    }
+  const fetchMyInfo = useCallback(async () => {
+    if (!payGramCore || !trustScoring || !address) return;
 
     setIsLoading(true);
+    setError(null);
     try {
-      // Reverse lookup: find which employer registered this wallet
       const employer: string = await payGramCore.employerOf(address);
       const isRegistered =
         employer !== "0x0000000000000000000000000000000000000000";
@@ -44,6 +40,20 @@ export default function SalaryView() {
       setIsActive(empData.isActive);
       if (empData.isActive) {
         setRole(empData.role);
+        setLastPayDate(formatTimestamp(empData.lastPayDate));
+        try {
+          const rawSalary: bigint = await payGramCore.getPlaintextSalary(
+            employer,
+            address
+          );
+          if (rawSalary > 0n) {
+            setSalary(Number(rawSalary).toLocaleString());
+          } else {
+            setSalary("Encrypted");
+          }
+        } catch {
+          setSalary("Encrypted");
+        }
       }
 
       const hasScore = await trustScoring.hasScore(address);
@@ -53,23 +63,30 @@ export default function SalaryView() {
           const tierNum = Number(plainTier);
           setTier(tierNum >= 2 ? "HIGH" : tierNum === 1 ? "MEDIUM" : "LOW");
         } catch {
-          setTier("MEDIUM");
+          setTier(null);
         }
       } else {
         setTier("LOW");
       }
-    } catch {
-      setUseMock(true);
-      setIsActive(true);
-      setRole("Senior Engineer");
-      setTier("HIGH");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("SalaryView fetch error:", msg);
+      setError(msg.length > 120 ? msg.slice(0, 120) + "..." : msg);
     } finally {
       setIsLoading(false);
       setHasChecked(true);
     }
-  }
+  }, [payGramCore, trustScoring, address]);
 
-  if (!hasChecked) {
+  // Auto-fetch when contracts and wallet are ready
+  useEffect(() => {
+    if (contractsReady && payGramCore && trustScoring && address && !hasChecked) {
+      fetchMyInfo();
+    }
+  }, [contractsReady, payGramCore, trustScoring, address, hasChecked, fetchMyInfo]);
+
+  // Not connected or contracts not ready yet
+  if (!contractsReady || !address) {
     return (
       <div className="card p-8 text-center border-l-4 border-l-primary">
         <Lock size={32} className="mx-auto mb-4 text-primary" />
@@ -77,27 +94,51 @@ export default function SalaryView() {
           Your Salary
         </h3>
         <p className="text-sm text-gray-500 dark:text-slate-400 mb-6">
-          Load your encrypted employment information
+          Connect your wallet on Sepolia to view your salary
         </p>
-        <Button
-          onClick={fetchMyInfo}
-          loading={isLoading}
-          disabled={!contractsReady && !useMock}
-          size="lg"
-        >
-          <Eye size={16} />
-          {isLoading ? "Loading..." : "Load My Info"}
-        </Button>
-        {!contractsReady && (
-          <p className="flex items-center justify-center gap-1.5 mt-3 text-xs text-gray-400 dark:text-slate-500">
-            <AlertCircle size={12} />
-            Will show demo data if contracts unavailable
-          </p>
-        )}
+        <p className="flex items-center justify-center gap-1.5 text-xs text-gray-400 dark:text-slate-500">
+          <AlertCircle size={12} />
+          Waiting for wallet connection
+        </p>
       </div>
     );
   }
 
+  // Loading state
+  if (isLoading || !hasChecked) {
+    return (
+      <div className="card p-8 text-center border-l-4 border-l-primary">
+        <Lock size={32} className="mx-auto mb-4 text-primary animate-pulse" />
+        <h3 className="text-lg font-heading font-bold text-gray-900 dark:text-slate-100 mb-2">
+          Your Salary
+        </h3>
+        <p className="text-sm text-gray-500 dark:text-slate-400">
+          Loading your on-chain employment data...
+        </p>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="card p-8 text-center border-l-4 border-l-red-400">
+        <AlertCircle size={32} className="mx-auto mb-4 text-red-400" />
+        <h3 className="text-lg font-heading font-bold text-gray-900 dark:text-slate-100 mb-2">
+          Failed to Load
+        </h3>
+        <p className="text-sm text-gray-500 dark:text-slate-400 mb-4">
+          {error}
+        </p>
+        <Button onClick={fetchMyInfo} size="sm">
+          <RefreshCw size={14} />
+          Retry
+        </Button>
+      </div>
+    );
+  }
+
+  // Not registered
   if (isActive === false) {
     return (
       <div className="card-static p-8 text-center">
@@ -115,11 +156,14 @@ export default function SalaryView() {
         <h3 className="text-sm font-heading font-bold text-gray-900 dark:text-slate-100">
           Your Salary
         </h3>
-        {useMock && (
-          <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800">
-            Demo Data
-          </span>
-        )}
+        <button
+          type="button"
+          onClick={fetchMyInfo}
+          className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 transition-colors"
+          title="Refresh"
+        >
+          <RefreshCw size={14} />
+        </button>
       </div>
 
       {/* Salary amount */}
@@ -127,8 +171,8 @@ export default function SalaryView() {
         {decrypted ? (
           <div className="animate-fade-in">
             <p className="text-4xl font-heading font-bold text-gray-900 dark:text-slate-100">
-              5,000{" "}
-              <span className="text-lg text-primary">cUSDC</span>
+              {salary ?? "---"}{" "}
+              <span className="text-lg text-primary">cPAY</span>
             </p>
             <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">per month</p>
           </div>
@@ -184,7 +228,7 @@ export default function SalaryView() {
           </p>
           <p className="text-sm font-medium text-gray-900 dark:text-slate-100 mt-0.5 flex items-center gap-1">
             <Calendar size={12} className="text-gray-400 dark:text-slate-500" />
-            Feb 1, 2026
+            {lastPayDate}
           </p>
         </div>
       </div>

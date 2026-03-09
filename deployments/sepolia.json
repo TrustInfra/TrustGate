@@ -3,14 +3,14 @@
   "chainId": 11155111,
   "deployer": "0x60C05e2d820CE989E944ED4e7bb33bAEB8705c62",
   "contracts": {
-    "TrustScoring": "0xC8886A68F2160a57A01b32AaE542b6EEC5CA3d02",
-    "PayGramToken": "0x70eFfc178806D75812E55DdeC4AD642Db01D9a83",
-    "PayGramCore": "0xfB23Bc13e8EC7202058BEc8467E2CA8871F58bE0"
+    "TrustScoring": "0x195dc8309F1b26BF6f5c568024E4060029233596",
+    "PayGramToken": "0x18572E79806bc3caAEeE52d81c0A7A4D86faeD6f",
+    "PayGramCore": "0x370B4F9917b65f36CAe01754c14829408bfAf7fd"
   },
   "transactions": {
-    "TrustScoring": "0x9f0bc91591624b13d577fa6f4eef254a22976ab31e21a002345d48fc82f89bff",
-    "PayGramToken": "0xe03cccff06a7c4bd7051504673fe75beff16b73732f8f3664592cd9f62608301",
-    "PayGramCore": "0xf2f03310a54996ca07f8e30bed9303ea939d42c9ccf712fc24819cfba45b4961"
+    "TrustScoring": "0xc747c30b467f40e445079193270bf8d838190e282c68e2b304031c89ba19331b",
+    "PayGramToken": "0xb9580b37de7f450f97b3f2a9f106ff42af9c8cb9c5207de022b3cb741d229412",
+    "PayGramCore": "0x8201046333f2ce49ecd9a1da18957ab2c92a4271ff0b7367d79ee52c9bb839ab"
   },
   "initialSupply": "1000000",
   "employees": [
@@ -45,5 +45,5 @@
       "score": 0
     }
   ],
-  "deployedAt": "2026-03-07T23:49:49.846Z"
+  "deployedAt": "2026-03-08T16:49:01.829Z"
 }
