@@ -17,29 +17,23 @@ cd trusted-paygram
 npm install
 ```
 
-## Hardhat Configuration Variables
+## Environment Configuration
 
-Trusted PayGram uses Hardhat's built-in `vars` system instead of `.env` files.  Set your variables with:
-
-```bash
-# Required for Sepolia / Mainnet deployment
-npx hardhat vars set MNEMONIC
-# Enter your 12-word seed phrase when prompted
-
-npx hardhat vars set INFURA_API_KEY
-# Enter your Infura project ID
-
-npx hardhat vars set ETHERSCAN_API_KEY
-# Enter your Etherscan API key (for contract verification)
-```
-
-To view currently set variables:
+Trusted PayGram uses a `.env` file with `dotenv/config`. Copy the example and fill in your values:
 
 ```bash
-npx hardhat vars list
+cp .env.example .env
 ```
 
-> **Note:** For local development only, you do not need to set any variables — the config uses safe defaults (Hardhat's test mnemonic and empty API keys).
+Required variables for Sepolia / Mainnet deployment:
+
+```
+PRIVATE_KEY=<your-deployer-private-key>
+SEPOLIA_RPC_URL=<your-sepolia-rpc-url>
+ETHERSCAN_API_KEY=<your-etherscan-api-key>
+```
+
+> **Note:** For local development only (Hardhat network), you do not need to set any variables.
 
 ## Local Development
 
@@ -79,17 +73,14 @@ Visit a Sepolia faucet to obtain test ETH for your deployer address:
 - https://sepoliafaucet.com
 - https://faucets.chain.link/sepolia
 
-### 2. Set Hardhat variables
+### 2. Configure `.env`
 
-```bash
-npx hardhat vars set MNEMONIC
-npx hardhat vars set INFURA_API_KEY
-```
+Ensure `PRIVATE_KEY`, `SEPOLIA_RPC_URL`, and `ETHERSCAN_API_KEY` are set in your `.env` file.
 
 ### 3. Deploy
 
 ```bash
-npm run deploy:sepolia
+npx hardhat run scripts/deploy-sepolia.ts --network sepolia
 ```
 
 ### 4. Verify on Etherscan (optional)
@@ -144,13 +135,7 @@ npm install
 
 ### Hardhat compilation errors with FHEVM
 
-Ensure your `hardhat.config.ts` includes the FHEVM plugin:
-
-```typescript
-import "@fhevm/solidity/hardhat";
-```
-
-And that the Solidity version is set to `0.8.24` with `evmVersion: "cancun"`.
+Ensure your Solidity version is set to `0.8.27` with `evmVersion: "cancun"` in `hardhat.config.ts`. Note: `@fhevm/solidity` has no Hardhat plugin -- do not import `@fhevm/solidity/hardhat`.
 
 ### "Nonce too high" on Sepolia
 

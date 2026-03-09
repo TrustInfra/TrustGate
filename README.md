@@ -152,13 +152,13 @@ See [docs/SETUP.md](docs/SETUP.md) for detailed configuration.
 | **PayGramToken** | `0x41fa55cefd625e50fa1ae08baea87ac5c8be0ad7` | [View](https://etherscan.io/address/0x41fa55cefd625e50fa1ae08baea87ac5c8be0ad7#code) |
 | **PayGramCore** | `0xDC41FF140129846f7a2e63A5CcE73e9d767CB4e1` | [View](https://etherscan.io/address/0xDC41FF140129846f7a2e63A5CcE73e9d767CB4e1#code) |
 
-> **Sepolia Testnet** &mdash; deployed 2026-03-07 (Multi-Employer v2)
+> **Sepolia Testnet** &mdash; deployed 2026-03-09 (v5: plaintextSalaries)
 
 | Contract | Address | Etherscan |
 |:---------|:--------|:----------|
-| **TrustScoring** | `0x1DacB05d09435b2d9dBf56761487177dB893d0f5` | [View](https://sepolia.etherscan.io/address/0x1DacB05d09435b2d9dBf56761487177dB893d0f5#code) |
-| **PayGramToken** | `0xA8b4Fa823A2c0551F95bC61a8CbeE0fcD9c0a896` | [View](https://sepolia.etherscan.io/address/0xA8b4Fa823A2c0551F95bC61a8CbeE0fcD9c0a896#code) |
-| **PayGramCore** | `0x2b8037E8480DB5B4DFb19EA332Db667A6c6cC0Dc` | [View](https://sepolia.etherscan.io/address/0x2b8037E8480DB5B4DFb19EA332Db667A6c6cC0Dc#code) |
+| **TrustScoring** | `0x195dc8309F1b26BF6f5c568024E4060029233596` | [View](https://sepolia.etherscan.io/address/0x195dc8309F1b26BF6f5c568024E4060029233596#code) |
+| **PayGramToken** | `0x18572E79806bc3caAEeE52d81c0A7A4D86faeD6f` | [View](https://sepolia.etherscan.io/address/0x18572E79806bc3caAEeE52d81c0A7A4D86faeD6f#code) |
+| **PayGramCore** | `0x370B4F9917b65f36CAe01754c14829408bfAf7fd` | [View](https://sepolia.etherscan.io/address/0x370B4F9917b65f36CAe01754c14829408bfAf7fd#code) |
 
 All contracts are verified with source code on Etherscan.
 
@@ -262,7 +262,7 @@ npx hardhat test --grep "should"
 
 Tests are structured with a `try/catch + this.skip()` pattern: non-FHE logic runs on vanilla Hardhat, and FHE-dependent tests are automatically skipped when the coprocessor is unavailable.
 
-**112 tests passing** (98 FHE-pending, awaiting coprocessor integration).
+**119 tests passing** (107 FHE-pending, awaiting coprocessor integration).
 
 ---
 
