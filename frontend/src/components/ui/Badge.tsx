@@ -4,18 +4,17 @@ import { cn } from "@/lib/utils";
 
 interface BadgeProps {
   children: React.ReactNode;
-  variant?: "default" | "primary" | "secondary" | "warning" | "danger" | "outline";
+  variant?: "default" | "accent" | "success" | "warning" | "danger";
   size?: "sm" | "md";
   className?: string;
 }
 
 const variantClasses = {
-  default: "bg-gray-100 text-gray-600 border-gray-200 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600",
-  primary: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800",
-  secondary: "bg-gray-50 text-gray-600 border-gray-200 dark:bg-slate-800/50 dark:text-slate-300 dark:border-slate-700",
-  warning: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800",
-  danger: "bg-red-50 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800",
-  outline: "bg-transparent text-gray-500 border-gray-300 dark:text-slate-400 dark:border-slate-600",
+  default: "bg-bg-surface text-text-secondary border-border",
+  accent: "bg-accent-muted text-accent border-accent/20",
+  success: "bg-tier-high-muted text-tier-high border-tier-high/20",
+  warning: "bg-tier-medium-muted text-tier-medium border-tier-medium/20",
+  danger: "bg-tier-low-muted text-tier-low border-tier-low/20",
 };
 
 const sizeClasses = {
@@ -32,7 +31,7 @@ export default function Badge({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 rounded-full border font-medium",
+        "inline-flex items-center gap-1 rounded-md border font-medium",
         variantClasses[variant],
         sizeClasses[size],
         className

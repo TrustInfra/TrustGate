@@ -1,0 +1,88 @@
+export const trustScoringAbi = [
+  {
+    inputs: [{ name: "account", type: "address" }],
+    name: "hasScore",
+    outputs: [{ name: "", type: "bool" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ name: "account", type: "address" }],
+    name: "isScoreExpired",
+    outputs: [{ name: "", type: "bool" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ name: "account", type: "address" }],
+    name: "getTrustTierPlaintext",
+    outputs: [{ name: "", type: "uint8" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ name: "account", type: "address" }],
+    name: "getTrustScore",
+    outputs: [{ name: "", type: "uint64" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ name: "account", type: "address" }, { name: "score", type: "uint64" }],
+    name: "setTrustScore",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [{ name: "account", type: "address" }],
+    name: "lastScoreUpdate",
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "totalScoredAddresses",
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ name: "account", type: "address" }],
+    name: "isHighTrust",
+    outputs: [{ name: "", type: "bool" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ name: "account", type: "address" }],
+    name: "isMediumTrust",
+    outputs: [{ name: "", type: "bool" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ name: "account", type: "address" }],
+    name: "isLowTrust",
+    outputs: [{ name: "", type: "bool" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  // Events
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, name: "account", type: "address" },
+      { indexed: false, name: "score", type: "uint64" },
+      { indexed: false, name: "tier", type: "uint8" },
+      { indexed: false, name: "timestamp", type: "uint256" },
+    ],
+    name: "TrustScoreUpdated",
+    type: "event",
+  },
+  // Errors
+  { inputs: [], name: "AccountNotScored", type: "error" },
+  { inputs: [], name: "ScoreExpired", type: "error" },
+  { inputs: [], name: "NotAuthorizedScorer", type: "error" },
+] as const;

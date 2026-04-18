@@ -9,6 +9,8 @@ const SEPOLIA_RPC_URL =
   process.env.SEPOLIA_RPC_URL ?? "https://rpc.sepolia.org";
 const MAINNET_RPC_URL =
   process.env.MAINNET_RPC_URL ?? "https://eth.llamarpc.com";
+const ARC_TESTNET_RPC_URL =
+  process.env.ARC_TESTNET_RPC_URL ?? "https://rpc.testnet.arc.network";
 const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY ?? "";
 
 // Validate private key format for live networks
@@ -47,13 +49,29 @@ const config: HardhatUserConfig = {
       accounts: liveAccounts,
       chainId: 1,
     },
+    arcTestnet: {
+      url: ARC_TESTNET_RPC_URL,
+      accounts: liveAccounts,
+      chainId: 5042002,
+    },
   },
   namedAccounts: {
     deployer: 0,
-    employer: 0, // Same as deployer for single-key deployments
   },
   etherscan: {
-    apiKey: ETHERSCAN_API_KEY,
+    apiKey: {
+      arcTestnet: ETHERSCAN_API_KEY,
+    },
+    customChains: [
+      {
+        network: "arcTestnet",
+        chainId: 5042002,
+        urls: {
+          apiURL: "https://testnet.arcscan.app/api",
+          browserURL: "https://testnet.arcscan.app",
+        },
+      },
+    ],
   },
   gasReporter: {
     enabled: process.env.REPORT_GAS === "true",

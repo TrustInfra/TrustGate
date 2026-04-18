@@ -1,5 +1,5 @@
 {
-  "name": "trusted-paygram-frontend",
+  "name": "trustgate-frontend",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -9,15 +9,18 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.62.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "ethers": "^6.13.0",
+    "connectkit": "^1.8.2",
     "framer-motion": "^12.34.3",
     "lucide-react": "^0.575.0",
     "next": "^14.2.0",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
-    "tailwind-merge": "^3.5.0"
+    "tailwind-merge": "^3.5.0",
+    "viem": "^2.21.0",
+    "wagmi": "^2.14.0"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",

@@ -18,7 +18,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
         {label && (
           <label
             htmlFor={inputId}
-            className="block text-sm font-medium text-gray-700 dark:text-slate-200"
+            className="block text-xs font-medium text-text-secondary"
           >
             {label}
           </label>
@@ -27,20 +27,20 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
           ref={ref}
           id={inputId}
           className={cn(
-            "w-full px-4 py-2.5 rounded-lg text-sm text-gray-900 dark:text-slate-100",
-            "bg-white border border-gray-300 dark:bg-slate-800 dark:border-slate-600",
-            "placeholder:text-gray-400 dark:placeholder:text-slate-500",
-            "focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30",
+            "w-full px-3 py-2.5 rounded-lg text-sm text-text",
+            "bg-bg-surface border border-border",
+            "placeholder:text-text-muted",
+            "focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/20",
             "transition-all duration-200",
-            error && "border-danger focus:border-danger focus:ring-danger/30",
+            error && "border-tier-low focus:border-tier-low focus:ring-tier-low/20",
             className
           )}
           {...props}
         />
         {hint && !error && (
-          <p className="text-xs text-gray-400 dark:text-slate-500">{hint}</p>
+          <p className="text-[11px] text-text-muted">{hint}</p>
         )}
-        {error && <p className="text-xs text-danger">{error}</p>}
+        {error && <p className="text-[11px] text-tier-low">{error}</p>}
       </div>
     );
   }

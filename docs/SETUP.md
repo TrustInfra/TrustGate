@@ -1,4 +1,4 @@
-# Setup Guide — Trusted PayGram
+# Setup Guide — TrustGate
 
 ## Prerequisites
 
@@ -7,141 +7,158 @@
 | Node.js | >= 18.x | Runtime |
 | npm | >= 9.x | Package management |
 | Git | >= 2.x | Version control |
-| MetaMask | Latest | Browser wallet for Sepolia interaction |
 
 ## Installation
 
 ```bash
-git clone https://github.com/<your-org>/trusted-paygram.git
-cd trusted-paygram
+git clone https://github.com/<your-org>/trustgate.git
+cd trustgate
 npm install
 ```
 
 ## Environment Configuration
 
-Trusted PayGram uses a `.env` file with `dotenv/config`. Copy the example and fill in your values:
+Copy the example and fill in your values:
 
 ```bash
 cp .env.example .env
 ```
 
-Required variables for Sepolia / Mainnet deployment:
+Required for Arc testnet deployment:
 
 ```
 PRIVATE_KEY=<your-deployer-private-key>
-SEPOLIA_RPC_URL=<your-sepolia-rpc-url>
-ETHERSCAN_API_KEY=<your-etherscan-api-key>
 ```
 
-> **Note:** For local development only (Hardhat network), you do not need to set any variables.
+Optional overrides:
+
+```
+ARC_TESTNET_RPC_URL=https://rpc.testnet.arc.network
+ETHERSCAN_API_KEY=<for-contract-verification>
+```
 
 ## Local Development
 
 ### Compile contracts
 
 ```bash
-npm run compile
+npx hardhat compile
 ```
 
-### Run the test suite
+### Run tests
 
 ```bash
-npm test
+npx hardhat test
 ```
 
-### Start a local Hardhat node
+Tests use `MockTrustScoring` (no FHE dependency) and `MockUSDC` (6-decimal ERC-20)
+so the full suite runs on vanilla Hardhat without a coprocessor.
+
+### Test coverage
 
 ```bash
-npm run node
+npx hardhat coverage
 ```
 
-### Deploy to localhost
+## Arc Testnet
 
-In a separate terminal (while the node is running):
+### Network Details
+
+| Property | Value |
+|----------|-------|
+| Network Name | Arc Testnet |
+| RPC URL | https://rpc.testnet.arc.network |
+| Chain ID | 5042002 |
+| Native Gas Token | USDC (18 decimals native, 6 decimals ERC-20) |
+| USDC ERC-20 Address | `0x3600000000000000000000000000000000000000` |
+| EURC Address | `0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a` |
+| Block Explorer | https://testnet.arcscan.app |
+| Faucet | https://faucet.circle.com (select Arc Testnet + USDC) |
+
+### Important: USDC Decimals
+
+USDC is the native gas token on Arc. The native balance uses **18 decimals**,
+but the ERC-20 interface uses **6 decimals**. All contracts use the ERC-20
+interface exclusively. Never mix native balance reads with ERC-20 amounts.
+
+### Get Testnet USDC
+
+1. Visit https://faucet.circle.com
+2. Select **Arc Testnet** and **USDC**
+3. Enter your deployer wallet address
+4. Request funds
+
+### Deploy to Arc Testnet
 
 ```bash
-npm run deploy:localhost
+npx hardhat run scripts/deploy-arc.ts --network arcTestnet
 ```
 
-The deploy script will print all contract addresses.
+The script deploys:
+1. **TrustScoringPlaintext** — plaintext scoring (no FHE on Arc)
+2. **AgentRegistry** — permissionless agent registration
+3. **TrustGate** — trust-gated USDC payment gateway
 
-## Sepolia Testnet Deployment
+Then wires them together and exports addresses to `deployments/arcTestnet-addresses.json`.
 
-### 1. Get Sepolia ETH
+### Current Deployment
 
-Visit a Sepolia faucet to obtain test ETH for your deployer address:
-- https://sepoliafaucet.com
-- https://faucets.chain.link/sepolia
+| Contract | Address |
+|----------|---------|
+| TrustScoringPlaintext | `0xEb979Dc25396ba4be6cEA41EAfEa894C55772246` |
+| AgentRegistry | `0x73d3cf7f2734C334927f991fe87D06d595d398b4` |
+| TrustGate | `0x52E17bC482d00776d73811680CbA9914e83E33CC` |
+| USDC (ERC-20) | `0x3600000000000000000000000000000000000000` |
 
-### 2. Configure `.env`
-
-Ensure `PRIVATE_KEY`, `SEPOLIA_RPC_URL`, and `ETHERSCAN_API_KEY` are set in your `.env` file.
-
-### 3. Deploy
+### Verify on Arcscan (optional)
 
 ```bash
-npx hardhat run scripts/deploy-sepolia.ts --network sepolia
+npx hardhat verify --network arcTestnet <CONTRACT_ADDRESS> <CONSTRUCTOR_ARGS...>
 ```
 
-### 4. Verify on Etherscan (optional)
+## Contract Interactions
 
-```bash
-npx hardhat verify --network sepolia <CONTRACT_ADDRESS> <CONSTRUCTOR_ARGS...>
+### Register an agent
+
+```typescript
+const registry = await ethers.getContractAt("AgentRegistry", REGISTRY_ADDRESS);
+await registry.registerAgent(agentWallet, "ipfs://metadata");
 ```
 
-## MetaMask Configuration
+### Set a trust score
 
-To interact with deployed contracts on Sepolia:
+```typescript
+const scoring = await ethers.getContractAt("TrustScoringPlaintext", SCORING_ADDRESS);
+await scoring.setTrustScore(agentWallet, 85); // HIGH tier (>= 75)
+```
 
-1. Open MetaMask and switch to the **Sepolia** test network
-2. Import the `cPAY` token:
-   - Click "Import tokens"
-   - Paste the deployed `PayGramToken` contract address
-   - Symbol: `cPAY`
-   - Decimals: `18`
+### Deposit USDC and set allowance
 
-> **Note:** Because cPAY uses encrypted balances (ERC-7984), MetaMask will not display the actual balance.  Use the frontend application or direct contract calls with FHE decryption to view balances.
+```typescript
+const usdc = await ethers.getContractAt("IERC20", USDC_ADDRESS);
+const gate = await ethers.getContractAt("TrustGate", GATE_ADDRESS);
+
+await usdc.approve(GATE_ADDRESS, amount);
+await gate.deposit(amount);
+await gate.setAllowance(agentWallet, amount);
+```
+
+### Agent claims USDC
+
+```typescript
+// Called by the agent wallet
+await gate.connect(agentSigner).claim(depositorAddress, amount);
+// HIGH tier: instant transfer
+// MEDIUM tier: creates time-locked claim (24h)
+// LOW tier: creates escrowed claim (depositor must approve)
+```
 
 ## Project Scripts
 
 | Script | Description |
 |--------|-------------|
-| `npm run compile` | Compile Solidity contracts |
-| `npm test` | Run all tests |
-| `npm run node` | Start local Hardhat node |
-| `npm run deploy:localhost` | Deploy to local node |
-| `npm run deploy:sepolia` | Deploy to Sepolia testnet |
-| `npm run clean` | Remove build artifacts |
-| `npm run lint` | Lint Solidity files |
-| `npm run coverage` | Generate test coverage report |
-
-## Troubleshooting
-
-### "Cannot find module @fhevm/solidity"
-
-Make sure you have installed dependencies:
-
-```bash
-npm install
-```
-
-If the issue persists, clear the cache and reinstall:
-
-```bash
-npm run clean
-rm -rf node_modules package-lock.json
-npm install
-```
-
-### Hardhat compilation errors with FHEVM
-
-Ensure your Solidity version is set to `0.8.27` with `evmVersion: "cancun"` in `hardhat.config.ts`. Note: `@fhevm/solidity` has no Hardhat plugin -- do not import `@fhevm/solidity/hardhat`.
-
-### "Nonce too high" on Sepolia
-
-Reset your MetaMask account nonce:
-1. MetaMask → Settings → Advanced → Clear activity tab data
-
-### Local node tests failing
-
-The local Hardhat node does not include the FHE coprocessor.  Some FHE operations will only work on networks with the Zama coprocessor deployed (Sepolia with Zama gateway).  Unit tests should mock FHE operations where necessary.
+| `npx hardhat compile` | Compile Solidity contracts |
+| `npx hardhat test` | Run all tests |
+| `npx hardhat run scripts/deploy-arc.ts --network arcTestnet` | Deploy to Arc testnet |
+| `npx hardhat clean` | Remove build artifacts |
+| `npx hardhat coverage` | Generate test coverage report |

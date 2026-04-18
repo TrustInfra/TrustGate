@@ -1,89 +1,36 @@
 "use client";
 
-import React, { createContext, useContext } from "react";
-import { ethers } from "ethers";
-import { useWallet } from "@/hooks/useWallet";
-import { useFHE } from "@/hooks/useFHE";
-import { useContracts } from "@/hooks/useContracts";
+import { WagmiProvider } from "wagmi";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { ConnectKitProvider } from "connectkit";
+import { config } from "@/lib/config";
 
-interface Web3ContextValue {
-  // Wallet
-  address: string | null;
-  provider: ethers.BrowserProvider | null;
-  signer: ethers.JsonRpcSigner | null;
-  chainId: number | null;
-  chainName: string | null;
-  hasWallet: boolean;
-  isConnected: boolean;
-  isLoading: boolean;
-  isSupportedChain: boolean;
-  isSepolia: boolean;
-  walletError: string | null;
-  connect: () => Promise<void>;
-  disconnect: () => void;
-  switchChain: (chainId: number) => Promise<void>;
-  switchToSepolia: () => Promise<void>;
-
-  // FHE
-  fheReady: boolean;
-  fheError: string | null;
-  encrypt: (
-    value: number | bigint,
-    contractAddress: string,
-    userAddress: string
-  ) => Promise<{
-    encrypted: boolean;
-    handles?: Uint8Array[];
-    inputProof?: Uint8Array;
-    plaintextValue?: bigint;
-  }>;
-
-  // Contracts
-  trustScoring: ethers.Contract | null;
-  payGramCore: ethers.Contract | null;
-  payGramToken: ethers.Contract | null;
-  contractsReady: boolean;
-}
-
-const Web3Context = createContext<Web3ContextValue | null>(null);
+const queryClient = new QueryClient();
 
 export function Web3Provider({ children }: { children: React.ReactNode }) {
-  const wallet = useWallet();
-  const fhe = useFHE();
-  const contracts = useContracts(wallet.signer, wallet.chainId);
-
-  const value: Web3ContextValue = {
-    address: wallet.address,
-    provider: wallet.provider,
-    signer: wallet.signer,
-    chainId: wallet.chainId,
-    chainName: wallet.chainName,
-    hasWallet: wallet.hasWallet,
-    isConnected: wallet.isConnected,
-    isLoading: wallet.isLoading,
-    isSupportedChain: wallet.isSupportedChain,
-    isSepolia: wallet.isSepolia,
-    walletError: wallet.error,
-    connect: wallet.connect,
-    disconnect: wallet.disconnect,
-    switchChain: wallet.switchChain,
-    switchToSepolia: wallet.switchToSepolia,
-    fheReady: fhe.isInitialized,
-    fheError: fhe.error,
-    encrypt: fhe.encrypt,
-    trustScoring: contracts.trustScoring,
-    payGramCore: contracts.payGramCore,
-    payGramToken: contracts.payGramToken,
-    contractsReady: contracts.isReady,
-  };
-
-  return <Web3Context.Provider value={value}>{children}</Web3Context.Provider>;
-}
-
-export function useWeb3(): Web3ContextValue {
-  const ctx = useContext(Web3Context);
-  if (!ctx) {
-    throw new Error("useWeb3 must be used within a Web3Provider");
-  }
-  return ctx;
+  return (
+    <WagmiProvider config={config}>
+      <QueryClientProvider client={queryClient}>
+        <ConnectKitProvider
+          mode="dark"
+          customTheme={{
+            "--ck-font-family": "var(--font-body), system-ui, sans-serif",
+            "--ck-body-background": "#141414",
+            "--ck-body-background-secondary": "#1a1a1a",
+            "--ck-body-background-tertiary": "#0a0a0a",
+            "--ck-body-color": "#f5f5f5",
+            "--ck-body-color-muted": "#71717a",
+            "--ck-primary-button-background": "#3b82f6",
+            "--ck-primary-button-hover-background": "#2563eb",
+            "--ck-focus-color": "#3b82f6",
+            "--ck-modal-box-shadow": "0 25px 50px -12px rgba(0, 0, 0, 0.5)",
+            "--ck-overlay-background": "rgba(0, 0, 0, 0.7)",
+            "--ck-border-radius": "12px",
+          }}
+        >
+          {children}
+        </ConnectKitProvider>
+      </QueryClientProvider>
+    </WagmiProvider>
+  );
 }

@@ -4,7 +4,7 @@ pragma solidity ^0.8.27;
 import {FHE, euint64, externalEuint64, ebool} from "@fhevm/solidity/lib/FHE.sol";
 import {ZamaEthereumConfig} from "@fhevm/solidity/config/ZamaConfig.sol";
 import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
-import {IPayGramCore} from "./IPayGramCore.sol";
+import {IAgentRegistry} from "./IAgentRegistry.sol";
 
 /**
  * @title TrustScoring
@@ -54,8 +54,8 @@ contract TrustScoring is ZamaEthereumConfig, Ownable2Step {
     ///      Only populated by plaintext setters (setTrustScorePlaintext, batchSetScores).
     mapping(address => uint8) private _tierCache;
 
-    /// @notice PayGramCore contract reference for employer-scoped score setting.
-    address public payGramCore;
+    /// @notice AgentRegistry contract reference for owner-scoped score setting.
+    address public agentRegistry;
 
     // ──────────────────────────────────────────────────────────────────
     //  Events
@@ -65,7 +65,7 @@ contract TrustScoring is ZamaEthereumConfig, Ownable2Step {
     event OracleAuthorized(address indexed oracle, bool authorized);
     event TrustScoreRevoked(address indexed account);
     event ScoreAccessGranted(address indexed account, address indexed allowedAddress);
-    event PayGramCoreUpdated(address indexed newCore);
+    event AgentRegistryUpdated(address indexed newRegistry);
 
     // ──────────────────────────────────────────────────────────────────
     //  Errors
@@ -88,16 +88,16 @@ contract TrustScoring is ZamaEthereumConfig, Ownable2Step {
         _;
     }
 
-    /// @dev Allows oracles or employers scoring their own active employees.
+    /// @dev Allows oracles or agent owners scoring their own active agents.
     modifier onlyScorer(address account) {
         if (authorizedOracles[msg.sender]) {
             // Oracle -- always authorized
         } else if (
-            payGramCore != address(0) &&
-            IPayGramCore(payGramCore).isEmployer(msg.sender) &&
-            IPayGramCore(payGramCore).isActiveEmployee(msg.sender, account)
+            agentRegistry != address(0) &&
+            IAgentRegistry(agentRegistry).isAgentOwner(msg.sender) &&
+            IAgentRegistry(agentRegistry).isActiveAgent(msg.sender, account)
         ) {
-            // Employer scoring their own active employee
+            // Agent owner scoring their own active agent
         } else {
             revert NotAuthorizedScorer();
         }
@@ -139,13 +139,13 @@ contract TrustScoring is ZamaEthereumConfig, Ownable2Step {
     }
 
     /**
-     * @notice Sets the PayGramCore contract address for employer-scoped scoring.
-     * @param _core Address of the deployed PayGramCore contract.
+     * @notice Sets the AgentRegistry contract address for owner-scoped scoring.
+     * @param _registry Address of the deployed AgentRegistry contract.
      */
-    function setPayGramCore(address _core) external onlyOwner {
-        if (_core == address(0)) revert ZeroAddress();
-        payGramCore = _core;
-        emit PayGramCoreUpdated(_core);
+    function setAgentRegistry(address _registry) external onlyOwner {
+        if (_registry == address(0)) revert ZeroAddress();
+        agentRegistry = _registry;
+        emit AgentRegistryUpdated(_registry);
     }
 
     // ──────────────────────────────────────────────────────────────────
@@ -215,9 +215,9 @@ contract TrustScoring is ZamaEthereumConfig, Ownable2Step {
         if (accounts.length != scores.length) revert BatchLengthMismatch();
 
         bool isOracle = authorizedOracles[msg.sender];
-        bool isEmp = !isOracle &&
-            payGramCore != address(0) &&
-            IPayGramCore(payGramCore).isEmployer(msg.sender);
+        bool isOwner = !isOracle &&
+            agentRegistry != address(0) &&
+            IAgentRegistry(agentRegistry).isAgentOwner(msg.sender);
 
         for (uint256 i = 0; i < accounts.length; i++) {
             if (accounts[i] == address(0)) revert ZeroAddress();
@@ -225,8 +225,8 @@ contract TrustScoring is ZamaEthereumConfig, Ownable2Step {
             // Authorization check per account
             if (isOracle) {
                 // Oracle -- always authorized
-            } else if (isEmp && IPayGramCore(payGramCore).isActiveEmployee(msg.sender, accounts[i])) {
-                // Employer scoring own employee
+            } else if (isOwner && IAgentRegistry(agentRegistry).isActiveAgent(msg.sender, accounts[i])) {
+                // Agent owner scoring own active agent
             } else {
                 revert NotAuthorizedScorer();
             }

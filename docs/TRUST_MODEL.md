@@ -1,30 +1,30 @@
-# Trust Model — Trusted PayGram
+# Trust Model — TrustGate
 
 ## Overview
 
-Trusted PayGram adapts the **EigenTrust** distributed reputation algorithm for use in an on-chain payroll context.  Trust scores quantify an employee's reliability history and directly determine how their salary payment is routed — all without revealing the score itself.
+TrustGate adapts the **EigenTrust** distributed reputation algorithm for trust-gated AI agent payments. Trust scores quantify an agent's reliability and directly determine how USDC payments are routed — instantly, with a time delay, or through depositor-approved escrow.
 
 ## EigenTrust Adaptation
 
-The original EigenTrust algorithm computes a global trust vector by iteratively aggregating local trust values across a peer-to-peer network.  Trusted PayGram adapts this model as follows:
+The original EigenTrust algorithm computes a global trust vector by iteratively aggregating local trust values across a peer-to-peer network. TrustGate adapts this model as follows:
 
-| EigenTrust Concept | PayGram Implementation |
-|--------------------|------------------------|
-| Local trust value (s_ij) | Per-employer rating of an employee based on milestone completion, attendance, deliverables |
-| Pre-trusted peers | Initial set of employees seeded with baseline scores by the employer |
-| Trust propagation | Oracle aggregates ratings from multiple employers (if applicable) into a single score |
-| Global trust vector | Final `euint64` score stored in `TrustScoring` contract |
-| Trust normalization | Scores normalized to 0–100 range before encryption |
+| EigenTrust Concept | TrustGate Implementation |
+|--------------------|--------------------------|
+| Local trust value (s_ij) | Per-owner rating of an agent based on task completion and reliability |
+| Pre-trusted peers | Initial set of agents seeded with baseline scores by their owners |
+| Trust propagation | Oracle aggregates ratings from multiple sources into a single score |
+| Global trust vector | Final score stored in TrustScoring (encrypted `euint64` on FHE chains, plaintext `uint64` on Arc) |
+| Trust normalization | Scores normalized to 0-100 range |
 
 ### Scoring Pipeline
 
 ```
-Employer feedback     ─┐
-                       │     ┌─────────────┐     ┌──────────────────┐
-Milestone completion  ─┼────▶│  Off-chain  │────▶│  TrustScoring    │
-                       │     │  Oracle     │     │  (on-chain, FHE) │
-Peer endorsements     ─┤     │  Aggregator │     └──────────────────┘
-                       │     └─────────────┘
+Agent owner feedback  ─┐
+                       │     ┌─────────────┐     ┌──────────────────────────────┐
+Task completion       ─┼────▶│  Off-chain  │────▶│  TrustScoring (FHE chains)   │
+                       │     │  Oracle     │     │  or TrustScoringPlaintext    │
+Peer endorsements     ─┤     │  Aggregator │     │  (non-FHE chains like Arc)   │
+                       │     └─────────────┘     └──────────────────────────────┘
 Historical track record┘
           │
           ▼
@@ -36,10 +36,8 @@ Historical track record┘
     Normalized score [0, 100]
           │
           ▼
-    Encrypt → externalEuint64
-          │
-          ▼
-    setTrustScore(subject, encScore, proof)
+    FHE chains: encrypt → setTrustScore(subject, encScore, proof)
+    Non-FHE:    plaintext → setTrustScore(subject, score)
 ```
 
 ## Trust Tiers
@@ -53,16 +51,16 @@ ebool isMedium = FHE.ge(score, FHE.asEuint64(40));
 
 | Tier | Threshold | Payment Path | Use Case |
 |------|-----------|--------------|----------|
-| HIGH | score >= 75 | Instant encrypted transfer | Long-term employees with consistent delivery |
-| MEDIUM | 40 <= score < 75 | 24-hour delayed release | Employees building their track record |
-| LOW | score < 40 | Escrow with milestone gating | New hires, contractors with limited history |
+| HIGH | score >= 75 | Instant USDC transfer | Established agents with consistent delivery |
+| MEDIUM | 40 <= score < 75 | 24-hour time-locked release | Agents building their track record |
+| LOW | score < 40 | Escrowed, depositor approves | New agents with limited history |
 
 ### Tier Transition
 
-Scores evolve over time as the oracle feeds updated ratings.  An employee's tier can improve or degrade based on recent performance:
+Scores evolve over time as the oracle feeds updated ratings. An agent's tier can improve or degrade based on recent performance:
 
 ```
-New hire (score 20, LOW) ──▶ 3 months good work (score 55, MEDIUM) ──▶ 1 year (score 82, HIGH)
+New agent (score 20, LOW) ──▶ 3 months reliable (score 55, MEDIUM) ──▶ 1 year (score 82, HIGH)
 ```
 
 Each score update replaces the previous ciphertext.  FHE grants on the old ciphertext become invalid, ensuring stale observers cannot read outdated scores.

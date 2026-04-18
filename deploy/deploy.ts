@@ -3,7 +3,13 @@ import { DeployFunction } from "hardhat-deploy/types";
 import * as fs from "fs";
 import * as path from "path";
 
-const INITIAL_SUPPLY: bigint = 1_000_000n; // 1M cPAY tokens
+/**
+ * Arc Testnet USDC (ERC-20 interface).
+ * USDC is the native gas token on Arc. Native balance uses 18 decimals,
+ * but the ERC-20 interface uses 6 decimals. Always use this address
+ * for balance reads and transfers.
+ */
+const ARC_TESTNET_USDC = "0x3600000000000000000000000000000000000000";
 
 const deployAll: DeployFunction = async function (
   hre: HardhatRuntimeEnvironment
@@ -12,105 +18,109 @@ const deployAll: DeployFunction = async function (
   const { deploy, log } = deployments;
   const { deployer } = await getNamedAccounts();
 
-  const isLive = hre.network.name !== "hardhat" && hre.network.name !== "localhost";
+  const isLive =
+    hre.network.name !== "hardhat" && hre.network.name !== "localhost";
   const confirmations = isLive ? 2 : 0;
 
   log("=".repeat(60));
-  log("  Trusted PayGram — Deployment");
+  log("  TrustGate — Deployment");
   log("=".repeat(60));
   log(`  Network : ${hre.network.name} (chainId: ${hre.network.config.chainId})`);
   log(`  Deployer: ${deployer}`);
-  log(`  Deployer is also the employer for this deployment`);
+  log("");
+
+  // ── Resolve USDC address ─────────────────────────────────────
+  let usdcAddress: string;
+
+  if (hre.network.name === "arcTestnet") {
+    usdcAddress = ARC_TESTNET_USDC;
+    log(`  USDC (Arc Testnet ERC-20): ${usdcAddress}`);
+  } else if (isLive) {
+    usdcAddress = process.env.USDC_ADDRESS ?? "";
+    if (!usdcAddress) {
+      throw new Error(
+        "USDC_ADDRESS env var required for live network deployment"
+      );
+    }
+    log(`  USDC (env): ${usdcAddress}`);
+  } else {
+    // Local network: deploy a mock USDC
+    log("  [0/5] Deploying MockUSDC for local testing...");
+    const mockUsdc = await deploy("MockUSDC", {
+      from: deployer,
+      args: [],
+      log: true,
+      waitConfirmations: 0,
+    });
+    usdcAddress = mockUsdc.address;
+    log(`  MockUSDC deployed at: ${usdcAddress}`);
+  }
   log("");
 
   // ── 1. TrustScoring ──────────────────────────────────────────
-  log("  [1/4] Deploying TrustScoring...");
-  const trustScoring = await deploy("TrustScoring", {
+  // Use TrustScoringPlaintext on chains without the Zama FHE coprocessor.
+  // FHE-enabled TrustScoring requires ZamaEthereumConfig which only supports
+  // specific chain IDs (Ethereum mainnet, Sepolia, Zama devnet).
+  const useFHE = hre.network.config.chainId === 1 ||
+    hre.network.config.chainId === 11155111;
+  const scoringContract = useFHE ? "TrustScoring" : "TrustScoringPlaintext";
+
+  log(`  [1/5] Deploying ${scoringContract}...`);
+  const trustScoring = await deploy(scoringContract, {
     from: deployer,
     args: [deployer],
     log: true,
     waitConfirmations: confirmations,
   });
-  log(`  TrustScoring deployed at: ${trustScoring.address}`);
-  if (trustScoring.transactionHash) {
-    log(`  Tx: ${trustScoring.transactionHash}`);
-  }
+  log(`  ${scoringContract} deployed at: ${trustScoring.address}`);
   log("");
 
-  // ── 2. PayGramToken (cPAY) ───────────────────────────────────
-  // On networks with Zama coprocessor, we can mint in constructor.
-  // On standard networks, deploy with 0 supply and mint later.
-  let tokenSupply = INITIAL_SUPPLY;
-  log(`  [2/4] Deploying PayGramToken (supply: ${tokenSupply})...`);
-
-  let payGramToken;
-  try {
-    payGramToken = await deploy("PayGramToken", {
-      from: deployer,
-      args: [deployer, tokenSupply],
-      log: true,
-      waitConfirmations: confirmations,
-    });
-  } catch (err) {
-    // FHE coprocessor may not be available — retry with 0 supply
-    log(`  Initial supply mint failed (FHE coprocessor may be unavailable).`);
-    log(`  Retrying with initialSupply = 0...`);
-    tokenSupply = 0n;
-    payGramToken = await deploy("PayGramToken", {
-      from: deployer,
-      args: [deployer, tokenSupply],
-      log: true,
-      waitConfirmations: confirmations,
-    });
-  }
-  log(`  PayGramToken deployed at: ${payGramToken.address}`);
-  if (payGramToken.transactionHash) {
-    log(`  Tx: ${payGramToken.transactionHash}`);
-  }
+  // ── 2. AgentRegistry ────────────────────────────────────────
+  log("  [2/5] Deploying AgentRegistry...");
+  const agentRegistry = await deploy("AgentRegistry", {
+    from: deployer,
+    args: [deployer],
+    log: true,
+    waitConfirmations: confirmations,
+  });
+  log(`  AgentRegistry deployed at: ${agentRegistry.address}`);
   log("");
 
-  // ── 3. PayGramCore ───────────────────────────────────────────
-  log("  [3/4] Deploying PayGramCore...");
-  const payGramCore = await deploy("PayGramCore", {
+  // ── 3. TrustGate ────────────────────────────────────────────
+  log("  [3/5] Deploying TrustGate...");
+  const trustGate = await deploy("TrustGate", {
     from: deployer,
     args: [
-      deployer,               // initialOwner
-      deployer,               // employer (same as deployer)
-      trustScoring.address,   // TrustScoring contract
-      payGramToken.address,   // PayGramToken (ERC-7984)
+      usdcAddress,
+      trustScoring.address,
+      agentRegistry.address,
+      deployer,
     ],
     log: true,
     waitConfirmations: confirmations,
   });
-  log(`  PayGramCore deployed at: ${payGramCore.address}`);
-  if (payGramCore.transactionHash) {
-    log(`  Tx: ${payGramCore.transactionHash}`);
-  }
+  log(`  TrustGate deployed at: ${trustGate.address}`);
   log("");
 
-  // ── 4. Wire contracts together ───────────────────────────────
-  log("  [4/4] Wiring contracts...");
+  // ── 4. Wire contracts ───────────────────────────────────────
+  log("  [4/5] Wiring contracts...");
 
-  // 4a. Set PayGramCore on PayGramToken
-  const tokenContract = await hre.ethers.getContractAt(
-    "PayGramToken",
-    payGramToken.address
+  // 4a. Set AgentRegistry on TrustScoring
+  const trustContract = await hre.ethers.getContractAt(
+    scoringContract,
+    trustScoring.address
   );
-  const currentCore = await tokenContract.payGramCore();
-  if (currentCore !== payGramCore.address) {
-    const tx1 = await tokenContract.setPayGramCore(payGramCore.address);
+  const currentRegistry = await trustContract.agentRegistry();
+  if (currentRegistry !== agentRegistry.address) {
+    const tx1 = await trustContract.setAgentRegistry(agentRegistry.address);
     const receipt1 = await tx1.wait();
-    log(`  PayGramToken.setPayGramCore -> ${payGramCore.address}`);
+    log(`  TrustScoring.setAgentRegistry -> ${agentRegistry.address}`);
     log(`  Tx: ${receipt1?.hash}`);
   } else {
-    log(`  PayGramToken.payGramCore already set`);
+    log(`  TrustScoring.agentRegistry already set`);
   }
 
   // 4b. Authorize deployer as oracle on TrustScoring
-  const trustContract = await hre.ethers.getContractAt(
-    "TrustScoring",
-    trustScoring.address
-  );
   const isDeployerOracle = await trustContract.authorizedOracles(deployer);
   if (!isDeployerOracle) {
     const tx2 = await trustContract.setOracle(deployer, true);
@@ -122,17 +132,18 @@ const deployAll: DeployFunction = async function (
   }
   log("");
 
-  // ── 5. Export deployment addresses ───────────────────────────
+  // ── 5. Export deployment addresses ──────────────────────────
+  log("  [5/5] Exporting addresses...");
   const addresses = {
     network: hre.network.name,
     chainId: hre.network.config.chainId,
     deployer,
     contracts: {
       TrustScoring: trustScoring.address,
-      PayGramToken: payGramToken.address,
-      PayGramCore: payGramCore.address,
+      AgentRegistry: agentRegistry.address,
+      TrustGate: trustGate.address,
+      USDC: usdcAddress,
     },
-    initialSupply: tokenSupply.toString(),
     deployedAt: new Date().toISOString(),
   };
 
@@ -140,7 +151,7 @@ const deployAll: DeployFunction = async function (
   if (!fs.existsSync(outputDir)) {
     fs.mkdirSync(outputDir, { recursive: true });
   }
-  const outputFile = path.join(outputDir, `${hre.network.name}.json`);
+  const outputFile = path.join(outputDir, `${hre.network.name}-addresses.json`);
   fs.writeFileSync(outputFile, JSON.stringify(addresses, null, 2));
   log(`  Addresses exported to: ${outputFile}`);
 
@@ -149,11 +160,12 @@ const deployAll: DeployFunction = async function (
   log("=".repeat(60));
   log("");
   log("  Summary:");
-  log(`    TrustScoring : ${trustScoring.address}`);
-  log(`    PayGramToken : ${payGramToken.address}`);
-  log(`    PayGramCore  : ${payGramCore.address}`);
+  log(`    USDC          : ${usdcAddress}`);
+  log(`    TrustScoring  : ${trustScoring.address}`);
+  log(`    AgentRegistry : ${agentRegistry.address}`);
+  log(`    TrustGate     : ${trustGate.address}`);
   log("=".repeat(60));
 };
 
-deployAll.tags = ["all", "TrustScoring", "PayGramToken", "PayGramCore"];
+deployAll.tags = ["all", "TrustScoring", "AgentRegistry", "TrustGate"];
 export default deployAll;

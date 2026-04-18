@@ -2,112 +2,71 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Base styles */
 html {
   scroll-behavior: smooth;
 }
 
 body {
-  background-color: #FAFBFC;
-  color: #111827;
-  font-family: var(--font-dm-sans), "DM Sans", sans-serif;
+  background-color: #0a0a0a;
+  color: #f5f5f5;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-html.dark body {
-  background-color: #0F172A;
-  color: #F1F5F9;
-}
-
-/* Card effect */
+/* Surface card */
 .card {
-  background: #FFFFFF;
-  border: 1px solid #E5E7EB;
+  background: #141414;
+  border: 1px solid #262626;
   border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-  transition: all 0.3s ease;
+  transition: border-color 0.2s ease;
 }
 
 .card:hover {
-  border-color: #D1D5DB;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border-color: #333333;
 }
 
-.dark .card {
-  background: #1E293B;
-  border-color: #334155;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-}
-
-.dark .card:hover {
-  border-color: #475569;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-}
-
-/* Card - no hover effect variant */
 .card-static {
-  background: #FFFFFF;
-  border: 1px solid #E5E7EB;
+  background: #141414;
+  border: 1px solid #262626;
   border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
-.dark .card-static {
-  background: #1E293B;
-  border-color: #334155;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-}
-
-/* Custom scrollbar */
+/* Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #FAFBFC;
+  background: #0a0a0a;
 }
 ::-webkit-scrollbar-thumb {
-  background: #D1D5DB;
+  background: #333333;
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #9CA3AF;
+  background: #525252;
 }
 
-.dark ::-webkit-scrollbar-track {
-  background: #0F172A;
-}
-.dark ::-webkit-scrollbar-thumb {
-  background: #475569;
-}
-.dark ::-webkit-scrollbar-thumb:hover {
-  background: #64748B;
-}
-
-/* Stagger animation delays for lists */
-.stagger-1 {
-  animation-delay: 0.1s;
-}
-.stagger-2 {
-  animation-delay: 0.2s;
-}
-.stagger-3 {
-  animation-delay: 0.3s;
-}
-.stagger-4 {
-  animation-delay: 0.4s;
-}
-.stagger-5 {
-  animation-delay: 0.5s;
-}
-
-/* Navigation bar */
+/* Nav bar */
 .nav-bar {
-  background: #FFFFFF;
-  border-bottom: 1px solid #E5E7EB;
+  background: rgba(10, 10, 10, 0.85);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid #1a1a1a;
 }
 
-.dark .nav-bar {
-  background: #0F172A;
-  border-bottom-color: #1E293B;
+/* Input focus ring override */
+input:focus,
+select:focus {
+  outline: none;
 }
+
+/* ConnectKit overrides for dark theme */
+[data-connectkit] {
+  --ck-font-family: var(--font-body), system-ui, sans-serif;
+}
+
+/* Stagger delays */
+.stagger-1 { animation-delay: 0.05s; }
+.stagger-2 { animation-delay: 0.1s; }
+.stagger-3 { animation-delay: 0.15s; }
+.stagger-4 { animation-delay: 0.2s; }
+.stagger-5 { animation-delay: 0.25s; }

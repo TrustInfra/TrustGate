@@ -1,15 +1,21 @@
 import type { Metadata, Viewport } from "next";
-import { DM_Sans, JetBrains_Mono } from "next/font/google";
+import { Syne, Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { Web3Provider } from "@/providers/Web3Provider";
-import { ThemeProvider } from "@/providers/ThemeProvider";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 
-const dmSans = DM_Sans({
+const syne = Syne({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700", "800"],
-  variable: "--font-dm-sans",
+  variable: "--font-syne",
+  display: "swap",
+});
+
+const jakarta = Plus_Jakarta_Sans({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-body",
   display: "swap",
 });
 
@@ -21,9 +27,9 @@ const jetbrains = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Trusted PayGram — Confidential Trust-Gated Payroll",
+  title: "TrustGate -- Trust-Gated Payments for AI Agents",
   description:
-    "Pay your team with encrypted stablecoins. Trust scores gate every payment flow. Built on Zama Protocol with ERC-7984.",
+    "Deposit USDC, set per-agent allowances, and let trust scores route payments. Instant, time-locked, or escrowed -- determined by reputation.",
   icons: {
     icon: [
       { url: "/favicon.svg", type: "image/svg+xml" },
@@ -32,32 +38,15 @@ export const metadata: Metadata = {
     apple: "/apple-touch-icon.png",
   },
   openGraph: {
-    title: "Trusted PayGram — Confidential Trust-Gated Payroll",
+    title: "TrustGate -- Trust-Gated Payments for AI Agents",
     description:
-      "Pay your team with encrypted stablecoins. Trust scores gate every payment flow. Built on Zama Protocol with ERC-7984.",
-    url: "https://trusted-paygram.vercel.app",
-    siteName: "Trusted PayGram",
-    images: [
-      {
-        url: "/og-image.png",
-        width: 1200,
-        height: 630,
-        alt: "Trusted PayGram — Confidential Trust-Gated Payroll on Zama FHEVM",
-      },
-    ],
+      "Deposit USDC, set per-agent allowances, and let trust scores route payments.",
     type: "website",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Trusted PayGram — Confidential Trust-Gated Payroll",
-    description:
-      "Pay your team with encrypted stablecoins. Trust scores gate every payment flow. Built on Zama Protocol with ERC-7984.",
-    images: ["/og-image.png"],
   },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#FAFBFC",
+  themeColor: "#0a0a0a",
 };
 
 export default function RootLayout({
@@ -68,26 +57,16 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${dmSans.variable} ${jetbrains.variable}`}
-      suppressHydrationWarning
+      className={`${syne.variable} ${jakarta.variable} ${jetbrains.variable}`}
     >
-      <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem("theme");var d=t==="dark"||(t!=="light"&&window.matchMedia("(prefers-color-scheme:dark)").matches);if(d)document.documentElement.classList.add("dark")}catch(e){}})();`,
-          }}
-        />
-      </head>
-      <body className={dmSans.className}>
-        <ThemeProvider>
-          <Web3Provider>
-            <div className="flex flex-col min-h-screen">
-              <Navbar />
-              <main className="flex-1">{children}</main>
-              <Footer />
-            </div>
-          </Web3Provider>
-        </ThemeProvider>
+      <body className={jakarta.className}>
+        <Web3Provider>
+          <div className="flex flex-col min-h-screen">
+            <Navbar />
+            <main className="flex-1">{children}</main>
+            <Footer />
+          </div>
+        </Web3Provider>
       </body>
     </html>
   );

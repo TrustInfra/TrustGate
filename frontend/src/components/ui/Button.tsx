@@ -11,21 +11,21 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantClasses = {
   primary:
-    "bg-primary text-white font-semibold hover:bg-primary-hover active:scale-[0.98]",
+    "bg-accent text-white font-semibold hover:bg-accent-hover active:scale-[0.98]",
   secondary:
-    "bg-gray-100 text-gray-700 font-semibold hover:bg-gray-200 active:scale-[0.98] dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600",
+    "bg-bg-surface text-text-secondary font-semibold hover:bg-bg-hover active:scale-[0.98]",
   ghost:
-    "bg-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-700",
+    "bg-transparent text-text-muted hover:text-text-secondary hover:bg-bg-surface",
   danger:
-    "bg-danger text-white font-semibold hover:bg-red-600 active:scale-[0.98]",
+    "bg-tier-low text-white font-semibold hover:bg-red-600 active:scale-[0.98]",
   outline:
-    "bg-transparent border border-gray-300 text-gray-700 hover:border-gray-400 hover:bg-gray-50 dark:border-slate-600 dark:text-slate-200 dark:hover:border-slate-500 dark:hover:bg-slate-700/50",
+    "bg-transparent border border-border text-text-secondary hover:border-border-hover hover:bg-bg-surface",
 };
 
 const sizeClasses = {
   sm: "px-3 py-1.5 text-xs rounded-lg",
   md: "px-4 py-2 text-sm rounded-lg",
-  lg: "px-6 py-3 text-base rounded-lg",
+  lg: "px-6 py-3 text-sm rounded-lg",
 };
 
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(
@@ -47,7 +47,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         disabled={disabled || loading}
         className={cn(
           "inline-flex items-center justify-center gap-2 font-medium transition-all duration-200",
-          "disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none",
+          "disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none",
           variantClasses[variant],
           sizeClasses[size],
           className

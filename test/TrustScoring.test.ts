@@ -725,38 +725,28 @@ describe("TrustScoring", function () {
   });
 
   // ================================================================
-  //  EMPLOYER-SCOPED SCORING
+  //  AGENT OWNER-SCOPED SCORING
   // ================================================================
 
-  describe("Employer-Scoped Scoring", function () {
-    // These tests deploy PayGramCore so employers can set scores for their employees.
+  describe("Agent Owner-Scoped Scoring", function () {
+    async function setupAgentScoring() {
+      const AgentRegistryFactory = await ethers.getContractFactory("AgentRegistry");
+      const registry = await AgentRegistryFactory.deploy(owner.address);
+      await registry.waitForDeployment();
 
-    async function setupEmployerScoring() {
-      const PayGramTokenFactory = await ethers.getContractFactory("PayGramToken");
-      const token = await PayGramTokenFactory.deploy(owner.address, 0);
-      await token.waitForDeployment();
+      // Wire TrustScoring -> AgentRegistry
+      await trustScoring.connect(owner).setAgentRegistry(await registry.getAddress());
 
-      const PayGramCoreFactory = await ethers.getContractFactory("PayGramCore");
-      const core = await PayGramCoreFactory.deploy(
-        owner.address,
-        oracle.address, // oracle is also initial employer
-        await trustScoring.getAddress(),
-        await token.getAddress()
-      );
-      await core.waitForDeployment();
-
-      // Wire TrustScoring -> PayGramCore
-      await trustScoring.connect(owner).setPayGramCore(await core.getAddress());
-
-      return { core, token };
+      return { registry };
     }
 
-    it("should allow employer to set score for own active employee", async function () {
-      const { core } = await setupEmployerScoring();
+    it("should allow agent owner to set score for own active agent", async function () {
+      const { registry } = await setupAgentScoring();
+
+      // oracle registers user1 as an agent (oracle becomes agent owner)
+      await registry.connect(oracle).registerAgent(user1.address, "ipfs://meta");
 
       try {
-        // oracle is employer here, add user1 as employee
-        await core.connect(oracle).addEmployeePlaintext(user1.address, 5000, "dev");
         await trustScoring.connect(oracle).setTrustScorePlaintext(user1.address, 85);
         expect(await trustScoring.hasScore(user1.address)).to.equal(true);
       } catch {
@@ -764,32 +754,46 @@ describe("TrustScoring", function () {
       }
     });
 
-    it("should reject employer scoring a non-employee", async function () {
-      await setupEmployerScoring();
+    it("should reject non-owner scoring an agent they do not own", async function () {
+      const { registry } = await setupAgentScoring();
 
-      // oracle2 registers as employer but has no employees
-      // oracle2 is not an oracle either
+      // oracle registers user1 as agent
+      await registry.connect(oracle).registerAgent(user1.address, "ipfs://meta");
+
+      // unauthorized is not an oracle and does not own user1
       await expect(
         trustScoring.connect(unauthorized).setTrustScorePlaintext(user1.address, 50)
       ).to.be.revertedWithCustomError(trustScoring, "NotAuthorizedScorer");
     });
 
-    it("should allow setPayGramCore by owner", async function () {
+    it("should reject agent owner scoring a deactivated agent", async function () {
+      const { registry } = await setupAgentScoring();
+
+      // Use user2 (non-oracle) as agent owner so the modifier tests the registry path
+      await registry.connect(user2).registerAgent(user1.address, "ipfs://meta");
+      await registry.connect(user2).deactivateAgent(user1.address);
+
       await expect(
-        trustScoring.connect(owner).setPayGramCore(user1.address)
-      ).to.emit(trustScoring, "PayGramCoreUpdated").withArgs(user1.address);
-      expect(await trustScoring.payGramCore()).to.equal(user1.address);
+        trustScoring.connect(user2).setTrustScorePlaintext(user1.address, 50)
+      ).to.be.revertedWithCustomError(trustScoring, "NotAuthorizedScorer");
     });
 
-    it("should reject setPayGramCore from non-owner", async function () {
+    it("should allow setAgentRegistry by owner", async function () {
       await expect(
-        trustScoring.connect(unauthorized).setPayGramCore(user1.address)
+        trustScoring.connect(owner).setAgentRegistry(user1.address)
+      ).to.emit(trustScoring, "AgentRegistryUpdated").withArgs(user1.address);
+      expect(await trustScoring.agentRegistry()).to.equal(user1.address);
+    });
+
+    it("should reject setAgentRegistry from non-owner", async function () {
+      await expect(
+        trustScoring.connect(unauthorized).setAgentRegistry(user1.address)
       ).to.be.revertedWithCustomError(trustScoring, "OwnableUnauthorizedAccount");
     });
 
-    it("should reject setPayGramCore with zero address", async function () {
+    it("should reject setAgentRegistry with zero address", async function () {
       await expect(
-        trustScoring.connect(owner).setPayGramCore(ethers.ZeroAddress)
+        trustScoring.connect(owner).setAgentRegistry(ethers.ZeroAddress)
       ).to.be.revertedWithCustomError(trustScoring, "ZeroAddress");
     });
   });

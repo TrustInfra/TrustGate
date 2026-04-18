@@ -9,10 +9,10 @@ interface StatusDotProps {
 }
 
 const colorMap = {
-  active: "bg-emerald-500",
-  pending: "bg-warning",
-  inactive: "bg-gray-300",
-  error: "bg-danger",
+  active: "bg-tier-high",
+  pending: "bg-tier-medium",
+  inactive: "bg-text-muted",
+  error: "bg-tier-low",
 };
 
 const sizeMap = {
@@ -25,7 +25,7 @@ export default function StatusDot({
   size = "sm",
   className,
 }: StatusDotProps) {
-  const shouldPulse = status === "active" || status === "pending" || status === "error";
+  const shouldPulse = status === "active" || status === "pending";
 
   return (
     <span className={cn("relative inline-flex", sizeMap[size], className)}>

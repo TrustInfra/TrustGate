@@ -1,7 +1,6 @@
 import type { Config } from "tailwindcss";
 
 const config: Config = {
-  darkMode: "class",
   content: [
     "./src/app/**/*.{ts,tsx}",
     "./src/components/**/*.{ts,tsx}",
@@ -11,53 +10,45 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        background: "#FAFBFC",
-        surface: {
-          DEFAULT: "#FFFFFF",
-          hover: "#F9FAFB",
+        bg: {
+          DEFAULT: "#0a0a0a",
+          raised: "#141414",
+          surface: "#1a1a1a",
+          hover: "#1f1f1f",
         },
         border: {
-          DEFAULT: "#E5E7EB",
-          hover: "#D1D5DB",
+          DEFAULT: "#262626",
+          hover: "#333333",
         },
-        primary: {
-          DEFAULT: "#2563EB",
-          hover: "#1D4ED8",
-          muted: "rgba(37, 99, 235, 0.08)",
-        },
-        secondary: {
-          DEFAULT: "#6B7280",
-          muted: "rgba(107, 114, 128, 0.08)",
-        },
-        warning: {
-          DEFAULT: "#F59E0B",
-          muted: "rgba(245, 158, 11, 0.08)",
-        },
-        danger: {
-          DEFAULT: "#EF4444",
-          muted: "rgba(239, 68, 68, 0.08)",
-        },
-        success: {
-          DEFAULT: "#10B981",
-          muted: "rgba(16, 185, 129, 0.08)",
+        accent: {
+          DEFAULT: "#3b82f6",
+          hover: "#2563eb",
+          muted: "rgba(59, 130, 246, 0.12)",
         },
         text: {
-          DEFAULT: "#111827",
-          secondary: "#6B7280",
-          muted: "#9CA3AF",
+          DEFAULT: "#f5f5f5",
+          secondary: "#a1a1aa",
+          muted: "#71717a",
+        },
+        tier: {
+          high: "#22c55e",
+          "high-muted": "rgba(34, 197, 94, 0.12)",
+          medium: "#eab308",
+          "medium-muted": "rgba(234, 179, 8, 0.12)",
+          low: "#ef4444",
+          "low-muted": "rgba(239, 68, 68, 0.12)",
         },
       },
       fontFamily: {
-        heading: ["var(--font-dm-sans)", "sans-serif"],
-        body: ["var(--font-dm-sans)", "sans-serif"],
+        display: ["var(--font-syne)", "sans-serif"],
+        body: ["var(--font-body)", "system-ui", "sans-serif"],
         mono: ["var(--font-jetbrains)", "monospace"],
       },
       animation: {
-        "fade-in": "fade-in 0.6s ease-out forwards",
-        "slide-up": "slide-up 0.6s ease-out forwards",
-        "slide-down": "slide-down 0.4s ease-out forwards",
-        float: "float 6s ease-in-out infinite",
-        marquee: "marquee var(--duration, 30s) infinite linear",
+        "fade-in": "fade-in 0.5s ease-out forwards",
+        "slide-up": "slide-up 0.5s ease-out forwards",
+        "slide-down": "slide-down 0.3s ease-out forwards",
+        pulse: "pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
       },
       keyframes: {
         "fade-in": {
@@ -65,20 +56,12 @@ const config: Config = {
           to: { opacity: "1" },
         },
         "slide-up": {
-          from: { opacity: "0", transform: "translateY(20px)" },
+          from: { opacity: "0", transform: "translateY(12px)" },
           to: { opacity: "1", transform: "translateY(0)" },
         },
         "slide-down": {
-          from: { opacity: "0", transform: "translateY(-10px)" },
+          from: { opacity: "0", transform: "translateY(-8px)" },
           to: { opacity: "1", transform: "translateY(0)" },
-        },
-        float: {
-          "0%, 100%": { transform: "translateY(0px)" },
-          "50%": { transform: "translateY(-10px)" },
-        },
-        marquee: {
-          from: { transform: "translateX(0)" },
-          to: { transform: "translateX(calc(-100% - 2rem))" },
         },
       },
     },

@@ -4,15 +4,13 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Shield, Menu, X } from "lucide-react";
-import ConnectButton from "@/components/wallet/ConnectButton";
-import ThemeToggle from "@/components/ui/ThemeToggle";
+import { ConnectKitButton } from "connectkit";
 import { cn } from "@/lib/utils";
 
 const NAV_LINKS = [
   { href: "/", label: "Home" },
-  { href: "/employer", label: "Employer" },
-  { href: "/employee", label: "Employee" },
-  { href: "/docs", label: "Docs" },
+  { href: "/dashboard", label: "Dashboard" },
+  { href: "/demo", label: "Demo" },
 ];
 
 export default function Navbar() {
@@ -23,26 +21,27 @@ export default function Navbar() {
     <nav className="nav-bar sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          {/* Logo */}
           <Link href="/" className="flex items-center gap-2.5 shrink-0 group">
             <Shield
-              size={24}
-              className="text-primary transition-colors group-hover:text-primary-hover"
+              size={22}
+              className="text-accent transition-colors group-hover:text-accent-hover"
             />
             <div className="flex flex-col">
-              <span className="text-base font-heading font-bold text-gray-900 dark:text-slate-100 leading-tight">
-                Trusted PayGram
+              <span className="text-sm font-display font-bold text-text leading-tight">
+                TrustGate
               </span>
-              <span className="text-[9px] text-gray-400 dark:text-slate-500 leading-tight tracking-wider uppercase">
-                Powered by Zama Protocol
+              <span className="text-[9px] text-text-muted leading-tight tracking-wider uppercase">
+                Arc Testnet
               </span>
             </div>
           </Link>
 
-          {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-1">
             {NAV_LINKS.map((link) => {
-              const isActive = pathname === link.href;
+              const isActive =
+                link.href === "/"
+                  ? pathname === "/"
+                  : pathname.startsWith(link.href);
               return (
                 <Link
                   key={link.href}
@@ -50,31 +49,28 @@ export default function Navbar() {
                   className={cn(
                     "relative px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200",
                     isActive
-                      ? "text-gray-900 dark:text-slate-100"
-                      : "text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-200"
+                      ? "text-text"
+                      : "text-text-muted hover:text-text-secondary"
                   )}
                 >
                   {link.label}
                   {isActive && (
-                    <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-6 h-0.5 bg-primary rounded-full" />
+                    <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-6 h-0.5 bg-accent rounded-full" />
                   )}
                 </Link>
               );
             })}
           </div>
 
-          {/* Right side */}
           <div className="flex items-center gap-3">
-            <ThemeToggle />
             <div className="hidden md:block">
-              <ConnectButton />
+              <ConnectKitButton />
             </div>
 
-            {/* Mobile menu toggle */}
             <button
               type="button"
               onClick={() => setMenuOpen(!menuOpen)}
-              className="md:hidden p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-700 transition-colors"
+              className="md:hidden p-2 rounded-lg text-text-muted hover:text-text-secondary hover:bg-bg-hover transition-colors"
               aria-label="Toggle menu"
             >
               {menuOpen ? <X size={22} /> : <Menu size={22} />}
@@ -82,11 +78,13 @@ export default function Navbar() {
           </div>
         </div>
 
-        {/* Mobile menu */}
         {menuOpen && (
-          <div className="md:hidden pb-4 border-t border-gray-200 dark:border-slate-700 mt-2 pt-4 space-y-1 animate-slide-down">
+          <div className="md:hidden pb-4 border-t border-border mt-2 pt-4 space-y-1 animate-slide-down">
             {NAV_LINKS.map((link) => {
-              const isActive = pathname === link.href;
+              const isActive =
+                link.href === "/"
+                  ? pathname === "/"
+                  : pathname.startsWith(link.href);
               return (
                 <Link
                   key={link.href}
@@ -95,8 +93,8 @@ export default function Navbar() {
                   className={cn(
                     "block px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
                     isActive
-                      ? "text-gray-900 bg-gray-50 dark:text-slate-100 dark:bg-slate-800/50"
-                      : "text-gray-500 hover:text-gray-700 hover:bg-gray-50 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-700/50"
+                      ? "text-text bg-bg-surface"
+                      : "text-text-muted hover:text-text-secondary hover:bg-bg-hover"
                   )}
                 >
                   {link.label}
@@ -104,7 +102,7 @@ export default function Navbar() {
               );
             })}
             <div className="pt-3">
-              <ConnectButton />
+              <ConnectKitButton />
             </div>
           </div>
         )}
