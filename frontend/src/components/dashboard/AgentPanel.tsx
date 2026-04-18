@@ -7,7 +7,17 @@ import {
   useWriteContract,
   useWaitForTransactionReceipt,
 } from "wagmi";
-import { Bot, Plus, XCircle, ShieldAlert, ShieldCheck } from "lucide-react";
+import { isAddress } from "viem";
+import {
+  Bot,
+  Plus,
+  XCircle,
+  Wallet,
+  Zap,
+  Clock,
+  Lock,
+  CheckCircle2,
+} from "lucide-react";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Card from "@/components/ui/GlassCard";
@@ -21,7 +31,41 @@ import {
   agentStatusLabel,
   formatTimestamp,
   formatUsdc,
+  parseUsdc,
 } from "@/lib/utils";
+
+type RoutingType = "instant" | "delayed" | "escrowed";
+
+function routingForTier(tier: number | undefined): RoutingType | null {
+  if (tier === 2) return "instant";
+  if (tier === 1) return "delayed";
+  if (tier === 0) return "escrowed";
+  return null;
+}
+
+const ROUTING_META: Record<
+  RoutingType,
+  { label: string; detail: string; color: string; Icon: typeof Zap }
+> = {
+  instant: {
+    label: "Instant",
+    detail: "USDC transfers immediately on claim.",
+    color: "text-tier-high",
+    Icon: Zap,
+  },
+  delayed: {
+    label: "Time-locked",
+    detail: "Claim releases after a 24h delay — agent pulls funds after expiry.",
+    color: "text-tier-medium",
+    Icon: Clock,
+  },
+  escrowed: {
+    label: "Escrowed",
+    detail: "Claim waits in escrow — depositor must explicitly approve release.",
+    color: "text-tier-low",
+    Icon: Lock,
+  },
+};
 
 function AgentCard({
   agentAddress,
@@ -197,6 +241,282 @@ function AgentCard({
   );
 }
 
+function ClaimPaymentCard() {
+  const { address } = useAccount();
+  const [depositorAddr, setDepositorAddr] = useState("");
+  const [amountInput, setAmountInput] = useState("");
+  const [showConfirm, setShowConfirm] = useState(false);
+
+  // Is the connected wallet itself a registered agent?
+  const { data: myAgent } = useReadContract({
+    address: CONTRACT_ADDRESSES.agentRegistry,
+    abi: agentRegistryAbi,
+    functionName: "getAgent",
+    args: address ? [address] : undefined,
+    query: { enabled: !!address },
+  });
+
+  const isActiveAgent =
+    !!myAgent && Number((myAgent as [string, number, bigint, string])[1]) === 1;
+
+  // Agent's own trust tier (determines routing)
+  const { data: hasScore } = useReadContract({
+    address: CONTRACT_ADDRESSES.trustScoring,
+    abi: trustScoringAbi,
+    functionName: "hasScore",
+    args: address ? [address] : undefined,
+    query: { enabled: !!address && isActiveAgent },
+  });
+
+  const { data: myTier } = useReadContract({
+    address: CONTRACT_ADDRESSES.trustScoring,
+    abi: trustScoringAbi,
+    functionName: "getTrustTierPlaintext",
+    args: address ? [address] : undefined,
+    query: { enabled: !!address && !!hasScore },
+  });
+
+  const { data: myScore } = useReadContract({
+    address: CONTRACT_ADDRESSES.trustScoring,
+    abi: trustScoringAbi,
+    functionName: "getTrustScore",
+    args: address ? [address] : undefined,
+    query: { enabled: !!address && !!hasScore },
+  });
+
+  const { data: scoreExpired } = useReadContract({
+    address: CONTRACT_ADDRESSES.trustScoring,
+    abi: trustScoringAbi,
+    functionName: "isScoreExpired",
+    args: address ? [address] : undefined,
+    query: { enabled: !!address && !!hasScore },
+  });
+
+  // Claimable from entered depositor
+  const depositorValid = isAddress(depositorAddr);
+  const { data: claimable } = useReadContract({
+    address: CONTRACT_ADDRESSES.trustGate,
+    abi: trustGateAbi,
+    functionName: "getClaimableAmount",
+    args:
+      depositorValid && address
+        ? [depositorAddr as `0x${string}`, address]
+        : undefined,
+    query: { enabled: depositorValid && !!address && isActiveAgent },
+  });
+
+  const {
+    writeContract: claim,
+    data: claimTxHash,
+    isPending: isClaiming,
+    reset: resetClaim,
+  } = useWriteContract();
+
+  const { isLoading: isConfirming, isSuccess: isClaimed } =
+    useWaitForTransactionReceipt({ hash: claimTxHash });
+
+  if (!isActiveAgent) return null;
+
+  const routing = routingForTier(myTier !== undefined ? Number(myTier) : undefined);
+  const claimableBig = (claimable as bigint | undefined) ?? 0n;
+
+  let amountBig = 0n;
+  let amountError: string | undefined;
+  try {
+    amountBig = amountInput ? parseUsdc(amountInput) : 0n;
+  } catch {
+    amountError = "Invalid amount";
+  }
+  if (!amountError && amountInput && amountBig === 0n) {
+    amountError = "Amount must be greater than zero";
+  }
+  if (!amountError && amountBig > claimableBig && claimable !== undefined) {
+    amountError = `Exceeds claimable (${formatUsdc(claimableBig)} USDC)`;
+  }
+
+  const blocker = !hasScore
+    ? "Your agent wallet has no trust score yet — ask a scorer to set one before claiming."
+    : scoreExpired
+    ? "Your trust score has expired. Request a refresh before claiming."
+    : undefined;
+
+  const canClaim =
+    !blocker &&
+    depositorValid &&
+    !amountError &&
+    amountBig > 0n &&
+    routing !== null &&
+    !isClaiming &&
+    !isConfirming;
+
+  const handlePreview = () => setShowConfirm(true);
+
+  const handleConfirm = () => {
+    if (!canClaim) return;
+    claim(
+      {
+        address: CONTRACT_ADDRESSES.trustGate,
+        abi: trustGateAbi,
+        functionName: "claim",
+        args: [depositorAddr as `0x${string}`, amountBig],
+      },
+      {
+        onSuccess: () => {
+          setAmountInput("");
+          setShowConfirm(false);
+        },
+      }
+    );
+  };
+
+  const handleReset = () => {
+    setShowConfirm(false);
+    resetClaim();
+  };
+
+  return (
+    <Card hover={false} className="p-5">
+      <div className="flex items-center gap-2 mb-4">
+        <Wallet size={16} className="text-accent" />
+        <h3 className="text-sm font-display font-semibold text-text">
+          Claim Payment
+        </h3>
+      </div>
+
+      <p className="text-xs text-text-muted mb-4">
+        Claim USDC from a depositor&apos;s allowance. Routing is enforced by your
+        trust tier — it cannot be overridden.
+      </p>
+
+      <div className="flex items-center gap-3 mb-4 pb-4 border-b border-border">
+        <span className="text-[11px] uppercase tracking-wider text-text-muted">
+          Your wallet
+        </span>
+        {hasScore && myTier !== undefined ? (
+          <TrustTierBadge
+            tier={Number(myTier)}
+            score={myScore ? Number(myScore) : undefined}
+            size="sm"
+          />
+        ) : (
+          <span className="text-[11px] text-text-muted">Unscored</span>
+        )}
+      </div>
+
+      {blocker && (
+        <div className="mb-4 p-3 rounded-lg bg-tier-low/10 border border-tier-low/30">
+          <p className="text-[11px] text-tier-low">{blocker}</p>
+        </div>
+      )}
+
+      <div className="space-y-3">
+        <Input
+          label="Depositor Address"
+          placeholder="0x... address of the depositor funding you"
+          value={depositorAddr}
+          onChange={(e) => {
+            setDepositorAddr(e.target.value);
+            setShowConfirm(false);
+          }}
+          error={
+            depositorAddr && !depositorValid ? "Not a valid address" : undefined
+          }
+        />
+        <Input
+          label="Amount (USDC)"
+          placeholder="0.00"
+          type="number"
+          step="0.000001"
+          min="0"
+          value={amountInput}
+          onChange={(e) => {
+            setAmountInput(e.target.value);
+            setShowConfirm(false);
+          }}
+          hint={
+            depositorValid && claimable !== undefined
+              ? `Claimable: ${formatUsdc(claimableBig)} USDC`
+              : undefined
+          }
+          error={amountError}
+        />
+
+        {/* Preview */}
+        {depositorValid && amountBig > 0n && !amountError && routing && (
+          <div className="p-4 rounded-lg bg-bg-surface border border-border">
+            <p className="text-[11px] uppercase tracking-wider text-text-muted mb-3">
+              Claim preview
+            </p>
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs text-text-secondary">Amount</span>
+              <span className="text-sm font-mono font-semibold text-text">
+                {formatUsdc(amountBig)} USDC
+              </span>
+            </div>
+            <div className="flex items-start justify-between gap-4">
+              <span className="text-xs text-text-secondary pt-0.5">Routing</span>
+              <div className="flex flex-col items-end text-right">
+                <span
+                  className={`inline-flex items-center gap-1.5 text-xs font-semibold ${ROUTING_META[routing].color}`}
+                >
+                  {(() => {
+                    const { Icon } = ROUTING_META[routing];
+                    return <Icon size={12} />;
+                  })()}
+                  {ROUTING_META[routing].label}
+                </span>
+                <span className="text-[11px] text-text-muted mt-1 max-w-[220px]">
+                  {ROUTING_META[routing].detail}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {isClaimed && (
+          <div className="p-3 rounded-lg bg-tier-high/10 border border-tier-high/30 flex items-center gap-2">
+            <CheckCircle2 size={14} className="text-tier-high" />
+            <p className="text-[11px] text-tier-high">
+              Claim submitted. Check the Claims tab for status.
+            </p>
+          </div>
+        )}
+
+        {/* Actions */}
+        {!showConfirm ? (
+          <Button
+            onClick={handlePreview}
+            disabled={!canClaim}
+            className="w-full"
+          >
+            <Wallet size={16} />
+            Claim Payment
+          </Button>
+        ) : (
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={handleReset}
+              disabled={isClaiming || isConfirming}
+              className="flex-1"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirm}
+              loading={isClaiming || isConfirming}
+              disabled={!canClaim}
+              className="flex-1"
+            >
+              Confirm Claim
+            </Button>
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+}
+
 export default function AgentPanel() {
   const { address } = useAccount();
   const [agentAddr, setAgentAddr] = useState("");
@@ -265,6 +585,9 @@ export default function AgentPanel() {
           </div>
         </div>
       </Card>
+
+      {/* Claim Payment (visible only when connected wallet is an active agent) */}
+      <ClaimPaymentCard />
 
       {/* Register Agent */}
       <Card hover={false} className="p-5">
