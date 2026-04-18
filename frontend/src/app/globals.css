@@ -70,3 +70,55 @@ select:focus {
 .stagger-3 { animation-delay: 0.15s; }
 .stagger-4 { animation-delay: 0.2s; }
 .stagger-5 { animation-delay: 0.25s; }
+
+/* Docs prose */
+.docs-prose { color: #a1a1aa; font-size: 0.95rem; line-height: 1.75; }
+.docs-prose h2 {
+  color: #f5f5f5;
+  font-family: var(--font-syne), sans-serif;
+  font-weight: 700;
+  font-size: 1.25rem;
+  letter-spacing: -0.01em;
+  margin-top: 2.5rem;
+  margin-bottom: 0.75rem;
+}
+.docs-prose h3 {
+  color: #f5f5f5;
+  font-family: var(--font-syne), sans-serif;
+  font-weight: 600;
+  font-size: 1rem;
+  margin-top: 1.75rem;
+  margin-bottom: 0.5rem;
+}
+.docs-prose p { margin-bottom: 1rem; }
+.docs-prose strong { color: #f5f5f5; font-weight: 600; }
+.docs-prose code {
+  font-family: var(--font-jetbrains), monospace;
+  font-size: 0.85em;
+  background: #1a1a1a;
+  color: #f5f5f5;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  border: 1px solid #262626;
+}
+.docs-prose ul { margin: 0.75rem 0 1.25rem; padding-left: 1.25rem; }
+.docs-prose li { margin-bottom: 0.35rem; list-style: disc; }
+.docs-prose a { color: #3b82f6; text-decoration: none; border-bottom: 1px dashed rgba(59,130,246,0.4); }
+.docs-prose a:hover { border-bottom-color: #3b82f6; }
+.docs-prose pre {
+  background: #0d0d0d;
+  border: 1px solid #262626;
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  overflow-x: auto;
+  font-family: var(--font-jetbrains), monospace;
+  font-size: 0.8rem;
+  color: #d4d4d8;
+  margin: 1rem 0 1.5rem;
+}
+.docs-prose pre code {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  color: inherit;
+}

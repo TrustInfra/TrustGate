@@ -1,193 +1,106 @@
 <div align="center">
 
-# Trusted PayGram
+# TrustGate
 
-**Confidential Trust-Gated Payroll on Zama FHEVM**
+**Trust-Gated USDC Payments for the Agentic Economy**
 
-Encrypted salaries. On-chain reputation. Zero data leakage.
+A settlement layer where autonomous agents earn, spend, and get paid in USDC — gated by on-chain reputation, priced per action, and settled through Circle Nanopayments on Arc.
 
-[![Built with Zama](https://img.shields.io/badge/Built_with-Zama_FHEVM-7B3FE4?style=flat-square&logo=data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiPjxyZWN0IHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgcng9IjQiIGZpbGw9IiM3QjNGRTQiLz48L3N2Zz4=)](https://docs.zama.ai/fhevm)
-[![ERC-7984](https://img.shields.io/badge/ERC--7984-Confidential_Token-3C3C3D?style=flat-square)](https://eips.ethereum.org/EIPS/eip-7984)
 [![Solidity](https://img.shields.io/badge/Solidity-0.8.27-363636?style=flat-square&logo=solidity)](https://soliditylang.org/)
+[![Next.js](https://img.shields.io/badge/Next.js-14-000000?style=flat-square&logo=next.js)](https://nextjs.org/)
+[![wagmi](https://img.shields.io/badge/wagmi-v2-1C1B1F?style=flat-square)](https://wagmi.sh/)
+[![Arc Testnet](https://img.shields.io/badge/Arc-Testnet-2563EB?style=flat-square)](https://testnet.arcscan.app)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=flat-square)](LICENSE)
 
-[Architecture](#architecture) &#8226; [Quick Start](#quick-start) &#8226; [Deployed Contracts](#deployed-contracts) &#8226; [Privacy Model](#privacy-model) &#8226; [Tech Stack](#tech-stack)
+[Problem](#the-problem) &#8226; [How It Works](#how-it-works) &#8226; [Contracts](#deployed-contracts-arc-testnet) &#8226; [Local Setup](#local-setup)
 
 </div>
 
 ---
 
-## What Is This?
+## The Problem
 
-Traditional payroll systems expose sensitive financial data at every layer. Employers see everyone's salary. Payment processors see transaction amounts. Blockchains make it worse: every balance and transfer is public by default.
+Autonomous agents are now executing economic actions on behalf of humans: fetching data, calling APIs, purchasing compute, paying other agents. Each action has a marginal cost in the range of **$0.0001 to $0.01** — fractions of a cent.
 
-**Trusted PayGram** solves this with Fully Homomorphic Encryption. Salaries, trust scores, and payment amounts are encrypted end-to-end. The smart contracts compute on ciphertext directly. Nobody sees the numbers, but the math still works.
+Traditional L1 settlement makes this mathematically impossible:
 
-The system adds a second layer: **trust-gated payment routing**. Each employee has an encrypted reputation score derived from EigenTrust. High-trust employees receive instant payments. Medium-trust employees have a 24-hour delay. Low-trust or new employees go through milestone-gated escrow. The routing decision happens entirely under encryption.
+- A routine USDC transfer on Ethereum mainnet costs **$2 to $20** in gas.
+- Paying an agent $0.005 for a completed task costs **400x to 4000x the payment itself**.
+- L2s improve this by an order of magnitude, but still leave micropayments uneconomical.
+- Off-chain solutions (batching, state channels, custodial ledgers) reintroduce trust assumptions and force every participant into the same platform.
 
----
-
-## Architecture
-
-```
-                              ┌──────────────────────────┐
-                              │     Oracle Network       │
-                              │   (EigenTrust Scores)    │
-                              └────────────┬─────────────┘
-                                           │ setTrustScore(encrypted)
-                                           v
-┌──────────────┐  executePayroll   ┌───────────────────┐  isHighTrust?   ┌──────────────────────┐
-│   Employer   │──────────────────>│   PayGramCore     │────────────────>│   TrustScoring       │
-│   Dashboard  │                   │  (Payroll Engine)  │<────────────────│  (FHE Tier Eval)     │
-└──────────────┘                   └─────────┬─────────┘   ebool result  └──────────────────────┘
-                                             │
-                              ┌──────────────┼──────────────┐
-                              │              │              │
-                         HIGH tier      MEDIUM tier     LOW tier
-                        (instant)      (24h delay)     (escrow)
-                              │              │              │
-                              v              v              v
-                     ┌──────────────────────────────────────────┐
-                     │          PayGramToken (cPAY)             │
-                     │       ERC-7984 Confidential Token        │
-                     │     Encrypted balances & transfers       │
-                     └──────────────────────────────────────────┘
-                              │              │              │
-                              v              v              v
-                     ┌──────────────────────────────────────────┐
-                     │      Zama FHE Coprocessor (Sepolia)      │
-                     │  ACL · TFHEExecutor · KMSVerifier        │
-                     └──────────────────────────────────────────┘
-```
-
-Three contracts, one coprocessor, zero plaintext.
+There is no on-chain rail where an agent can be paid per action at its true marginal cost, settled in a stable asset, without a depositor taking on open-ended counterparty risk.
 
 ---
 
-## Trust-Gated Payment Flows
+## The Solution
 
-| Tier | Score Range | Routing | Release Mechanism |
-|:-----|:-----------|:--------|:------------------|
-| **HIGH** | 75 - 100 | Instant encrypted transfer | Immediate |
-| **MEDIUM** | 40 - 74 | 24-hour delayed release | Automatic after time lock |
-| **LOW** | 0 - 39 | Milestone-gated escrow | Manual employer approval |
-| **Unscored** | N/A | Defaults to escrow | Manual employer approval |
+TrustGate combines two primitives:
 
-The routing decision is fully oblivious. All three payment paths execute on every payroll run, but only the correct path carries a non-zero encrypted amount:
+1. **On-chain trust scoring** — every registered agent carries a reputation score (0–100) maintained by authorized oracles. Score buckets map to trust tiers: **HIGH**, **MEDIUM**, **LOW**.
+2. **Circle Nanopayments on Arc** — Arc is Circle's purpose-built L1 for USDC settlement, supporting per-transaction costs in the sub-cent range. USDC is native, gas is negligible, and finality is fast.
 
-```solidity
-function _processWithTrustTier(Employee storage emp) internal {
-    ebool isHigh = trustScoring.isHighTrust(emp.wallet);
-    ebool isMed  = trustScoring.isMediumTrust(emp.wallet);
+The combination produces a system where:
 
-    euint64 zero = FHE.asEuint64(0);
+- **Depositors** fund an allowance for a specific agent without losing custody.
+- **Agents** claim against the allowance per action completed.
+- **Trust tier decides the release model** — high-reputation agents settle instantly; medium agents wait through a short time-lock; low or new agents flow through depositor-gated escrow.
+- **Per-action pricing stays under $0.01**, making high-frequency agentic work economically viable for the first time.
 
-    // Oblivious routing: exactly one path carries the salary
-    euint64 instantAmt = FHE.select(isHigh, emp.encryptedSalary, zero);
-    euint64 remaining  = FHE.sub(emp.encryptedSalary, instantAmt);
-    euint64 delayedAmt = FHE.select(isMed, remaining, zero);
-    euint64 escrowAmt  = FHE.sub(remaining, delayedAmt);
-
-    _processInstantPayment(emp.wallet, instantAmt);
-    _processDelayedPayment(emp.wallet, delayedAmt);
-    _processEscrowPaymentEncrypted(emp.wallet, escrowAmt);
-}
-```
-
-No `if` statements. No branching on decrypted values. The coprocessor evaluates `FHE.select` on ciphertext, and the chain never learns which tier an employee belongs to.
+Trust is the missing primitive. Without it, every depositor must either over-trust (pay instantly and hope) or over-gate (micro-manage every call). TrustGate turns reputation into a routing signal so depositors delegate with the right amount of friction automatically.
 
 ---
 
-## Quick Start
+## How It Works
 
-### Prerequisites
-
-- Node.js >= 18
-- MetaMask or compatible wallet
-- Sepolia ETH for gas ([faucet](https://sepoliafaucet.com))
-
-### Run the Frontend
-
-```bash
-git clone https://github.com/rudazy/Trusted-paygram.git
-cd Trusted-paygram/frontend
-npm install
-npm run dev
+```
+  Agent                Depositor             TrustGate              TrustScoring             Arc / USDC
+    │                      │                     │                       │                        │
+    │  register(metadata)  │                     │                       │                        │
+    ├─────────────────────────────────────────>  │                       │                        │
+    │                      │                     │                       │                        │
+    │                      │  deposit(USDC)      │                       │                        │
+    │                      ├───────────────────> │                       │                        │
+    │                      │  setAllowance(agent,cap,perAction)          │                        │
+    │                      ├───────────────────> │                       │                        │
+    │                      │                     │                       │                        │
+    │  claim(amount)       │                     │  getTrustTier(agent)  │                        │
+    ├─────────────────────────────────────────>  ├─────────────────────> │                        │
+    │                      │                     │ <── HIGH / MED / LOW ─│                        │
+    │                      │                     │                       │                        │
+    │                      │                     │  route by tier                                 │
+    │                      │                     ├──HIGH───────> instant USDC transfer ─────────> │
+    │                      │                     ├──MEDIUM─────> time-locked claim ─────────────> │
+    │                      │                     ├──LOW────────> escrow, awaits depositor ok ───> │
+    │                      │                     │                                                │
+    │  receive USDC <──────────────────────────────────────────────────────────────────────────── │
 ```
 
-Open [http://localhost:3000](http://localhost:3000) and connect your wallet to Sepolia.
+### Step by step
 
-### Deploy Your Own
+1. **Agent registers.** Any address can call `AgentRegistry.registerAgent(metadata)` — registration is permissionless. The agent is now discoverable and score-eligible.
+2. **Oracle assigns trust score.** An authorized oracle submits a 0–100 score to `TrustScoring`. Score ranges map to tiers: HIGH (75–100), MEDIUM (40–74), LOW (0–39). Unscored agents default to LOW.
+3. **Depositor deposits USDC.** The depositor approves USDC and calls `TrustGate.deposit(amount)`. Funds sit in a per-depositor balance, still under their control.
+4. **Depositor sets per-agent allowance.** `setAllowance(agent, cap, perActionLimit)` authorizes a specific agent to pull up to `cap` in total, with each claim capped at `perActionLimit` (typically ≤ $0.01).
+5. **Agent claims.** The agent calls `TrustGate.claim(depositor, amount)`. TrustGate reads the agent's tier from `TrustScoring` and routes the claim:
+   - **HIGH** — USDC transfers instantly to the agent.
+   - **MEDIUM** — claim enters a short time-lock; agent calls `releaseDelayed(claimId)` after the lock expires.
+   - **LOW** — claim enters escrow; the depositor must explicitly call `approveEscrow(claimId)` for release.
+6. **USDC settles on Arc.** Transfer cost is in the sub-cent range thanks to Arc's nanopayment economics. The depositor can cancel any pending (non-released) claim to recover the funds.
 
-```bash
-# Install dependencies
-cd Trusted-paygram
-npm install
-
-# Configure environment
-cp .env.example .env
-# Edit .env with your PRIVATE_KEY, SEPOLIA_RPC_URL, ETHERSCAN_API_KEY
-
-# Compile contracts
-npx hardhat compile
-
-# Deploy to Sepolia
-npx hardhat run scripts/deploy-sepolia.ts --network sepolia
-
-# Verify on Etherscan
-npx hardhat verify --network sepolia <ADDRESS> <CONSTRUCTOR_ARGS>
-```
-
-See [docs/SETUP.md](docs/SETUP.md) for detailed configuration.
+The routing is enforced on-chain. Depositors don't pick tiers — the agent's reputation decides.
 
 ---
 
-## Deployed Contracts
+## Key Features
 
-> **Ethereum Mainnet** &mdash; deployed 2026-02-28
-
-| Contract | Address | Etherscan |
-|:---------|:--------|:----------|
-| **TrustScoring** | `0xaa3ae25ebac250ff67f4d9e3195c4c7610055067` | [View](https://etherscan.io/address/0xaa3ae25ebac250ff67f4d9e3195c4c7610055067#code) |
-| **PayGramToken** | `0x41fa55cefd625e50fa1ae08baea87ac5c8be0ad7` | [View](https://etherscan.io/address/0x41fa55cefd625e50fa1ae08baea87ac5c8be0ad7#code) |
-| **PayGramCore** | `0xDC41FF140129846f7a2e63A5CcE73e9d767CB4e1` | [View](https://etherscan.io/address/0xDC41FF140129846f7a2e63A5CcE73e9d767CB4e1#code) |
-
-> **Sepolia Testnet** &mdash; deployed 2026-03-09 (v5: plaintextSalaries)
-
-| Contract | Address | Etherscan |
-|:---------|:--------|:----------|
-| **TrustScoring** | `0x195dc8309F1b26BF6f5c568024E4060029233596` | [View](https://sepolia.etherscan.io/address/0x195dc8309F1b26BF6f5c568024E4060029233596#code) |
-| **PayGramToken** | `0x18572E79806bc3caAEeE52d81c0A7A4D86faeD6f` | [View](https://sepolia.etherscan.io/address/0x18572E79806bc3caAEeE52d81c0A7A4D86faeD6f#code) |
-| **PayGramCore** | `0x370B4F9917b65f36CAe01754c14829408bfAf7fd` | [View](https://sepolia.etherscan.io/address/0x370B4F9917b65f36CAe01754c14829408bfAf7fd#code) |
-
-All contracts are verified with source code on Etherscan.
-
----
-
-## Privacy Model
-
-### What's Encrypted
-
-- [x] Employee salary amounts (stored as `euint64`)
-- [x] Trust reputation scores (stored as `euint64`)
-- [x] Trust tier classification (computed via `FHE.select`, never decrypted on-chain)
-- [x] Token balances (ERC-7984 encrypted balances)
-- [x] Transfer amounts (confidential transfers between contract and employees)
-- [x] Payment routing decision (oblivious branching, no plaintext conditionals)
-
-### Who Can See What
-
-| Data | Employer | Employee | Public | Contract |
-|:-----|:--------:|:--------:|:------:|:--------:|
-| Salary amount | Granted | Own only | No | Yes |
-| Trust score | Granted | Own only | No | Yes |
-| Trust tier | No | No | No | Computed |
-| Token balance | No | Own only | No | Yes |
-| Payment status | Yes | Own only | Event only | Yes |
-| Employee roster | Yes | No | Events | Yes |
-| Payment timing | Yes | Own only | Events | Yes |
-
-"Granted" means the address holds an FHE decryption grant issued via `FHE.allow()`. "Computed" means the value is used in encrypted computation but never materialized as plaintext.
+- **Trust-gated payments** — three-tier reputation gating built into the settlement contract. Agents graduate from escrow to time-lock to instant as they build score.
+- **3-tier routing** — HIGH (instant), MEDIUM (time-locked), LOW (depositor-approved escrow). Deterministic, on-chain, no off-chain arbiters.
+- **Per-action pricing ≤ $0.01** — depositors enforce micro-limits per claim, making agentic workflows viable without blowing through allowances.
+- **99.97% cost reduction vs L1 gas** — a $0.005 agent payment on Ethereum mainnet costs multiples of its value in gas; on Arc, the same settlement costs a fraction of a cent.
+- **Permissionless agent registration** — any address can register and earn score. No gatekeeper. No allowlist.
+- **Depositor-safe** — allowances are revocable, pending claims are cancellable, escrow releases require explicit approval. Funds never leave the depositor's control without tier-appropriate gating.
+- **Oracle-pluggable scoring** — `TrustScoring` is oracle-authorized; reputation sources (EigenTrust, custom models, external signals) can be swapped without touching settlement logic.
 
 ---
 
@@ -195,112 +108,114 @@ All contracts are verified with source code on Etherscan.
 
 | Layer | Technology | Purpose |
 |:------|:-----------|:--------|
-| Smart Contracts | Solidity 0.8.27 | Contract logic |
-| FHE Runtime | Zama FHEVM v0.9 | Encrypted computation on-chain |
-| Token Standard | ERC-7984 | Confidential token with encrypted balances |
-| Access Control | OpenZeppelin Confidential Contracts | ObserverAccess, Ownable2Step, Pausable |
-| Framework | Hardhat + TypeScript | Compilation, testing, deployment |
-| Frontend | Next.js 14 (App Router) | Employer dashboard, employee portal |
-| Styling | Tailwind CSS | Glassmorphism UI with custom theme |
-| Wallet | ethers.js v6 | MetaMask integration, contract calls |
-| FHE Client | fhevmjs | Client-side encryption for encrypted inputs |
+| Settlement chain | Arc Testnet (chain id `5042002`) | Purpose-built USDC L1, nanopayment economics |
+| Stable asset | USDC (6 decimals, native on Arc) | Unit of account for all agent payments |
+| Contracts | Solidity `0.8.27`, Hardhat `2.22` | Agent registry, trust scoring, trust-gated allowance |
+| Libraries | OpenZeppelin Contracts `^5.1` | Ownable2Step, ReentrancyGuard, ERC20 interfaces |
+| Verification | `@nomicfoundation/hardhat-verify` | Arcscan contract verification |
+| Frontend | Next.js 14 (App Router), React 18, TypeScript 5 | Depositor / agent / claims dashboard |
+| Web3 client | wagmi v2, viem v2, ConnectKit | Typed hooks, RPC, wallet UX |
+| State | `@tanstack/react-query` | Contract read caching and background updates |
+| Styling | Tailwind CSS 3, Framer Motion 12 | Dark-first design, motion primitives |
+| Fonts | Syne (display), Plus Jakarta Sans (body), JetBrains Mono | Editorial typography, precision dark |
+| Icons | lucide-react | Line-weight icon set |
+
+Test suite: **142 passing** (Hardhat + Chai), covering agent lifecycle, deposit/withdraw, per-tier claim flows, cancellation, escrow approval, and cross-contract integration.
 
 ---
 
-## Project Structure
+## Deployed Contracts (Arc Testnet)
 
-```
-contracts/
-  TrustScoring.sol          Encrypted trust score storage and tier evaluation
-  PayGramCore.sol           Payroll engine with trust-gated payment routing
-  PayGramToken.sol          ERC-7984 confidential token (cPAY)
+> Chain id: `5042002` &#8226; RPC: `https://rpc.testnet.arc.network` &#8226; Explorer: [testnet.arcscan.app](https://testnet.arcscan.app)
 
-frontend/
-  src/
-    app/                    Next.js pages (landing, employer, employee)
-    components/
-      employer/             AddEmployee, EmployeeList, ExecutePayroll, PayrollHistory
-      employee/             SalaryView, PaymentHistory
-      wallet/               ConnectButton (4-state: no wallet, connecting, wrong network, connected)
-      layout/               Navbar, Footer, NetworkBanner
-      ui/                   GlassCard, Button, Badge, StatusDot, TrustBadge, Tabs, Dialog
-    hooks/                  useWallet, useFHE, useContracts
-    lib/                    constants, contracts, fhe, mockData, utils
-    providers/              Web3Provider (wallet + FHE + contracts context)
+| Contract | Address | Arcscan |
+|:---------|:--------|:--------|
+| **TrustScoringPlaintext** | `0xEb979Dc25396ba4be6cEA41EAfEa894C55772246` | [View](https://testnet.arcscan.app/address/0xEb979Dc25396ba4be6cEA41EAfEa894C55772246) |
+| **AgentRegistry** | `0x73d3cf7f2734C334927f991fe87D06d595d398b4` | [View](https://testnet.arcscan.app/address/0x73d3cf7f2734C334927f991fe87D06d595d398b4) |
+| **TrustGate** | `0x52E17bC482d00776d73811680CbA9914e83E33CC` | [View](https://testnet.arcscan.app/address/0x52E17bC482d00776d73811680CbA9914e83E33CC) |
+| USDC (reference) | `0x3600000000000000000000000000000000000000` | [View](https://testnet.arcscan.app/address/0x3600000000000000000000000000000000000000) |
 
-scripts/
-  deploy-sepolia.ts         Deployment script (ethers-based, single-key)
-
-test/
-  TrustScoring.test.ts      46 passing, 35 FHE-pending
-  PayGramCore.test.ts        52 passing, 38 FHE-pending
-  integration.test.ts       41 passing, 30 FHE-pending
-
-docs/
-  ARCHITECTURE.md           System design and data flows
-  TRUST_MODEL.md            EigenTrust adaptation and privacy model
-  SETUP.md                  Installation and deployment guide
-```
+Deployed 2026-04-17. All three TrustGate contracts are wired together on-chain: `TrustGate` reads tiers from `TrustScoringPlaintext` and agent status from `AgentRegistry`.
 
 ---
 
-## Testing
+## Local Setup
+
+### Prerequisites
+
+- Node.js `>= 18`
+- A funded Arc Testnet key (for deployment)
+- An EVM wallet (MetaMask, Rabby, or any ConnectKit-supported wallet)
+
+### 1. Clone and install
 
 ```bash
-# Run all tests
-npm test
+git clone https://github.com/rudazy/TrustGate.git
+cd TrustGate
 
-# Run with gas reporting
-REPORT_GAS=true npm test
+# Install contract workspace
+npm install
 
-# Run specific test file
-npx hardhat test test/TrustScoring.test.ts
-
-# Run only non-FHE tests (no coprocessor needed)
-npx hardhat test --grep "should"
+# Install frontend workspace
+cd frontend
+npm install
+cd ..
 ```
 
-Tests are structured with a `try/catch + this.skip()` pattern: non-FHE logic runs on vanilla Hardhat, and FHE-dependent tests are automatically skipped when the coprocessor is unavailable.
+### 2. Configure environment
 
-**119 tests passing** (107 FHE-pending, awaiting coprocessor integration).
+```bash
+cp .env.example .env
+```
+
+Edit `.env` and populate:
+
+```dotenv
+PRIVATE_KEY=0x...                               # deployer key (Arc Testnet funded)
+ARC_TESTNET_RPC_URL=https://rpc.testnet.arc.network
+ETHERSCAN_API_KEY=any-nonempty-string           # Arcscan accepts any non-empty key
+```
+
+### 3. Compile and test
+
+```bash
+npx hardhat compile
+npx hardhat test
+```
+
+### 4. Deploy to Arc Testnet
+
+```bash
+npx hardhat run scripts/deploy-arc.ts --network arcTestnet
+```
+
+The script deploys `TrustScoringPlaintext`, `AgentRegistry`, and `TrustGate`, wires them together, and writes addresses to `deployments/arcTestnet-addresses.json`.
+
+### 5. Verify on Arcscan (optional)
+
+```bash
+npx hardhat verify --network arcTestnet <ADDRESS> <CONSTRUCTOR_ARGS...>
+```
+
+If the first attempt returns a generic "Unable to verify" error, retry with `--force` — Arcscan's verify endpoint accepts any non-empty `ETHERSCAN_API_KEY` but occasionally needs a second pass.
+
+### 6. Run the frontend
+
+```bash
+cd frontend
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000), connect a wallet, and switch to Arc Testnet. The dashboard exposes three panels:
+
+- **Depositor** — deposit / withdraw USDC, set per-agent allowances.
+- **Agents** — register agents, view trust scores, deactivate.
+- **Claims** — file claims, release time-locked claims, approve escrowed claims, cancel pending.
+
+If you need Arc testnet USDC, use the faucet linked in the dashboard footer.
 
 ---
 
-## Key Innovations
+## License
 
-1. **Oblivious payment routing** &mdash; Trust tier evaluation and salary routing happen entirely under FHE. The contract executes all three payment paths on every payroll run; `FHE.select` ensures only the correct path carries value. No observer can determine which tier an employee falls into.
-
-2. **EigenTrust reputation on-chain** &mdash; Encrypted reputation scores are submitted by authorized oracles and stored as `euint64`. Tier boundaries are evaluated with `FHE.ge` comparisons that never reveal the underlying score, even to the contract owner.
-
-3. **Batch payroll with bounded gas** &mdash; A single `executePayroll()` processes up to 50 employees per transaction. Each employee requires exactly 3 FHE operations for tier evaluation plus 3 payment record writes, keeping gas predictable.
-
-4. **ERC-7984 observer access** &mdash; The `ObserverAccess` extension allows employers to set an observer on employee token accounts for payroll auditing. Observers can verify encrypted disbursements without accessing other employees' data.
-
-5. **Escrow with milestone gating** &mdash; Low-trust and unscored employees receive payments into escrow. The employer must explicitly approve release, providing a dispute resolution mechanism without exposing payment amounts.
-
----
-
-## Roadmap
-
-- [x] TrustScoring contract with encrypted tier evaluation
-- [x] PayGramCore payroll engine with oblivious routing
-- [x] PayGramToken (ERC-7984) with supply cap, pause, observer access
-- [x] Full test suite (119 passing, 107 FHE-pending)
-- [x] Deployment to Sepolia with Etherscan verification
-- [x] Frontend: employer dashboard, employee portal, wallet connection
-- [x] Network switching UX (Sepolia auto-switch, wrong network banner)
-- [x] Live FHE encryption in frontend via fhevmjs
-- [ ] Oracle integration for real EigenTrust score submission
-- [x] Multi-employer support (any wallet can register, manage employees independently)
-- [ ] Payment release automation (keeper-compatible delayed releases)
-- [ ] Mainnet deployment
-
----
-
-<div align="center">
-
-Built by [**Ludarep**](https://github.com/rudazy)
-
-[Zama FHEVM](https://docs.zama.ai/fhevm) &#8226; [ERC-7984](https://eips.ethereum.org/EIPS/eip-7984) &#8226; [OpenZeppelin Confidential Contracts](https://github.com/OpenZeppelin/openzeppelin-contracts/tree/master/contracts) &#8226; [EigenTrust](https://nlp.stanford.edu/pubs/eigentrust.pdf)
-
-</div>
+MIT — see [LICENSE](LICENSE).
