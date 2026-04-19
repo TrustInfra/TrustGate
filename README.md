@@ -53,28 +53,7 @@ Trust is the missing primitive. Without it, every depositor must either over-tru
 
 ## How It Works
 
-```
-  Agent                Depositor             TrustGate              TrustScoring             Arc / USDC
-    │                      │                     │                       │                        │
-    │  register(metadata)  │                     │                       │                        │
-    ├─────────────────────────────────────────>  │                       │                        │
-    │                      │                     │                       │                        │
-    │                      │  deposit(USDC)      │                       │                        │
-    │                      ├───────────────────> │                       │                        │
-    │                      │  setAllowance(agent,cap,perAction)          │                        │
-    │                      ├───────────────────> │                       │                        │
-    │                      │                     │                       │                        │
-    │  claim(amount)       │                     │  getTrustTier(agent)  │                        │
-    ├─────────────────────────────────────────>  ├─────────────────────> │                        │
-    │                      │                     │ <── HIGH / MED / LOW ─│                        │
-    │                      │                     │                       │                        │
-    │                      │                     │  route by tier                                 │
-    │                      │                     ├──HIGH───────> instant USDC transfer ─────────> │
-    │                      │                     ├──MEDIUM─────> time-locked claim ─────────────> │
-    │                      │                     ├──LOW────────> escrow, awaits depositor ok ───> │
-    │                      │                     │                                                │
-    │  receive USDC <──────────────────────────────────────────────────────────────────────────── │
-```
+![TrustGate Flow](docs/images/trustgate-flow.png)
 
 ### Step by step
 
