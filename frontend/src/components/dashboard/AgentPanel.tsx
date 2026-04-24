@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   useAccount,
   useReadContract,
@@ -17,6 +17,10 @@ import {
   Clock,
   Lock,
   CheckCircle2,
+  Activity,
+  AlertTriangle,
+  Loader2,
+  ShieldCheck,
 } from "lucide-react";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
@@ -33,6 +37,7 @@ import {
   formatUsdc,
   parseUsdc,
 } from "@/lib/utils";
+import { calculateArcTrustScore, type ArcScoreResult } from "@/lib/arcScoring";
 
 type RoutingType = "instant" | "delayed" | "escrowed";
 
@@ -88,7 +93,7 @@ function AgentCard({
     args: [agentAddress as `0x${string}`],
   });
 
-  const { data: trustScore } = useReadContract({
+  const { data: trustScore, refetch: refetchScore } = useReadContract({
     address: CONTRACT_ADDRESSES.trustScoring,
     abi: trustScoringAbi,
     functionName: "getTrustScore",
@@ -96,7 +101,7 @@ function AgentCard({
     query: { enabled: !!hasScore },
   });
 
-  const { data: trustTier } = useReadContract({
+  const { data: trustTier, refetch: refetchTier } = useReadContract({
     address: CONTRACT_ADDRESSES.trustScoring,
     abi: trustScoringAbi,
     functionName: "getTrustTierPlaintext",
@@ -118,11 +123,21 @@ function AgentCard({
   const { writeContract: setScore, data: scoreTxHash, isPending: isSettingScore } =
     useWriteContract();
 
-  const { isLoading: isConfirmingScore } = useWaitForTransactionReceipt({
-    hash: scoreTxHash,
-  });
+  const { isLoading: isConfirmingScore, isSuccess: isScoreConfirmed } =
+    useWaitForTransactionReceipt({
+      hash: scoreTxHash,
+    });
 
-  const [scoreInput, setScoreInput] = useState("");
+  const [isQueryingArc, setIsQueryingArc] = useState(false);
+  const [scoreResult, setScoreResult] = useState<ArcScoreResult | null>(null);
+  const [scoreError, setScoreError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isScoreConfirmed) {
+      refetchScore();
+      refetchTier();
+    }
+  }, [isScoreConfirmed, refetchScore, refetchTier]);
 
   if (!agentData) return null;
 
@@ -141,17 +156,43 @@ function AgentCard({
     });
   };
 
-  const handleSetScore = () => {
-    if (!scoreInput) return;
-    setScore({
-      address: CONTRACT_ADDRESSES.trustScoring,
-      abi: trustScoringAbi,
-      functionName: "setTrustScore",
-      args: [agentAddress as `0x${string}`, BigInt(scoreInput)],
-    }, {
-      onSuccess: () => setScoreInput(""),
-    });
+  const handleCalculateScore = async () => {
+    setScoreError(null);
+    setScoreResult(null);
+    setIsQueryingArc(true);
+    try {
+      const result = await calculateArcTrustScore(agentAddress);
+      setScoreResult(result);
+
+      if (result.blocked) {
+        setScoreError(
+          "Wallet has no onchain activity on Arc — cannot assign a trust score."
+        );
+        return;
+      }
+
+      setScore({
+        address: CONTRACT_ADDRESSES.trustScoring,
+        abi: trustScoringAbi,
+        functionName: "setTrustScore",
+        args: [agentAddress as `0x${string}`, BigInt(result.finalScore)],
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unknown error";
+      setScoreError(`Arc RPC query failed: ${message}`);
+    } finally {
+      setIsQueryingArc(false);
+    }
   };
+
+  const isScoreBusy = isQueryingArc || isSettingScore || isConfirmingScore;
+  const loadingLabel = isQueryingArc
+    ? "Querying Arc RPC"
+    : isSettingScore
+    ? "Awaiting wallet"
+    : isConfirmingScore
+    ? "Confirming on Arc"
+    : null;
 
   return (
     <Card hover={false} className="p-4">
@@ -214,30 +255,181 @@ function AgentCard({
         )}
       </div>
 
-      {/* Set Trust Score (agent owner can score their own agents) */}
+      {/* Calculate Trust Score from Arc onchain activity */}
       {isActive && (
-        <div className="flex items-center gap-2 pt-3 border-t border-border">
-          <Input
-            placeholder="Score (0-100)"
-            type="number"
-            min="0"
-            max="100"
-            value={scoreInput}
-            onChange={(e) => setScoreInput(e.target.value)}
-            className="flex-1 py-1.5 text-xs"
-          />
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={handleSetScore}
-            loading={isSettingScore || isConfirmingScore}
-            disabled={!scoreInput}
-          >
-            Set Score
-          </Button>
+        <div className="pt-3 border-t border-border space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <p className="text-[11px] font-medium text-text">
+                Arc onchain activity score
+              </p>
+              <p className="text-[10px] text-text-muted">
+                Auto-calculated from tx count, USDC balance, and contract calls
+              </p>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleCalculateScore}
+              disabled={isScoreBusy}
+            >
+              {isScoreBusy ? (
+                <>
+                  <Loader2 size={12} className="animate-spin" />
+                  {loadingLabel}
+                </>
+              ) : (
+                <>
+                  <Activity size={12} />
+                  Calculate Score
+                </>
+              )}
+            </Button>
+          </div>
+
+          {scoreError && !scoreResult?.blocked && (
+            <div className="p-2.5 rounded-md bg-tier-low/10 border border-tier-low/30 flex items-start gap-2">
+              <AlertTriangle size={12} className="text-tier-low mt-0.5 shrink-0" />
+              <p className="text-[11px] text-tier-low">{scoreError}</p>
+            </div>
+          )}
+
+          {scoreResult && (
+            <ScoreBreakdown
+              result={scoreResult}
+              confirmed={isScoreConfirmed}
+              confirming={isConfirmingScore || isSettingScore}
+            />
+          )}
         </div>
       )}
     </Card>
+  );
+}
+
+function ScoreBreakdown({
+  result,
+  confirmed,
+  confirming,
+}: {
+  result: ArcScoreResult;
+  confirmed: boolean;
+  confirming: boolean;
+}) {
+  const tierColor =
+    result.tier === "HIGH_ELITE" || result.tier === "HIGH"
+      ? "text-tier-high"
+      : result.tier === "MEDIUM"
+      ? "text-tier-medium"
+      : result.tier === "LOW"
+      ? "text-tier-low"
+      : "text-text-muted";
+
+  const tierLabel =
+    result.tier === "HIGH_ELITE" ? "HIGH ELITE" : result.tier;
+
+  return (
+    <div className="p-3 rounded-md bg-bg-surface border border-border space-y-2">
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-[10px] uppercase tracking-wider text-text-muted">
+          Score breakdown
+        </span>
+        {result.tier === "HIGH_ELITE" && (
+          <span className="inline-flex items-center gap-1 text-[10px] font-medium text-tier-high">
+            <ShieldCheck size={10} />
+            Verified
+          </span>
+        )}
+      </div>
+
+      <BreakdownRow
+        label={result.components.transactions.label}
+        points={result.components.transactions.points}
+        note={result.components.transactions.note}
+      />
+      <BreakdownRow
+        label={result.components.usdcBalance.label}
+        points={result.components.usdcBalance.points}
+        note={result.components.usdcBalance.note}
+        muted={result.components.usdcBalance.points === 0}
+      />
+      <BreakdownRow
+        label={result.components.contractInteractions.label}
+        points={result.components.contractInteractions.points}
+        note={result.components.contractInteractions.note}
+        muted={result.components.contractInteractions.points === 0}
+      />
+
+      {result.capped && (
+        <p className="text-[10px] text-text-muted italic">
+          Capped at 97 — only wallets with 100+ contract interactions can reach 100
+        </p>
+      )}
+
+      <div className="flex items-center justify-between pt-2 border-t border-border">
+        <span className="text-[11px] font-semibold text-text">Total score</span>
+        <span className="font-mono text-sm font-semibold text-text">
+          {result.finalScore} / 100
+        </span>
+      </div>
+
+      <div className="flex items-center justify-between">
+        <span className="text-[11px] text-text-secondary">Tier</span>
+        <span className={`text-[11px] font-semibold ${tierColor}`}>
+          {tierLabel}
+        </span>
+      </div>
+
+      <div className="flex items-center justify-between">
+        <span className="text-[11px] text-text-muted">Score source</span>
+        <span className="text-[10px] font-mono text-text-muted">
+          Arc Onchain Activity
+        </span>
+      </div>
+
+      {confirming && (
+        <div className="flex items-center gap-1.5 pt-1 text-[10px] text-text-muted">
+          <Loader2 size={10} className="animate-spin" />
+          Writing score to TrustScoring contract...
+        </div>
+      )}
+      {confirmed && (
+        <div className="flex items-center gap-1.5 pt-1 text-[10px] text-tier-high">
+          <CheckCircle2 size={10} />
+          Score committed onchain
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BreakdownRow({
+  label,
+  points,
+  note,
+  muted,
+}: {
+  label: string;
+  points: number;
+  note: string;
+  muted?: boolean;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <div>
+        <p className="text-[11px] text-text-secondary">{label}</p>
+        <p className={`text-[10px] ${muted ? "text-text-muted italic" : "text-text-muted"}`}>
+          {note}
+        </p>
+      </div>
+      <span
+        className={`font-mono text-xs font-semibold shrink-0 ${
+          muted ? "text-text-muted" : "text-text"
+        }`}
+      >
+        {points > 0 ? `+${points}` : points} pts
+      </span>
+    </div>
   );
 }
 

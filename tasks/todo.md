@@ -77,3 +77,15 @@
 
 - 142 passing, 0 failing
 - 36 pending (FHE-dependent TrustScoring tests, expected on vanilla Hardhat)
+
+## 2026-04-24 Session
+
+### Completed
+
+- [x] Added `src/lib/arcScoring.ts` — queries Arc RPC + Arcscan API for tx count, USDC balance, and contract interactions; implements exact trust-score formula (tx tiers 20/40/60/75/85, +5 USDC>100, +5/+7/+15 contract bonus, 3-contract minimum, 97-cap unless 100+ contracts, BLOCKED/LOW/MEDIUM/HIGH/HIGH_ELITE tier mapping)
+- [x] Replaced manual "Set Score" input + button in `AgentPanel.tsx` AgentCard with "Calculate Score" button that auto-runs the Arc onchain formula
+- [x] Added loading states: "Querying Arc RPC" -> "Awaiting wallet" -> "Confirming on Arc"
+- [x] Added ScoreBreakdown panel that displays: transaction points, USDC balance points (with "Below 100 USDC threshold — 0 points" fallback), contract interaction points (with "Below 3 minimum — 0 points" fallback), total score X/100, tier, score source = Arc Onchain Activity, and HIGH ELITE "Verified" indicator
+- [x] Score flow auto-calls `TrustScoring.setScore()` with computed score; refetches hasScore/trustTier after tx confirmation
+- [x] BLOCKED wallets (0 tx) skip the setScore call and show a warning instead of writing 0 onchain
+- [x] `next build` passes (0 errors, pre-existing warnings only)
