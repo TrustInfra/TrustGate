@@ -89,3 +89,19 @@
 - [x] Score flow auto-calls `TrustScoring.setScore()` with computed score; refetches hasScore/trustTier after tx confirmation
 - [x] BLOCKED wallets (0 tx) skip the setScore call and show a warning instead of writing 0 onchain
 - [x] `next build` passes (0 errors, pre-existing warnings only)
+
+### Bug Fix Round 1 (2026-04-24)
+
+- [x] **Moved Arc score logic server-side** — created `/api/arc-score/[address]/route.ts` to fix CORS-blocked Arcscan calls. Queries Arc RPC `eth_getTransactionCount`, `eth_call` for USDC `balanceOf`, and Arcscan `/api/v2/addresses/{addr}/transactions?filter=from` (paginated up to 10 pages) for contract interactions + deployments
+- [x] **Fixed Blockscout field name** — API uses `transaction_types` (not `tx_types`); earlier browser-side code silently returned 0 interactions because of this
+- [x] Added **contract deployment bonus** (+10 points) for wallets that have deployed 1+ contracts on Arc (detected via `created_contract != null` / `contract_creation` in `transaction_types`)
+- [x] API route logs every stage: raw RPC results, scanned tx counts, points per category, raw total, capped flag, final score, tier
+- [x] Refactored `arcScoring.ts` to call `/api/arc-score/[address]` — no direct Arcscan calls from browser
+- [x] **Breakdown panel extended** with "Contract deployments" row ("X deployments on Arc" or "No deployments on Arc — 0 points")
+- [x] **Register Agent preflight** — `getAgent(agentAddr)` read detects status != None and blocks client-side with "already registered" message before tx (prevents the previously-seen `0xe098d3ee AgentAlreadyRegistered` revert)
+- [x] **Auto-fill agent address** with connected wallet; "Use connected wallet" button restores it if edited
+- [x] **Gas balance check** via wagmi `useBalance` — blocks submit with "Insufficient USDC for gas" if native balance < 0.01 USDC (18 decimal threshold 10^16 wei)
+- [x] **Revert decoding** — `BaseError.walk(ContractFunctionRevertedError)` extracts `errorName` from the ABI, mapped to human messages (`AgentAlreadyRegistered`, `ZeroAddress`, `NotAgentOwner`, etc.); unknown reverts fall through to `shortMessage`; raw error logged via `console.error`
+- [x] **Live test passed** against `0x60C05e2d820CE989E944ED4e7bb33bAEB8705c62`: 29 txs (40 pts) + 13.88 USDC (0 pts) + 13 contract calls (7 pts) + 16 deployments (10 pts) = 57 / MEDIUM
+- [x] BLOCKED path verified with zero-tx address: `{score: 0, tier: "BLOCKED"}` even when USDC balance > 100
+- [x] `next build` still passes

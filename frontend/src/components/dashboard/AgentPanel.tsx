@@ -3,11 +3,12 @@
 import { useEffect, useState } from "react";
 import {
   useAccount,
+  useBalance,
   useReadContract,
   useWriteContract,
   useWaitForTransactionReceipt,
 } from "wagmi";
-import { isAddress } from "viem";
+import { BaseError, ContractFunctionRevertedError, isAddress } from "viem";
 import {
   Bot,
   Plus,
@@ -38,6 +39,34 @@ import {
   parseUsdc,
 } from "@/lib/utils";
 import { calculateArcTrustScore, type ArcScoreResult } from "@/lib/arcScoring";
+
+const REGISTRY_ERROR_MESSAGES: Record<string, string> = {
+  ZeroAddress: "Agent address cannot be the zero address.",
+  AgentAlreadyRegistered:
+    "This address is already registered. Each agent can only be registered once.",
+  AgentNotFound: "Agent not found in the registry.",
+  NotAgentOwner: "Only the registering wallet can modify this agent.",
+  AgentNotActive: "Agent is not currently active.",
+};
+
+function decodeContractError(error: unknown): string {
+  if (!error) return "Unknown error";
+  if (error instanceof BaseError) {
+    const reverted = error.walk(
+      (e) => e instanceof ContractFunctionRevertedError
+    ) as ContractFunctionRevertedError | null;
+    if (reverted?.data?.errorName) {
+      const name = reverted.data.errorName;
+      return REGISTRY_ERROR_MESSAGES[name] ?? `Contract reverted: ${name}`;
+    }
+    if (reverted?.reason) {
+      return `Contract reverted: ${reverted.reason}`;
+    }
+    return error.shortMessage || error.message;
+  }
+  if (error instanceof Error) return error.message;
+  return String(error);
+}
 
 type RoutingType = "instant" | "delayed" | "escrowed";
 
@@ -358,6 +387,12 @@ function ScoreBreakdown({
         points={result.components.contractInteractions.points}
         note={result.components.contractInteractions.note}
         muted={result.components.contractInteractions.points === 0}
+      />
+      <BreakdownRow
+        label={result.components.contractDeployments.label}
+        points={result.components.contractDeployments.points}
+        note={result.components.contractDeployments.note}
+        muted={result.components.contractDeployments.points === 0}
       />
 
       {result.capped && (
@@ -709,10 +744,19 @@ function ClaimPaymentCard() {
   );
 }
 
+const MIN_GAS_USDC_WEI = 10_000_000_000_000_000n; // 0.01 USDC at 18 native decimals
+
 export default function AgentPanel() {
   const { address } = useAccount();
   const [agentAddr, setAgentAddr] = useState("");
   const [metadataURI, setMetadataURI] = useState("");
+  const [registerError, setRegisterError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (address && !agentAddr) {
+      setAgentAddr(address);
+    }
+  }, [address, agentAddr]);
 
   // Read agents owned by connected address
   const { data: ownedAgents, refetch: refetchAgents } = useReadContract({
@@ -730,29 +774,109 @@ export default function AgentPanel() {
     functionName: "totalActiveAgents",
   });
 
-  const { writeContract: register, data: registerTxHash, isPending: isRegistering } =
-    useWriteContract();
-  const { isLoading: isConfirmingRegister } = useWaitForTransactionReceipt({
-    hash: registerTxHash,
+  // Native USDC gas balance on Arc
+  const { data: gasBalance } = useBalance({
+    address,
+    query: { enabled: !!address, refetchInterval: 20_000 },
   });
 
-  const handleRegister = () => {
-    if (!agentAddr) return;
-    register({
-      address: CONTRACT_ADDRESSES.agentRegistry,
-      abi: agentRegistryAbi,
-      functionName: "registerAgent",
-      args: [agentAddr as `0x${string}`, metadataURI],
-    }, {
-      onSuccess: () => {
-        setAgentAddr("");
-        setMetadataURI("");
-        refetchAgents();
-      },
+  // Preflight: check if the agent address is already registered
+  const agentAddrValid = isAddress(agentAddr);
+  const { data: existingAgent } = useReadContract({
+    address: CONTRACT_ADDRESSES.agentRegistry,
+    abi: agentRegistryAbi,
+    functionName: "getAgent",
+    args: agentAddrValid ? [agentAddr as `0x${string}`] : undefined,
+    query: { enabled: agentAddrValid, refetchOnWindowFocus: false },
+  });
+
+  const existingStatus = existingAgent
+    ? Number((existingAgent as [string, number, bigint, string])[1])
+    : 0;
+  const existingOwner = existingAgent
+    ? ((existingAgent as [string, number, bigint, string])[0] as string)
+    : undefined;
+  const alreadyRegistered = existingStatus !== 0;
+
+  const {
+    writeContract: register,
+    data: registerTxHash,
+    isPending: isRegistering,
+    reset: resetRegister,
+  } = useWriteContract();
+  const { isLoading: isConfirmingRegister, isSuccess: isRegistered } =
+    useWaitForTransactionReceipt({
+      hash: registerTxHash,
     });
+
+  useEffect(() => {
+    if (isRegistered) {
+      setAgentAddr(address ?? "");
+      setMetadataURI("");
+      setRegisterError(null);
+      refetchAgents();
+    }
+  }, [isRegistered, address, refetchAgents]);
+
+  const insufficientGas =
+    !!gasBalance && gasBalance.value < MIN_GAS_USDC_WEI;
+
+  const preflightBlocker = (() => {
+    if (!address) return "Connect a wallet to register an agent.";
+    if (!agentAddr) return null;
+    if (!agentAddrValid) return "Not a valid Ethereum address.";
+    if (alreadyRegistered) {
+      if (
+        existingOwner &&
+        existingOwner.toLowerCase() === address.toLowerCase()
+      ) {
+        return "You have already registered this agent.";
+      }
+      return "This address is already registered by another wallet.";
+    }
+    if (insufficientGas) {
+      return "Insufficient USDC for gas on Arc — add at least 0.01 USDC to your wallet.";
+    }
+    return null;
+  })();
+
+  const handleUseWallet = () => {
+    if (address) {
+      setAgentAddr(address);
+      setRegisterError(null);
+    }
+  };
+
+  const handleRegister = () => {
+    if (!agentAddr || !agentAddrValid || alreadyRegistered) return;
+    setRegisterError(null);
+    resetRegister();
+    register(
+      {
+        address: CONTRACT_ADDRESSES.agentRegistry,
+        abi: agentRegistryAbi,
+        functionName: "registerAgent",
+        args: [agentAddr as `0x${string}`, metadataURI],
+      },
+      {
+        onError: (err) => {
+          const decoded = decodeContractError(err);
+          console.error("[registerAgent] failed:", err);
+          console.error("[registerAgent] decoded reason:", decoded);
+          setRegisterError(decoded);
+        },
+      }
+    );
   };
 
   const agents = (ownedAgents as string[]) ?? [];
+  const canSubmit =
+    !!address &&
+    agentAddrValid &&
+    !alreadyRegistered &&
+    !insufficientGas &&
+    !isRegistering &&
+    !isConfirmingRegister;
 
   return (
     <div className="space-y-6">
@@ -794,12 +918,33 @@ export default function AgentPanel() {
           low-trust agents receive escrowed payments rather than being blocked.
         </p>
         <div className="space-y-3">
-          <Input
-            label="Agent Wallet Address"
-            placeholder="0x..."
-            value={agentAddr}
-            onChange={(e) => setAgentAddr(e.target.value)}
-          />
+          <div>
+            <Input
+              label="Agent Wallet Address"
+              placeholder="0x..."
+              value={agentAddr}
+              onChange={(e) => {
+                setAgentAddr(e.target.value.trim());
+                setRegisterError(null);
+              }}
+              hint={
+                address &&
+                agentAddr.toLowerCase() === address.toLowerCase()
+                  ? "Using your connected wallet"
+                  : "Defaults to your connected wallet — the caller becomes the agent owner"
+              }
+            />
+            {address && agentAddr.toLowerCase() !== address.toLowerCase() && (
+              <button
+                type="button"
+                onClick={handleUseWallet}
+                className="mt-1 text-[11px] text-accent hover:underline"
+              >
+                Use connected wallet
+              </button>
+            )}
+          </div>
+
           <Input
             label="Metadata URI (optional)"
             placeholder="ipfs://... or https://..."
@@ -807,10 +952,46 @@ export default function AgentPanel() {
             onChange={(e) => setMetadataURI(e.target.value)}
             hint="Pointer to off-chain agent metadata (capabilities, model, etc.)"
           />
+
+          {gasBalance && (
+            <p className="text-[11px] text-text-muted">
+              Gas balance: {Number(gasBalance.formatted).toFixed(4)}{" "}
+              {gasBalance.symbol}
+            </p>
+          )}
+
+          {preflightBlocker && (
+            <div className="p-2.5 rounded-md bg-tier-medium/10 border border-tier-medium/30 flex items-start gap-2">
+              <AlertTriangle
+                size={12}
+                className="text-tier-medium mt-0.5 shrink-0"
+              />
+              <p className="text-[11px] text-tier-medium">{preflightBlocker}</p>
+            </div>
+          )}
+
+          {registerError && (
+            <div className="p-2.5 rounded-md bg-tier-low/10 border border-tier-low/30 flex items-start gap-2">
+              <XCircle size={12} className="text-tier-low mt-0.5 shrink-0" />
+              <p className="text-[11px] text-tier-low break-words">
+                {registerError}
+              </p>
+            </div>
+          )}
+
+          {isRegistered && (
+            <div className="p-2.5 rounded-md bg-tier-high/10 border border-tier-high/30 flex items-center gap-2">
+              <CheckCircle2 size={12} className="text-tier-high" />
+              <p className="text-[11px] text-tier-high">
+                Agent registered successfully.
+              </p>
+            </div>
+          )}
+
           <Button
             onClick={handleRegister}
             loading={isRegistering || isConfirmingRegister}
-            disabled={!agentAddr || !address}
+            disabled={!canSubmit}
           >
             <Bot size={16} />
             Register Agent
