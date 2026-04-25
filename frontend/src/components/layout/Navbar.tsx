@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Shield, Menu, X } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import { ConnectKitButton } from "connectkit";
 import { cn } from "@/lib/utils";
 
@@ -25,10 +26,15 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           <Link href="/" className="flex items-center gap-2.5 shrink-0 group">
-            <Shield
-              size={22}
-              className="text-accent transition-colors group-hover:text-accent-hover"
+            <Image
+              src="/logo.png"
+              alt="TrustGate logo"
+              width={36}
+              height={36}
+              priority
+              className="h-9 w-9 rounded-xl object-contain transition-transform duration-200 group-hover:scale-105"
             />
+
             <div className="flex flex-col">
               <span className="text-sm font-display font-bold text-text leading-tight">
                 TrustGate
