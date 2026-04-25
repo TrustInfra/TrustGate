@@ -1,4 +1,4 @@
-import { Shield } from "lucide-react";
+import Image from "next/image";
 import { EXPLORER_URL } from "@/lib/constants";
 
 export default function Footer() {
@@ -7,7 +7,14 @@ export default function Footer() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <Shield size={16} className="text-accent" />
+            <Image
+              src="/logo.png"
+              alt="TrustGate logo"
+              width={24}
+              height={24}
+              className="h-6 w-6 rounded-md object-contain"
+            />
+
             <span className="text-sm font-display font-semibold text-text">
               TrustGate
             </span>
