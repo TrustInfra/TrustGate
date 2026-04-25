@@ -1,10 +1,35 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  useAccount,
+  useChainId,
+  usePublicClient,
+  useSwitchChain,
+  useWriteContract,
+} from 'wagmi';
+import { ConnectKitButton } from 'connectkit';
+import { CONTRACT_ADDRESSES, arcTestnet } from '@/lib/constants';
+import { erc20Abi } from '@/lib/abi/ERC20';
 
 // Browser calls go through the Next.js proxy at /api/oracle/* to avoid mixed
 // content issues — the upstream HTTP oracle URL only lives on the server.
 const ORACLE_PROXY = '/api/oracle';
+
+const PAYMENT_AMOUNT_RAW = 1000n; // 0.001 USDC at 6 decimals
+const PAYMENT_AMOUNT_HUMAN = '0.001';
+const PAYMENT_RECIPIENT = CONTRACT_ADDRESSES.trustGate;
+const USDC_ADDRESS = CONTRACT_ADDRESSES.usdc;
+
+type QueryPhase =
+  | 'idle'
+  | 'challenge'
+  | 'switch-network'
+  | 'sign'
+  | 'confirm'
+  | 'fetch'
+  | 'done'
+  | 'error';
 
 interface Stats {
   totalQueries: number;
@@ -38,6 +63,15 @@ interface ScoreResult {
   };
 }
 
+interface PaymentRequirement {
+  amount?: string;
+  currency?: string;
+  recipient?: string;
+  network?: string;
+  memo?: string;
+  [k: string]: unknown;
+}
+
 const TIER_COLORS: Record<string, string> = {
   BLOCKED: 'bg-red-500/15 text-red-300 border-red-500/30',
   LOW: 'bg-orange-500/15 text-orange-300 border-orange-500/30',
@@ -46,13 +80,40 @@ const TIER_COLORS: Record<string, string> = {
   HIGH_ELITE: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30',
 };
 
+function phaseLabel(phase: QueryPhase): string {
+  switch (phase) {
+    case 'challenge':
+      return 'Requesting payment quote…';
+    case 'switch-network':
+      return 'Switching to Arc Testnet…';
+    case 'sign':
+      return 'Awaiting wallet signature…';
+    case 'confirm':
+      return 'Confirming on Arc…';
+    case 'fetch':
+      return 'Fetching trust score…';
+    default:
+      return 'Query Trust Score (0.001 USDC)';
+  }
+}
+
 export default function OraclePage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [address, setAddress] = useState('');
   const [result, setResult] = useState<ScoreResult | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [phase, setPhase] = useState<QueryPhase>('idle');
   const [error, setError] = useState<string | null>(null);
+  const [paymentTx, setPaymentTx] = useState<`0x${string}` | null>(null);
   const [tab, setTab] = useState<'js' | 'py' | 'curl'>('js');
+
+  const { address: walletAddress, isConnected } = useAccount();
+  const chainId = useChainId();
+  const publicClient = usePublicClient({ chainId: arcTestnet.id });
+  const { switchChainAsync } = useSwitchChain();
+  const { writeContractAsync } = useWriteContract();
+
+  const onArc = chainId === arcTestnet.id;
+  const busy = phase !== 'idle' && phase !== 'done' && phase !== 'error';
 
   useEffect(() => {
     let cancelled = false;
@@ -75,57 +136,143 @@ export default function OraclePage() {
   }, []);
 
   const query = async () => {
-    setError(null);
-    setResult(null);
+    if (!isConnected || !walletAddress) {
+      setError('Connect your wallet first.');
+      return;
+    }
     if (!/^0x[0-9a-fA-F]{40}$/.test(address)) {
       setError('Enter a valid Arc wallet address');
       return;
     }
-    setLoading(true);
+    if (!publicClient) {
+      setError('Arc public client unavailable. Try refreshing the page.');
+      return;
+    }
+
+    setError(null);
+    setResult(null);
+    setPaymentTx(null);
+
     try {
-      // Step 1: hit the oracle without payment, get the 402 challenge
-      const challenge = await fetch(`${ORACLE_PROXY}/oracle/${address}`);
-      if (challenge.status !== 402) {
-        // already returned a result somehow (e.g. dev-mode)
-        if (challenge.ok) {
-          setResult(await challenge.json());
-          return;
-        }
-        setError(`unexpected status ${challenge.status}`);
+      // Step 1 — challenge the oracle, expect HTTP 402
+      setPhase('challenge');
+      const challenge = await fetch(`${ORACLE_PROXY}/oracle/${address}`, {
+        cache: 'no-store',
+      });
+
+      if (challenge.status === 200) {
+        // Dev-mode or already paid path — surface the result directly.
+        const data = (await challenge.json()) as ScoreResult;
+        setResult(data);
+        setPhase('done');
         return;
       }
 
-      const requirement = await challenge.json();
+      if (challenge.status !== 402) {
+        let detail = '';
+        try {
+          detail = JSON.stringify(await challenge.json());
+        } catch {
+          detail = await challenge.text();
+        }
+        throw new Error(`Oracle returned ${challenge.status}. ${detail}`.trim());
+      }
 
-      // Step 2: prompt user to pay via wallet (handled in PayButton below)
-      // For the playground we surface the requirement and let user
-      // paste a tx hash + nonce. This keeps the page wallet-agnostic
-      // and shows the x402 flow honestly.
-      setError(
-        `Payment required: ${requirement.amount} USDC to ${requirement.recipient} on Arc Testnet. ` +
-          `Send the transfer in your wallet, then paste the tx hash below to retry.`
-      );
+      // Read the payment requirement (logged for transparency / debugging).
+      const requirement = (await challenge.json()) as PaymentRequirement;
+      if (typeof window !== 'undefined') {
+        // eslint-disable-next-line no-console
+        console.log('[oracle] payment requirement:', requirement);
+      }
+
+      // Step 2 — make sure the wallet is on Arc testnet
+      if (!onArc) {
+        setPhase('switch-network');
+        try {
+          await switchChainAsync({ chainId: arcTestnet.id });
+        } catch (err) {
+          throw new Error(
+            `Switch to Arc Testnet (chain id ${arcTestnet.id}) to continue. ` +
+              ((err as Error).message ?? '')
+          );
+        }
+      }
+
+      // Step 3 — sign and broadcast the USDC transfer
+      setPhase('sign');
+      const txHash = await writeContractAsync({
+        chainId: arcTestnet.id,
+        address: USDC_ADDRESS,
+        abi: erc20Abi,
+        functionName: 'transfer',
+        args: [PAYMENT_RECIPIENT, PAYMENT_AMOUNT_RAW],
+      });
+      setPaymentTx(txHash);
+
+      // Step 4 — wait for the receipt on Arc
+      setPhase('confirm');
+      const receipt = await publicClient.waitForTransactionReceipt({
+        hash: txHash,
+        confirmations: 1,
+      });
+      if (receipt.status !== 'success') {
+        throw new Error(
+          `Payment transaction reverted on Arc. Hash: ${txHash}`
+        );
+      }
+
+      // Step 5 — replay the oracle request with the proof header
+      setPhase('fetch');
+      const paid = await fetch(`${ORACLE_PROXY}/oracle/${address}`, {
+        cache: 'no-store',
+        headers: {
+          'X-Payment': txHash,
+          'X-Payment-Tx': txHash,
+        },
+      });
+      if (!paid.ok) {
+        let detail = '';
+        try {
+          detail = JSON.stringify(await paid.json());
+        } catch {
+          detail = await paid.text();
+        }
+        throw new Error(
+          `Oracle rejected payment proof (${paid.status}). ${detail}`.trim()
+        );
+      }
+      const data = (await paid.json()) as ScoreResult;
+      setResult(data);
+      setPhase('done');
     } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setLoading(false);
+      const message = err instanceof Error ? err.message : String(err);
+      // eslint-disable-next-line no-console
+      console.error('[oracle] query failed:', err);
+      setError(humaniseWalletError(message));
+      setPhase('error');
     }
   };
 
-  const codeExamples = {
-    js: `const response = await fetch(
+  const codeExamples = useMemo(
+    () => ({
+      js: `const response = await fetch(
   'https://trustgate-oracle.up.railway.app/oracle/0xYOUR_ADDRESS',
   { headers: { 'X-Payment': x402Token } }
 )
 const trust = await response.json()`,
-    py: `import requests
+      py: `import requests
 response = requests.get(
   'https://trustgate-oracle.up.railway.app/oracle/0xYOUR_ADDRESS',
   headers={'X-Payment': x402_token}
 )`,
-    curl: `curl -H "X-Payment: YOUR_TOKEN" \\
+      curl: `curl -H "X-Payment: YOUR_TOKEN" \\
   https://trustgate-oracle.up.railway.app/oracle/0xYOUR_ADDRESS`,
-  };
+    }),
+    []
+  );
+
+  const buttonLabel = phaseLabel(phase);
+  const validAddress = /^0x[0-9a-fA-F]{40}$/.test(address);
 
   return (
     <main className="min-h-screen bg-zinc-950 text-zinc-100">
@@ -156,24 +303,55 @@ response = requests.get(
         <section className="mb-16 rounded-2xl border border-zinc-800 bg-zinc-900/40 p-8">
           <h2 className="text-2xl font-semibold">Playground</h2>
           <p className="mt-1 text-sm text-zinc-400">
-            Query any Arc testnet address. Costs 0.001 USDC.
+            Query any Arc testnet address. Costs {PAYMENT_AMOUNT_HUMAN} USDC paid from
+            your wallet to the TrustGate contract.
           </p>
 
           <div className="mt-6 flex flex-col gap-3 md:flex-row">
             <input
               value={address}
-              onChange={(e) => setAddress(e.target.value)}
+              onChange={(e) => {
+                setAddress(e.target.value.trim());
+                setError(null);
+                if (phase === 'done' || phase === 'error') setPhase('idle');
+              }}
               placeholder="0x..."
               className="flex-1 rounded-lg border border-zinc-800 bg-zinc-950 px-4 py-3 font-mono text-sm focus:border-emerald-500 focus:outline-none"
             />
-            <button
-              onClick={query}
-              disabled={loading}
-              className="rounded-lg bg-emerald-500 px-5 py-3 text-sm font-semibold text-zinc-950 transition hover:bg-emerald-400 disabled:opacity-50"
-            >
-              {loading ? 'Querying…' : 'Query Trust Score (0.001 USDC)'}
-            </button>
+            {!isConnected ? (
+              <ConnectKitButton.Custom>
+                {({ show }) => (
+                  <button
+                    onClick={show}
+                    className="rounded-lg bg-emerald-500 px-5 py-3 text-sm font-semibold text-zinc-950 transition hover:bg-emerald-400"
+                  >
+                    Connect wallet to query
+                  </button>
+                )}
+              </ConnectKitButton.Custom>
+            ) : (
+              <button
+                onClick={query}
+                disabled={busy || !validAddress}
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-500 px-5 py-3 text-sm font-semibold text-zinc-950 transition hover:bg-emerald-400 disabled:opacity-50"
+              >
+                {busy && <Spinner />}
+                {buttonLabel}
+              </button>
+            )}
           </div>
+
+          {/* Phase progress */}
+          {busy && (
+            <div className="mt-4 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4">
+              <p className="text-sm text-emerald-200">{phaseLabel(phase)}</p>
+              {paymentTx && (
+                <p className="mt-1 font-mono text-xs text-zinc-500 break-all">
+                  Payment tx: {paymentTx}
+                </p>
+              )}
+            </div>
+          )}
 
           {error && (
             <div className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-200">
@@ -181,7 +359,17 @@ response = requests.get(
             </div>
           )}
 
-          {result && <ScoreCard result={result} />}
+          {!isConnected && (
+            <p className="mt-4 text-xs text-zinc-500">
+              The playground sends a real USDC transfer on Arc Testnet. Make sure your
+              wallet is on chain id {arcTestnet.id} and has at least{' '}
+              {PAYMENT_AMOUNT_HUMAN} USDC plus gas.
+            </p>
+          )}
+
+          {result && phase === 'done' && (
+            <ScoreCard result={result} paymentTx={paymentTx} />
+          )}
         </section>
 
         {/* Live Feed */}
@@ -211,7 +399,7 @@ response = requests.get(
                           {q.tier}
                         </span>
                       </td>
-                      <td className="px-4 py-3">{q.paid ? '✓' : '—'}</td>
+                      <td className="px-4 py-3">{q.paid ? 'Yes' : '—'}</td>
                       <td className="px-4 py-3 text-zinc-500">
                         {new Date(q.at).toLocaleTimeString()}
                       </td>
@@ -252,6 +440,40 @@ response = requests.get(
   );
 }
 
+function humaniseWalletError(message: string): string {
+  if (/user rejected|user denied|rejected the request/i.test(message)) {
+    return 'Wallet signature was rejected. Click the button again to retry.';
+  }
+  if (/insufficient funds|exceeds the balance/i.test(message)) {
+    return 'Insufficient USDC for the 0.001 USDC payment plus Arc gas.';
+  }
+  return message;
+}
+
+function Spinner() {
+  return (
+    <svg
+      className="h-4 w-4 animate-spin text-zinc-950"
+      viewBox="0 0 24 24"
+      fill="none"
+    >
+      <circle
+        className="opacity-25"
+        cx="12"
+        cy="12"
+        r="10"
+        stroke="currentColor"
+        strokeWidth="4"
+      />
+      <path
+        className="opacity-75"
+        fill="currentColor"
+        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+      />
+    </svg>
+  );
+}
+
 function StatCard({ label, value }: { label: string; value: string | number }) {
   return (
     <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-5">
@@ -261,7 +483,13 @@ function StatCard({ label, value }: { label: string; value: string | number }) {
   );
 }
 
-function ScoreCard({ result }: { result: ScoreResult }) {
+function ScoreCard({
+  result,
+  paymentTx,
+}: {
+  result: ScoreResult;
+  paymentTx: `0x${string}` | null;
+}) {
   return (
     <div className="mt-6 rounded-xl border border-zinc-800 bg-zinc-950 p-6">
       <div className="flex items-center justify-between">
@@ -280,6 +508,11 @@ function ScoreCard({ result }: { result: ScoreResult }) {
         <Cell label="Contract calls" value={result.breakdown.contractInteractions} />
         <Cell label="Deployments" value={result.breakdown.deployments} />
       </div>
+      {paymentTx && (
+        <p className="mt-4 font-mono text-[11px] text-zinc-500 break-all">
+          Settled by tx {paymentTx}
+        </p>
+      )}
     </div>
   );
 }
