@@ -1,0 +1,23 @@
+[
+  {
+    "address": "0x0000000000000000000000000000000000000000",
+    "privateKeyEnv": "AGENT_1_KEY",
+    "label": "DataFeed-Agent-01",
+    "depositorAddress": "0x0000000000000000000000000000000000000000",
+    "claimAmount": "0.1"
+  },
+  {
+    "address": "0x0000000000000000000000000000000000000000",
+    "privateKeyEnv": "AGENT_2_KEY",
+    "label": "PriceFeed-Agent-02",
+    "depositorAddress": "0x0000000000000000000000000000000000000000",
+    "claimAmount": "0.1"
+  },
+  {
+    "address": "0x0000000000000000000000000000000000000000",
+    "privateKeyEnv": "AGENT_3_KEY",
+    "label": "Arbitrage-Agent-03",
+    "depositorAddress": "0x0000000000000000000000000000000000000000",
+    "claimAmount": "0.1"
+  }
+]
