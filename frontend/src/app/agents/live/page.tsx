@@ -41,7 +41,7 @@ export default function LiveAgentsPage() {
     let cancelled = false;
     const tick = async () => {
       try {
-        const r = await fetch('/api/agent-status', { cache: 'no-store' });
+        const r = await fetch('/api/oracle/agent-status', { cache: 'no-store' });
         if (!r.ok) {
           if (!cancelled) setStale(true);
           return;

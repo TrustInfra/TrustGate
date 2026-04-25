@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from 'react';
 
-const ORACLE_BASE =
-  process.env.NEXT_PUBLIC_ORACLE_URL || 'https://trustgate-oracle.up.railway.app';
+// Browser calls go through the Next.js proxy at /api/oracle/* to avoid mixed
+// content issues — the upstream HTTP oracle URL only lives on the server.
+const ORACLE_PROXY = '/api/oracle';
 
 interface Stats {
   totalQueries: number;
@@ -57,7 +58,7 @@ export default function OraclePage() {
     let cancelled = false;
     const fetchStats = async () => {
       try {
-        const r = await fetch(`${ORACLE_BASE}/oracle/stats`, { cache: 'no-store' });
+        const r = await fetch(`${ORACLE_PROXY}/oracle/stats`, { cache: 'no-store' });
         if (!r.ok) return;
         const data = (await r.json()) as Stats;
         if (!cancelled) setStats(data);
@@ -83,7 +84,7 @@ export default function OraclePage() {
     setLoading(true);
     try {
       // Step 1: hit the oracle without payment, get the 402 challenge
-      const challenge = await fetch(`${ORACLE_BASE}/oracle/${address}`);
+      const challenge = await fetch(`${ORACLE_PROXY}/oracle/${address}`);
       if (challenge.status !== 402) {
         // already returned a result somehow (e.g. dev-mode)
         if (challenge.ok) {
