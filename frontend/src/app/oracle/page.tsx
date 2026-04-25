@@ -221,12 +221,25 @@ export default function OraclePage() {
         );
       }
 
-      // Step 5 — replay the oracle request with the proof header
+      // Step 5 — replay the oracle request with the proof header.
+      // The oracle expects X-Payment to be a base64-encoded JSON envelope.
       setPhase('fetch');
+      const payload = JSON.stringify({
+        txHash,
+        network: 'Arc Testnet',
+        chainId: arcTestnet.id,
+        amount: PAYMENT_AMOUNT_HUMAN,
+        currency: 'USDC',
+        recipient: PAYMENT_RECIPIENT,
+      });
+      const xPaymentHeader =
+        typeof btoa === 'function'
+          ? btoa(payload)
+          : Buffer.from(payload, 'utf-8').toString('base64');
       const paid = await fetch(`${ORACLE_PROXY}/oracle/${address}`, {
         cache: 'no-store',
         headers: {
-          'X-Payment': txHash,
+          'X-Payment': xPaymentHeader,
           'X-Payment-Tx': txHash,
         },
       });
