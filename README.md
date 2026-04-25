@@ -1,199 +1,204 @@
-<div align="center">
-
 # TrustGate
 
-**Trust-Gated USDC Payments for the Agentic Economy**
+> Trust-Gated USDC Payments for the Agentic Economy
 
-A settlement layer where autonomous agents earn, spend, and get paid in USDC — gated by on-chain reputation, priced per action, and settled through Circle Nanopayments on Arc.
-
-[![Solidity](https://img.shields.io/badge/Solidity-0.8.27-363636?style=flat-square&logo=solidity)](https://soliditylang.org/)
-[![Next.js](https://img.shields.io/badge/Next.js-14-000000?style=flat-square&logo=next.js)](https://nextjs.org/)
-[![wagmi](https://img.shields.io/badge/wagmi-v2-1C1B1F?style=flat-square)](https://wagmi.sh/)
-[![Arc Testnet](https://img.shields.io/badge/Arc-Testnet-2563EB?style=flat-square)](https://testnet.arcscan.app)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=flat-square)](LICENSE)
-
-[Problem](#the-problem) &#8226; [How It Works](#how-it-works) &#8226; [Contracts](#deployed-contracts-arc-testnet) &#8226; [Local Setup](#local-setup)
-
-</div>
+TrustGate is a payment layer for autonomous agents on Arc. Depositors fund a pooled USDC balance, set per-agent spending caps, and delegate routing to an onchain trust score. Each claim settles instantly, time-locks for 24 hours, or holds in escrow — picked deterministically from the agent's tier. The result is sub-cent agent payments with reputation gating that lives entirely on the chain that settles the money.
 
 ---
 
 ## The Problem
 
-Autonomous agents are now executing economic actions on behalf of humans: fetching data, calling APIs, purchasing compute, paying other agents. Each action has a marginal cost in the range of **$0.0001 to $0.01** — fractions of a cent.
-
-Traditional L1 settlement makes this mathematically impossible:
-
-- A routine USDC transfer on Ethereum mainnet costs **$2 to $20** in gas.
-- Paying an agent $0.005 for a completed task costs **400x to 4000x the payment itself**.
-- L2s improve this by an order of magnitude, but still leave micropayments uneconomical.
-- Off-chain solutions (batching, state channels, custodial ledgers) reintroduce trust assumptions and force every participant into the same platform.
-
-There is no on-chain rail where an agent can be paid per action at its true marginal cost, settled in a stable asset, without a depositor taking on open-ended counterparty risk.
-
----
+- AI agents need sub-cent micropayments at high frequency.
+- Traditional L1 gas fees ($2 – $5 per tx) make this economically impossible.
+- ERC-20 `approve()` is all-or-nothing — there is no trust layer for agent-to-agent commerce.
+- Any agent that registers can claim against any allowance, with no reputation gate on the settlement path.
 
 ## The Solution
 
-TrustGate combines two primitives:
-
-1. **On-chain trust scoring** — every registered agent carries a reputation score (0–100) maintained by authorized oracles. Score buckets map to trust tiers: **HIGH**, **MEDIUM**, **LOW**.
-2. **Circle Nanopayments on Arc** — Arc is Circle's purpose-built L1 for USDC settlement, supporting per-transaction costs in the sub-cent range. USDC is native, gas is negligible, and finality is fast.
-
-The combination produces a system where:
-
-- **Depositors** fund an allowance for a specific agent without losing custody.
-- **Agents** claim against the allowance per action completed.
-- **Trust tier decides the release model** — high-reputation agents settle instantly; medium agents wait through a short time-lock; low or new agents flow through depositor-gated escrow.
-- **Per-action pricing stays under $0.01**, making high-frequency agentic work economically viable for the first time.
-
-Trust is the missing primitive. Without it, every depositor must either over-trust (pay instantly and hope) or over-gate (micro-manage every call). TrustGate turns reputation into a routing signal so depositors delegate with the right amount of friction automatically.
-
----
+- **Onchain trust scoring from real Arc activity** — transactions, USDC balance, contract interactions, and contract deployments combine into a 0 – 100 integer score.
+- **Circle Nanopayments** for sub-cent USDC settlement on Arc, where USDC is the native gas token.
+- **Trust tier routing** — `HIGH` settles instantly, `MEDIUM` time-locks 24 hours, `LOW` holds in escrow, `BLOCKED` reverts.
+- **99.97% cost reduction** versus standard L1 gas — about $0.0008 per claim on Arc versus $2 – $5 on Ethereum mainnet.
 
 ## How It Works
 
-![TrustGate Flow](docs/images/trustgate-flow.png)
+1. **Depositor funds TrustGate.** Approve USDC to the contract, call `deposit(amount)` to credit a pooled balance.
+2. **Set per-agent allowances.** `setAgentAllowance(agent, maxSpend)` caps every agent independently.
+3. **Agent registers** via `AgentRegistry.registerAgent(agent, metadataURI)`. Permissionless.
+4. **Agent claims** via `TrustGate.claim(depositor, amount)`. Atomic: read tier, debit allowance, settle.
+5. **Score determines routing** — tier is read from `TrustScoring` in the same transaction:
 
-### Step by step
+```
+       ┌───────────────────────────────┐
+       │  TrustGate.claim(deposit, x)  │
+       └──────────────┬────────────────┘
+                      ▼
+              read tier (onchain)
+                      │
+        ┌─────────┬───┴────┬──────────────────┐
+        ▼         ▼        ▼                  ▼
+     BLOCKED    LOW     MEDIUM         HIGH / HIGH_ELITE
+      revert  escrow  24h time-lock     instant transfer
+```
 
-1. **Agent registers.** Any address can call `AgentRegistry.registerAgent(metadata)` — registration is permissionless. The agent is now discoverable and score-eligible.
-2. **Oracle assigns trust score.** An authorized oracle submits a 0–100 score to `TrustScoring`. Score ranges map to tiers: HIGH (75–100), MEDIUM (40–74), LOW (0–39). Unscored agents default to LOW.
-3. **Depositor deposits USDC.** The depositor approves USDC and calls `TrustGate.deposit(amount)`. Funds sit in a per-depositor balance, still under their control.
-4. **Depositor sets per-agent allowance.** `setAllowance(agent, cap, perActionLimit)` authorizes a specific agent to pull up to `cap` in total, with each claim capped at `perActionLimit` (typically ≤ $0.01).
-5. **Agent claims.** The agent calls `TrustGate.claim(depositor, amount)`. TrustGate reads the agent's tier from `TrustScoring` and routes the claim:
-   - **HIGH** — USDC transfers instantly to the agent.
-   - **MEDIUM** — claim enters a short time-lock; agent calls `releaseDelayed(claimId)` after the lock expires.
-   - **LOW** — claim enters escrow; the depositor must explicitly call `approveEscrow(claimId)` for release.
-6. **USDC settles on Arc.** Transfer cost is in the sub-cent range thanks to Arc's nanopayment economics. The depositor can cancel any pending (non-released) claim to recover the funds.
+## Trust Scoring
 
-The routing is enforced on-chain. Depositors don't pick tiers — the agent's reputation decides.
+Every score is computed deterministically from Arc onchain activity. No oracle, no manual input.
 
----
+| Transaction count | Points | Notes |
+|---|---|---|
+| 0 | 0 | BLOCKED — wallet rejected |
+| 1 – 10 | 20 | Newly active |
+| 11 – 30 | 40 | Light usage |
+| 31 – 60 | 60 | Regular usage |
+| 61 – 100 | 75 | High usage |
+| 100+ | 85 | Power user |
 
-## Key Features
+| Bonus signal | Threshold | Bonus |
+|---|---|---|
+| USDC balance | > 100 USDC | +5 |
+| Contract interactions | 3 – 9 | +5 |
+| Contract interactions | 10 – 99 | +7 |
+| Contract interactions | 100+ | +15 |
+| Contract deployments | 1+ | +10 |
 
-- **Trust-gated payments** — three-tier reputation gating built into the settlement contract. Agents graduate from escrow to time-lock to instant as they build score.
-- **3-tier routing** — HIGH (instant), MEDIUM (time-locked), LOW (depositor-approved escrow). Deterministic, on-chain, no off-chain arbiters.
-- **Per-action pricing ≤ $0.01** — depositors enforce micro-limits per claim, making agentic workflows viable without blowing through allowances.
-- **99.97% cost reduction vs L1 gas** — a $0.005 agent payment on Ethereum mainnet costs multiples of its value in gas; on Arc, the same settlement costs a fraction of a cent.
-- **Permissionless agent registration** — any address can register and earn score. No gatekeeper. No allowlist.
-- **Depositor-safe** — allowances are revocable, pending claims are cancellable, escrow releases require explicit approval. Funds never leave the depositor's control without tier-appropriate gating.
-- **Oracle-pluggable scoring** — `TrustScoring` is oracle-authorized; reputation sources (EigenTrust, custom models, external signals) can be swapped without touching settlement logic.
+**Cap rules:** hard cap at 97 unless contract interactions ≥ 100. Maximum score is 100. Zero transactions returns 0 regardless of any other signal.
 
----
+| Tier | Score | Payment behavior |
+|---|---|---|
+| `BLOCKED` | 0 | Claim reverts |
+| `LOW` | 1 – 39 | Escrowed — depositor approval required |
+| `MEDIUM` | 40 – 74 | Time-locked 24h, depositor can cancel |
+| `HIGH` | 75 – 97 | Instant settlement |
+| `HIGH_ELITE` | 98 – 100 | Instant settlement, marked verified |
+
+## Architecture
+
+- **`TrustGate.sol`** — pooled USDC ledger, per-agent allowances, tier-routed claim settlement. The user-facing entry point.
+- **`AgentRegistry.sol`** — permissionless agent enrollment with Active / Suspended / Deactivated lifecycle. msg.sender becomes agent owner.
+- **`TrustScoringPlaintext.sol`** — onchain trust scores (uint64) with HIGH / MEDIUM / LOW tier lookups. FHE variant exists for Zama-compatible chains.
+- **Oracle API** — public, payable HTTP service that returns a typed score for any Arc wallet. 0.001 USDC per query, settled through the x402 payment standard.
+- **Frontend** — Next.js 14 dashboard, oracle page, live agents view, demo simulator, full docs.
+
+## Deployed Contracts (Arc Testnet — Chain ID 5042002)
+
+| Contract | Address |
+|---|---|
+| `TrustGate` | [`0x52E17bC482d00776d73811680CbA9914e83E33CC`](https://testnet.arcscan.app/address/0x52E17bC482d00776d73811680CbA9914e83E33CC) |
+| `AgentRegistry` | [`0x73d3cf7f2734C334927f991fe87D06d595d398b4`](https://testnet.arcscan.app/address/0x73d3cf7f2734C334927f991fe87D06d595d398b4) |
+| `TrustScoringPlaintext` | [`0xEb979Dc25396ba4be6cEA41EAfEa894C55772246`](https://testnet.arcscan.app/address/0xEb979Dc25396ba4be6cEA41EAfEa894C55772246) |
+| USDC (Circle) | [`0x3600000000000000000000000000000000000000`](https://testnet.arcscan.app/address/0x3600000000000000000000000000000000000000) |
+
+All three TrustGate contracts are source-verified on Arcscan.
+
+- RPC: `https://rpc.testnet.arc.network`
+- Explorer: `https://testnet.arcscan.app`
+- Faucet: `https://faucet.circle.com`
+
+## Live Demo
+
+- App: https://trustgated.xyz
+- Demo simulator: https://trustgated.xyz/demo
+- Oracle page: https://trustgated.xyz/oracle
+- Live agents: https://trustgated.xyz/agents/live
+- Docs: https://trustgated.xyz/docs
+- Demo video: https://youtu.be/MvLSx6fLaq0
+
+## Oracle API
+
+Base URL: `https://oracle.trustgated.xyz`
+
+Two paid endpoints, settled via the x402 payment standard (HTTP 402 with payment instructions, replay with `X-Payment` header carrying the proof).
+
+- `GET /trust/:address` — score, tier, recommendation, breakdown, queriedAt, network, source. 0.001 USDC.
+- `POST /trust/batch` — up to 10 addresses in one call, charged 0.001 USDC per address.
+- `GET /health` — liveness probe, no payment required.
+
+```ts
+const ORACLE = process.env.NEXT_PUBLIC_ORACLE_URL!;
+
+// Step 1 — unpaid challenge
+const challenge = await fetch(`${ORACLE}/trust/${address}`);
+if (challenge.status === 402) {
+  const requirement = await challenge.json();
+  // Step 2 — settle 0.001 USDC on Arc to requirement.recipient
+  const txHash = await sendUsdc(requirement);
+  // Step 3 — replay with X-Payment proof
+  const paid = await fetch(`${ORACLE}/trust/${address}`, {
+    headers: { "X-Payment": btoa(JSON.stringify({ txHash })) },
+  });
+  const trust = await paid.json();
+  if (trust.tier === "HIGH" || trust.tier === "HIGH_ELITE") {
+    // proceed instantly
+  }
+}
+```
+
+Full request and response shapes live at `/docs/api-reference`.
 
 ## Tech Stack
 
-| Layer | Technology | Purpose |
-|:------|:-----------|:--------|
-| Settlement chain | Arc Testnet (chain id `5042002`) | Purpose-built USDC L1, nanopayment economics |
-| Stable asset | USDC (6 decimals, native on Arc) | Unit of account for all agent payments |
-| Contracts | Solidity `0.8.27`, Hardhat `2.22` | Agent registry, trust scoring, trust-gated allowance |
-| Libraries | OpenZeppelin Contracts `^5.1` | Ownable2Step, ReentrancyGuard, ERC20 interfaces |
-| Verification | `@nomicfoundation/hardhat-verify` | Arcscan contract verification |
-| Frontend | Next.js 14 (App Router), React 18, TypeScript 5 | Depositor / agent / claims dashboard |
-| Web3 client | wagmi v2, viem v2, ConnectKit | Typed hooks, RPC, wallet UX |
-| State | `@tanstack/react-query` | Contract read caching and background updates |
-| Styling | Tailwind CSS 3, Framer Motion 12 | Dark-first design, motion primitives |
-| Fonts | Syne (display), Plus Jakarta Sans (body), JetBrains Mono | Editorial typography, precision dark |
-| Icons | lucide-react | Line-weight icon set |
-
-Test suite: **142 passing** (Hardhat + Chai), covering agent lifecycle, deposit/withdraw, per-tier claim flows, cancellation, escrow approval, and cross-contract integration.
-
----
-
-## Deployed Contracts (Arc Testnet)
-
-> Chain id: `5042002` &#8226; RPC: `https://rpc.testnet.arc.network` &#8226; Explorer: [testnet.arcscan.app](https://testnet.arcscan.app)
-
-| Contract | Address | Arcscan |
-|:---------|:--------|:--------|
-| **TrustScoringPlaintext** | `0xEb979Dc25396ba4be6cEA41EAfEa894C55772246` | [View](https://testnet.arcscan.app/address/0xEb979Dc25396ba4be6cEA41EAfEa894C55772246) |
-| **AgentRegistry** | `0x73d3cf7f2734C334927f991fe87D06d595d398b4` | [View](https://testnet.arcscan.app/address/0x73d3cf7f2734C334927f991fe87D06d595d398b4) |
-| **TrustGate** | `0x52E17bC482d00776d73811680CbA9914e83E33CC` | [View](https://testnet.arcscan.app/address/0x52E17bC482d00776d73811680CbA9914e83E33CC) |
-| USDC (reference) | `0x3600000000000000000000000000000000000000` | [View](https://testnet.arcscan.app/address/0x3600000000000000000000000000000000000000) |
-
-Deployed 2026-04-17. All three TrustGate contracts are wired together on-chain: `TrustGate` reads tiers from `TrustScoringPlaintext` and agent status from `AgentRegistry`.
-
----
+- **Contracts:** Solidity 0.8.27, Hardhat, OpenZeppelin Contracts 5.x
+- **Frontend:** Next.js 14 (App Router), React 18, TypeScript 5, wagmi v2, viem v2, ConnectKit, Tailwind CSS, Framer Motion
+- **Settlement:** Arc Testnet (chain ID 5042002), USDC (Circle, 6 decimals), Circle Nanopayments
+- **Oracle:** Node.js, Express, x402 payment standard
+- **Testing:** Hardhat + Chai, 142 tests, 0 failing
 
 ## Local Setup
 
 ### Prerequisites
 
-- Node.js `>= 18`
-- A funded Arc Testnet key (for deployment)
-- An EVM wallet (MetaMask, Rabby, or any ConnectKit-supported wallet)
+- Node.js 18+
+- Git
+- An Arc Testnet wallet with at least 0.05 USDC for gas (faucet: `https://faucet.circle.com`)
 
-### 1. Clone and install
+### Clone and install
 
 ```bash
-git clone https://github.com/rudazy/TrustGate.git
+git clone https://github.com/rudazy/TrustGate
 cd TrustGate
-
-# Install contract workspace
 npm install
-
-# Install frontend workspace
-cd frontend
-npm install
-cd ..
+cd frontend && npm install && cd ..
 ```
 
-### 2. Configure environment
+### Environment variables
 
 ```bash
+# repo root .env (for contract deploy + scripts)
 cp .env.example .env
+# add PRIVATE_KEY=<deployer>
+
+# frontend .env.local
+cp frontend/.env.example frontend/.env.local
 ```
 
-Edit `.env` and populate:
+Frontend variables:
 
-```dotenv
-PRIVATE_KEY=0x...                               # deployer key (Arc Testnet funded)
-ARC_TESTNET_RPC_URL=https://rpc.testnet.arc.network
-ETHERSCAN_API_KEY=any-nonempty-string           # Arcscan accepts any non-empty key
+```
+NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your_project_id
+NEXT_PUBLIC_ORACLE_URL=https://oracle.trustgated.xyz
 ```
 
-### 3. Compile and test
+### Run
 
 ```bash
+# contracts
 npx hardhat compile
-npx hardhat test
-```
+npm test                  # 142 passing
 
-### 4. Deploy to Arc Testnet
+# frontend dev server
+cd frontend && npm run dev
 
-```bash
+# deploy fresh contracts to Arc testnet
 npx hardhat run scripts/deploy-arc.ts --network arcTestnet
 ```
 
-The script deploys `TrustScoringPlaintext`, `AgentRegistry`, and `TrustGate`, wires them together, and writes addresses to `deployments/arcTestnet-addresses.json`.
+Open `http://localhost:3000` and connect a wallet on Arc Testnet (chain ID `5042002`). Detailed walkthroughs live in [the in-app docs](https://trustgated.xyz/docs).
 
-### 5. Verify on Arcscan (optional)
+## Team
 
-```bash
-npx hardhat verify --network arcTestnet <ADDRESS> <CONSTRUCTOR_ARGS...>
-```
-
-If the first attempt returns a generic "Unable to verify" error, retry with `--force` — Arcscan's verify endpoint accepts any non-empty `ETHERSCAN_API_KEY` but occasionally needs a second pass.
-
-### 6. Run the frontend
-
-```bash
-cd frontend
-npm run dev
-```
-
-Open [http://localhost:3000](http://localhost:3000), connect a wallet, and switch to Arc Testnet. The dashboard exposes three panels:
-
-- **Depositor** — deposit / withdraw USDC, set per-agent allowances.
-- **Agents** — register agents, view trust scores, deactivate.
-- **Claims** — file claims, release time-locked claims, approve escrowed claims, cancel pending.
-
-If you need Arc testnet USDC, use the faucet linked in the dashboard footer.
-
----
+- **Ludarep** — main developer
+- **Nald** ([@0xnald](https://github.com/0xnald)) — co-builder
 
 ## License
 

@@ -105,3 +105,28 @@
 - [x] **Live test passed** against `0x60C05e2d820CE989E944ED4e7bb33bAEB8705c62`: 29 txs (40 pts) + 13.88 USDC (0 pts) + 13 contract calls (7 pts) + 16 deployments (10 pts) = 57 / MEDIUM
 - [x] BLOCKED path verified with zero-tx address: `{score: 0, tier: "BLOCKED"}` even when USDC balance > 100
 - [x] `next build` still passes
+
+## 2026-04-25 Session
+
+### Oracle + Live Agents pages
+
+- [x] Created `app/oracle/page.tsx` — hero, live stats from `${ORACLE_URL}/oracle/stats`, interactive playground hitting `/oracle/query` (renders 402 with x402 badge), curl example + response shape, CTA to live agents
+- [x] Created `app/agents/live/page.tsx` — Autonomous Agent Loop view, polls `/agent-status` every 5s, table (Agent · Address · Score · Tier · Last claim · Total USDC · Total Claims), summary tiles, graceful 404/error fallback with static loop explainer
+- [x] Added `Oracle` and `Live Agents` links to `Navbar.tsx`
+- [x] Added `NEXT_PUBLIC_ORACLE_URL` to root `.env.example` and created `frontend/.env.example`
+- [x] `next build` passes — `/oracle` and `/agents/live` listed as static routes
+
+### Docs + README rewrite
+
+- [x] Updated `DocsSidebar.tsx` to the new 8-section structure: Overview → How It Works → Trust Scoring → Contracts → API Reference → Dashboard Guide → Integration → Local Setup
+- [x] Rewrote `/docs` (Overview) — problem, solution, quick links to the four most-visited pages
+- [x] Rewrote `/docs/how-it-works` — five-step flow, ASCII routing diagram, "Why Arc + Circle Nanopayments" rationale
+- [x] Created `/docs/trust-scoring` — full scoring formula, bonus + cap rules, tier mapping table, worked example
+- [x] Refreshed `/docs/contracts` — all 4 addresses (TrustGate, AgentRegistry, TrustScoringPlaintext, USDC) with Arcscan links, network params, verification recipe
+- [x] Created `/docs/api-reference` — base URL, x402 explanation, GET /trust/:address, POST /trust/batch, GET /health, error codes
+- [x] Created `/docs/dashboard-guide` — Depositor / Agents / Claims tab walkthrough, Calculate Score flow, what the dashboard does NOT do
+- [x] Created `/docs/integration` — TS oracle integration, contract integration with `ITrustScoring` interface, Sofia-style predicate weight forward look
+- [x] Created `/docs/local-setup` — prereqs, clone, contracts + frontend install, env vars, deploy + verify recipe, repo layout, common issues
+- [x] Rewrote root `README.md` per the new structure (problem, solution, scoring tables, tier table, architecture, deployed contracts, live demo links to trustgated.xyz, oracle API + code example, tech stack, local setup, team)
+- [x] Old orphan doc pages (trust-tiers, agent-registration, payment-flow, margin-analysis, oracle, agent-loop) left in place — no longer in sidebar but still resolve at their URLs
+- [x] `next build` passes — all 8 new doc routes static, 0 errors

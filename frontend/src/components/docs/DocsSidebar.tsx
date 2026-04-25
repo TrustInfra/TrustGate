@@ -6,21 +6,23 @@ import {
   BookOpen,
   Workflow,
   ShieldCheck,
-  Bot,
-  ArrowRightLeft,
-  TrendingDown,
   FileCode2,
+  Cable,
+  LayoutDashboard,
+  Boxes,
+  Terminal,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export const DOC_SECTIONS = [
   { href: "/docs", label: "Overview", icon: BookOpen },
   { href: "/docs/how-it-works", label: "How It Works", icon: Workflow },
-  { href: "/docs/trust-tiers", label: "Trust Tiers", icon: ShieldCheck },
-  { href: "/docs/agent-registration", label: "Agent Registration", icon: Bot },
-  { href: "/docs/payment-flow", label: "Payment Flow", icon: ArrowRightLeft },
-  { href: "/docs/margin-analysis", label: "Margin Analysis", icon: TrendingDown },
-  { href: "/docs/contracts", label: "Contract Reference", icon: FileCode2 },
+  { href: "/docs/trust-scoring", label: "Trust Scoring", icon: ShieldCheck },
+  { href: "/docs/contracts", label: "Contracts", icon: FileCode2 },
+  { href: "/docs/api-reference", label: "API Reference", icon: Cable },
+  { href: "/docs/dashboard-guide", label: "Dashboard Guide", icon: LayoutDashboard },
+  { href: "/docs/integration", label: "Integration", icon: Boxes },
+  { href: "/docs/local-setup", label: "Local Setup", icon: Terminal },
 ] as const;
 
 export default function DocsSidebar() {
