@@ -12,6 +12,7 @@ const NAV_LINKS = [
   { href: "/", label: "Home" },
   { href: "/dashboard", label: "Dashboard" },
   { href: "/oracle", label: "Oracle" },
+  { href: "/token-shield", label: "Token Shield" },
   { href: "/agents/live", label: "Live Agents" },
   { href: "/demo", label: "Demo" },
   { href: "/docs", label: "Docs" },
