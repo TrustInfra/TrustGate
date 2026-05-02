@@ -15,6 +15,7 @@ import {
 import { cn } from "@/lib/utils";
 import Card from "@/components/ui/GlassCard";
 import Badge from "@/components/ui/Badge";
+import LiveStats from "@/components/landing/LiveStats";
 
 /* ───────────────────────── Trust Tier Card ───────────────────────── */
 
@@ -220,6 +221,11 @@ export default function HomePage() {
             </p>
           </div>
         </div>
+      </section>
+
+      {/* LIVE STATS */}
+      <section className="-mt-12 mb-4 px-4 sm:px-6 lg:px-8">
+        <LiveStats />
       </section>
 
       {/* TRUST TIERS */}
