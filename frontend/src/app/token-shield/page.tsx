@@ -31,13 +31,8 @@ type QueryPhase =
   | "error";
 
 interface TokenScoreResult {
-  address?: string;
   score: number;
   tier: string;
-  trend?: string;
-  updatedAt?: string;
-  lastUpdated?: string;
-  recommendation?: string;
 }
 
 interface TokenStatsRecentQuery {
@@ -110,13 +105,6 @@ function phaseLabel(phase: QueryPhase): string {
 function maskAddress(address: string): string {
   if (!/^0x[0-9a-fA-F]{40}$/.test(address)) return address;
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
-}
-
-function formatTimestamp(value: string | undefined): string {
-  if (!value) return "—";
-  const ts = Date.parse(value);
-  if (Number.isNaN(ts)) return value;
-  return new Date(ts).toLocaleString();
 }
 
 function relativeTime(value: string): string {
@@ -421,9 +409,7 @@ export default function TokenShieldPage() {
         </section>
 
         {/* Result */}
-        {result && phase === "done" && (
-          <ResultCard result={result} paymentTx={paymentTx} queriedAddress={address} />
-        )}
+        {result && phase === "done" && <ResultCard result={result} />}
 
         {/* Live Feed */}
         {stats && stats.recentQueries && stats.recentQueries.length > 0 && (
@@ -473,65 +459,17 @@ export default function TokenShieldPage() {
   );
 }
 
-function ResultCard({
-  result,
-  paymentTx,
-  queriedAddress,
-}: {
-  result: TokenScoreResult;
-  paymentTx: `0x${string}` | null;
-  queriedAddress: string;
-}) {
-  const updated = result.updatedAt ?? result.lastUpdated;
-  const trend = result.trend?.toLowerCase();
-  const trendShown = trend === "rising" || trend === "falling";
-  const trendColor =
-    trend === "rising"
-      ? "text-emerald-400"
-      : trend === "falling"
-        ? "text-red-400"
-        : "text-zinc-400";
-  const trendArrow = trend === "rising" ? "↑" : trend === "falling" ? "↓" : "";
-
-  const displayAddress = result.address ?? queriedAddress;
-
+function ResultCard({ result }: { result: TokenScoreResult }) {
   return (
     <section className="mb-12 rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6">
-      <p className="break-all font-mono text-xs text-zinc-500">{displayAddress}</p>
-
-      <div className="mt-4 flex flex-wrap items-end gap-4">
+      <div className="flex flex-wrap items-end gap-4">
         <div className="text-5xl font-bold tabular-nums">{result.score}</div>
         <span
           className={`rounded border px-2.5 py-1 text-xs font-semibold tracking-wide ${tierClass(result.tier)}`}
         >
           {result.tier}
         </span>
-        {trendShown && (
-          <span className={`text-sm font-medium ${trendColor}`}>
-            {trendArrow} {trend}
-          </span>
-        )}
       </div>
-
-      <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-zinc-500">
-        <span>Last updated: {formatTimestamp(updated)}</span>
-        {result.recommendation && (
-          <span>
-            Recommendation:{" "}
-            <span className="text-zinc-300">{result.recommendation}</span>
-          </span>
-        )}
-      </div>
-
-      <p className="mt-4 text-xs text-zinc-500">
-        Score updates automatically over time.
-      </p>
-
-      {paymentTx && (
-        <p className="mt-4 break-all font-mono text-[11px] text-zinc-600">
-          Settled by tx {paymentTx}
-        </p>
-      )}
     </section>
   );
 }
