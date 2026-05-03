@@ -114,9 +114,15 @@ app.get('/oracle/token/:address', async (req: Request, res: Response) => {
   try {
     const result = tokenLookup(address);
     if (result.kind === 'pending') {
-      return res.status(202).json(result.data);
+      return res.status(202).json({ status: 'pending' });
     }
-    return res.json(result.data);
+    // Public response intentionally limited to score and tier.
+    // address/trend/timestamps are kept internally for cache management
+    // but are not part of the public API surface.
+    return res.json({
+      score: result.data.score,
+      tier: result.data.tier,
+    });
   } catch (err) {
     console.error('[oracle] token scoring failed:', (err as Error).message);
     return res.status(500).json({ error: 'token scoring failed', detail: (err as Error).message });

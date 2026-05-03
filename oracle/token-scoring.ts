@@ -4,15 +4,26 @@ import { publicClient, scoreAddress, ScoreResult, Tier } from './scoring';
 
 const ARCSCAN_API_URL = process.env.ARCSCAN_API_URL || 'https://testnet.arcscan.app';
 
-// Top N holders to score against the wallet oracle. Capping at 100 keeps
-// us under Arcscan's rate limit even at 1hr refresh for a hot token.
 const HOLDER_ANALYSIS_CAP = 100;
 
-// Bot detection: if 80%+ of buyers purchased within the same 3hr window,
-// flag and reduce their weight to 10%.
-const BOT_WINDOW_MS = 3 * 60 * 60 * 1000;
-const BOT_THRESHOLD = 0.8;
-const BOT_PENALTY = 0.1;
+// Coordinated buyer detection (kept from prior version, treated as one bot flag)
+const COORDINATED_WINDOW_MS = 3 * 60 * 60 * 1000;
+const COORDINATED_THRESHOLD = 0.8;
+const COORDINATED_BUYER_WEIGHT_PENALTY = 0.1;
+
+// Per-flag score deduction (user spec: 10–15 minimum). Settled at 12.
+const BOT_FLAG_PENALTY = 12;
+
+// Bot-signal thresholds
+const VELOCITY_TXS_PER_HOUR = 50;
+const INTERVAL_PATTERN_MIN_SAMPLE = 8;
+const INTERVAL_PATTERN_TOLERANCE = 0.1; // ±10% groups as "identical"
+const INTERVAL_PATTERN_DOMINANCE = 0.5; // 50%+ of intervals
+const SELF_INTERACTION_THRESHOLD = 5;
+const CLEAN_HISTORY_MIN_TXS = 50;
+
+const HOUR_MS = 60 * 60 * 1000;
+const DAY_MS = 24 * HOUR_MS;
 
 // Per-tier weight for purchased holders (BLOCKED ignored)
 const BUYER_WEIGHTS: Record<Tier, number> = {
@@ -23,8 +34,6 @@ const BUYER_WEIGHTS: Record<Tier, number> = {
   HIGH_ELITE: 10,
 };
 
-// Optional DEX whitelist — if set, only these count as "purchase sources".
-// If unset, fall back to the heuristic (any contract sender = DEX).
 const DEX_WHITELIST: Set<string> = new Set(
   (process.env.KNOWN_DEX_ADDRESSES || '')
     .split(',')
@@ -34,7 +43,7 @@ const DEX_WHITELIST: Set<string> = new Set(
 
 interface ArcscanHolder {
   address: { hash: string };
-  value: string; // balance as string (token wei)
+  value: string;
 }
 
 interface ArcscanTransfer {
@@ -55,8 +64,21 @@ interface ArcscanTokenInfo {
   symbol?: string;
 }
 
-export type TokenTier = 'BLOCKED' | 'LOW' | 'MEDIUM' | 'HIGH' | 'HIGH_ELITE';
+interface ArcscanContractTx {
+  result?: string;
+  status?: string;
+  timestamp?: string;
+  created_contract?: { hash?: string } | null;
+}
+
+export type TokenTier = 'LOW' | 'MEDIUM' | 'HIGH' | 'HIGH_ELITE';
 export type Trend = 'rising' | 'stable' | 'falling';
+export type BotFlag =
+  | 'velocity'
+  | 'interval-pattern'
+  | 'self-interaction'
+  | 'clean-history'
+  | 'coordinated-buying';
 
 export interface TokenScoreResult {
   address: string;
@@ -115,6 +137,60 @@ async function fetchAllTransfers(address: string, maxPages = 5): Promise<Arcscan
   return out;
 }
 
+async function fetchTokenContractTxs(
+  address: string,
+  maxPages = 3
+): Promise<ArcscanContractTx[]> {
+  const out: ArcscanContractTx[] = [];
+  let nextParams = '';
+  for (let page = 0; page < maxPages; page++) {
+    try {
+      const url = `${ARCSCAN_API_URL}/api/v2/addresses/${address}/transactions${nextParams ? `?${nextParams}` : ''}`;
+      const res = await axios.get<{
+        items?: ArcscanContractTx[];
+        next_page_params?: Record<string, unknown>;
+      }>(url, { timeout: 10_000 });
+      const items = res.data.items || [];
+      out.push(...items);
+      const np = res.data.next_page_params;
+      if (!np || items.length === 0) break;
+      const tuples: [string, string][] = Object.entries(np).map(([k, v]) => [k, String(v)]);
+      nextParams = new URLSearchParams(tuples).toString();
+    } catch (err) {
+      console.error(`[token-scoring] contract tx fetch failed: ${(err as Error).message}`);
+      break;
+    }
+  }
+  return out;
+}
+
+async function fetchDeployerDeployments(deployer: string, maxPages = 5): Promise<number> {
+  let count = 0;
+  let nextParams = 'filter=from';
+  for (let page = 0; page < maxPages; page++) {
+    try {
+      const url = `${ARCSCAN_API_URL}/api/v2/addresses/${deployer}/transactions?${nextParams}`;
+      const res = await axios.get<{
+        items?: Array<{ created_contract?: { hash?: string } | null }>;
+        next_page_params?: Record<string, unknown>;
+      }>(url, { timeout: 10_000 });
+      const items = res.data.items || [];
+      for (const tx of items) {
+        if (tx.created_contract?.hash) count++;
+      }
+      const np = res.data.next_page_params;
+      if (!np || items.length === 0) break;
+      const tuples: [string, string][] = Object.entries(np).map(([k, v]) => [k, String(v)]);
+      tuples.push(['filter', 'from']);
+      nextParams = new URLSearchParams(tuples).toString();
+    } catch (err) {
+      console.error(`[token-scoring] deployer deployments fetch failed: ${(err as Error).message}`);
+      break;
+    }
+  }
+  return count;
+}
+
 async function isContract(address: string): Promise<boolean> {
   try {
     const code = await publicClient.getCode({ address: address as `0x${string}` });
@@ -159,11 +235,80 @@ async function fetchAddressCounters(address: string): Promise<AddressCounters> {
   }
 }
 
-// ----- core scoring -----
+// ----- bot signal detectors -----
+
+function detectVelocity(transfers: ArcscanTransfer[]): boolean {
+  if (transfers.length < VELOCITY_TXS_PER_HOUR) return false;
+  const ms = transfers
+    .map((t) => new Date(t.timestamp).getTime())
+    .filter((n) => !Number.isNaN(n))
+    .sort((a, b) => a - b);
+  let left = 0;
+  let max = 0;
+  for (let right = 0; right < ms.length; right++) {
+    while (ms[right] - ms[left] > HOUR_MS) left++;
+    const count = right - left + 1;
+    if (count > max) max = count;
+  }
+  return max > VELOCITY_TXS_PER_HOUR;
+}
+
+function detectIntervalPattern(transfers: ArcscanTransfer[]): boolean {
+  if (transfers.length < INTERVAL_PATTERN_MIN_SAMPLE + 1) return false;
+  const sorted = transfers
+    .map((t) => new Date(t.timestamp).getTime())
+    .filter((n) => !Number.isNaN(n))
+    .sort((a, b) => a - b);
+  const intervals: number[] = [];
+  for (let i = 1; i < sorted.length; i++) {
+    const d = sorted[i] - sorted[i - 1];
+    if (d > 0) intervals.push(d);
+  }
+  if (intervals.length < INTERVAL_PATTERN_MIN_SAMPLE) return false;
+
+  let bestCluster = 0;
+  for (const ref of intervals) {
+    let count = 0;
+    for (const v of intervals) {
+      if (Math.abs(v - ref) / ref <= INTERVAL_PATTERN_TOLERANCE) count++;
+    }
+    if (count > bestCluster) bestCluster = count;
+  }
+  return bestCluster / intervals.length >= INTERVAL_PATTERN_DOMINANCE;
+}
+
+function detectSelfInteraction(transfers: ArcscanTransfer[]): boolean {
+  let selfCount = 0;
+  for (const t of transfers) {
+    const from = t.from?.hash?.toLowerCase();
+    const to = t.to?.hash?.toLowerCase();
+    if (from && to && from === to) selfCount++;
+  }
+  return selfCount >= SELF_INTERACTION_THRESHOLD;
+}
+
+function detectCleanHistoryManipulation(txs: ArcscanContractTx[]): boolean {
+  if (txs.length < CLEAN_HISTORY_MIN_TXS) return false;
+  for (const tx of txs) {
+    const result = (tx.result || '').toLowerCase();
+    const status = (tx.status || '').toLowerCase();
+    const failed =
+      result === 'error' ||
+      result === 'failed' ||
+      result === 'reverted' ||
+      status === 'error' ||
+      status === 'failed' ||
+      status === '0';
+    if (failed) return false;
+  }
+  return true;
+}
+
+// ----- buyer classification (kept from prior implementation) -----
 
 interface BuyerInfo {
   address: string;
-  firstReceivedAt: number; // ms epoch
+  firstReceivedAt: number;
   firstSource: string;
   isPurchased: boolean;
 }
@@ -178,9 +323,6 @@ async function classifyHolders(
   const deployerLower = deployer?.toLowerCase();
   const tokenLower = tokenAddress.toLowerCase();
 
-  // Build first-received map: holder → earliest inbound transfer
-  // Transfers are typically newest-first from Arcscan, so iterate and keep
-  // the oldest seen per recipient.
   const firstIn: Map<string, ArcscanTransfer> = new Map();
   for (const tx of transfers) {
     const to = tx.to?.hash?.toLowerCase();
@@ -193,12 +335,7 @@ async function classifyHolders(
     }
   }
 
-  // For each top-N holder, classify
-  const results: BuyerInfo[] = [];
   const topHolders = holders.slice(0, HOLDER_ANALYSIS_CAP);
-
-  // Pre-collect unique senders we need to check is-contract for, dedupe to
-  // minimize RPC calls.
   const sendersToProbe = new Set<string>();
   for (const h of topHolders) {
     const addr = h.address?.hash?.toLowerCase();
@@ -215,7 +352,6 @@ async function classifyHolders(
   }
 
   const senderIsContract: Map<string, boolean> = new Map();
-  // Run probes with bounded concurrency
   const probeList = Array.from(sendersToProbe);
   const CONCURRENCY = 8;
   for (let i = 0; i < probeList.length; i += CONCURRENCY) {
@@ -224,29 +360,23 @@ async function classifyHolders(
     slice.forEach((a, idx) => senderIsContract.set(a, codes[idx]));
   }
 
+  const results: BuyerInfo[] = [];
   for (const h of topHolders) {
     const addr = h.address?.hash?.toLowerCase();
     if (!addr) continue;
     const tx = firstIn.get(addr);
-    if (!tx) {
-      // No inbound transfer found in our window — skip (likely older than fetch range)
-      continue;
-    }
+    if (!tx) continue;
     const from = tx.from?.hash?.toLowerCase() || '';
     const tsMs = new Date(tx.timestamp).getTime();
 
     let isPurchased = false;
     if (from === ZERO || from === deployerLower) {
-      // mint or deployer transfer — airdrop, not purchased
       isPurchased = false;
     } else if (DEX_WHITELIST.size > 0 && DEX_WHITELIST.has(from)) {
       isPurchased = true;
     } else if (DEX_WHITELIST.size === 0 && senderIsContract.get(from)) {
-      // heuristic: contract sender = DEX
       isPurchased = true;
     } else {
-      // EOA-to-EOA transfer — treat as purchase if from someone who isn't deployer/mint.
-      // This catches OTC and casual transfers; safer to count than to ignore.
       isPurchased = true;
     }
 
@@ -257,50 +387,36 @@ async function classifyHolders(
       isPurchased,
     });
   }
-
   return results;
 }
 
 function detectCoordinatedBuying(buyers: BuyerInfo[]): boolean {
   const purchased = buyers.filter((b) => b.isPurchased);
-  if (purchased.length < 5) return false; // too few to flag
-
-  // Find the densest 3hr window using a sliding-window over sorted timestamps
+  if (purchased.length < 5) return false;
   const times = purchased.map((b) => b.firstReceivedAt).sort((a, b) => a - b);
   let maxInWindow = 0;
   let left = 0;
   for (let right = 0; right < times.length; right++) {
-    while (times[right] - times[left] > BOT_WINDOW_MS) left++;
+    while (times[right] - times[left] > COORDINATED_WINDOW_MS) left++;
     const inWin = right - left + 1;
     if (inWin > maxInWindow) maxInWindow = inWin;
   }
-
-  return maxInWindow / purchased.length >= BOT_THRESHOLD;
+  return maxInWindow / purchased.length >= COORDINATED_THRESHOLD;
 }
 
+// ----- contract significance (drives precompile fallback weighting) -----
+
 interface ContractSignificance {
-  multiplier: number; // 1.0 = neutral, up to 10x for systemically important contracts
+  multiplier: number;
   reason: string;
 }
 
-/**
- * Significance multiplier per spec:
- *   holder_count > 50    → 2x
- *   transactions > 500   → 3x
- *   transactions > 10000 → 10x
- *   max wins (these are tiers, not stackable). Hard cap 10x.
- *
- * USDC at 0x3600...0000 has thousands of holders and millions of txs, so it
- * hits the 10x tier unconditionally — independent of deployer (which is null
- * for system precompiles, handled separately in computeTokenScore).
- */
 function contractSignificance(opts: {
   holderCount: number;
   transactionsCount: number;
 }): ContractSignificance {
   const reasons: string[] = [];
   let mult = 1.0;
-
   if (opts.transactionsCount > 10_000) {
     mult = Math.max(mult, 10);
     reasons.push('tx>10000');
@@ -313,30 +429,30 @@ function contractSignificance(opts: {
     mult = Math.max(mult, 2);
     reasons.push('holders>50');
   }
-
   if (mult > 10) mult = 10;
   return { multiplier: mult, reason: reasons.join(',') || 'baseline' };
 }
 
 function tierFor(score: number): TokenTier {
-  if (score === 0) return 'BLOCKED';
   if (score < 40) return 'LOW';
-  if (score < 75) return 'MEDIUM';
-  if (score < 90) return 'HIGH';
+  if (score < 60) return 'MEDIUM';
+  if (score < 80) return 'HIGH';
   return 'HIGH_ELITE';
 }
 
 export interface ComputedTokenScore {
   result: TokenScoreResult;
   // internal — not returned to API caller, used for trend on next refresh
+  // and surfaced only to operators / logs.
   _internal: {
     rawBuyerScore: number;
     rawDeployerScore: number;
-    botFlagged: boolean;
-    holderCount: number;
-    transferCount: number;
+    deployerDeployments: number;
+    tokenAgeDays: number;
     transactionsCount: number;
+    botFlags: BotFlag[];
     significanceMultiplier: number;
+    appliedCap: number;
   };
 }
 
@@ -347,23 +463,45 @@ export async function computeTokenScore(
 ): Promise<ComputedTokenScore> {
   const address = getAddress(rawAddress);
 
-  const [info, holders, transfers, deployer, counters] = await Promise.all([
-    fetchTokenInfo(address),
-    fetchHolders(address),
-    fetchAllTransfers(address),
-    fetchDeployer(address),
-    fetchAddressCounters(address),
-  ]);
+  const [info, holders, transfers, deployer, counters, tokenAgeMs, contractTxs] =
+    await Promise.all([
+      fetchTokenInfo(address),
+      fetchHolders(address),
+      fetchAllTransfers(address),
+      fetchDeployer(address),
+      fetchAddressCounters(address),
+      fetchTokenAgeMs(address),
+      fetchTokenContractTxs(address),
+    ]);
 
-  // Authoritative holder count from token endpoint, fallback to fetched array
   const reportedHolderCount = Number(info?.holders || 0);
   const effectiveHolderCount = Math.max(reportedHolderCount, holders.length);
 
   const buyers = await classifyHolders(holders, transfers, deployer, address);
   const purchased = buyers.filter((b) => b.isPurchased);
-  const botFlagged = detectCoordinatedBuying(buyers);
 
-  // Score each purchased buyer against the wallet oracle, in parallel batches
+  // Deployer signals
+  let deployerDeployments = 0;
+  let deployerScore: ScoreResult | null = null;
+  if (deployer) {
+    const [count, score] = await Promise.all([
+      fetchDeployerDeployments(deployer),
+      scoreAddress(deployer).catch(() => null as ScoreResult | null),
+    ]);
+    deployerDeployments = count;
+    deployerScore = score;
+  }
+
+  // Bot signals
+  const botFlags: BotFlag[] = [];
+  if (detectVelocity(transfers)) botFlags.push('velocity');
+  if (detectIntervalPattern(transfers)) botFlags.push('interval-pattern');
+  if (detectSelfInteraction(transfers)) botFlags.push('self-interaction');
+  if (detectCleanHistoryManipulation(contractTxs)) botFlags.push('clean-history');
+  const coordinated = detectCoordinatedBuying(buyers);
+  if (coordinated) botFlags.push('coordinated-buying');
+
+  // Buyer points (with coordinated-buying weight reduction)
   const buyerScores: Array<{ tier: Tier }> = [];
   const CONCURRENCY = 6;
   for (let i = 0; i < purchased.length; i += CONCURRENCY) {
@@ -379,58 +517,79 @@ export async function computeTokenScore(
     );
     for (const r of results) if (r) buyerScores.push({ tier: r.tier });
   }
-
-  // Sum buyer weights (with bot penalty if flagged)
   let buyerPoints = 0;
   for (const b of buyerScores) {
     const w = BUYER_WEIGHTS[b.tier] || 0;
-    buyerPoints += botFlagged ? w * BOT_PENALTY : w;
+    buyerPoints += coordinated ? w * COORDINATED_BUYER_WEIGHT_PENALTY : w;
   }
 
-  // Significance multiplier — driven by token's own onchain footprint
+  // Significance + deployer points
   const sig = contractSignificance({
     holderCount: effectiveHolderCount,
     transactionsCount: counters.transactionsCount,
   });
 
-  // Deployer contribution. For system precompiles like native USDC at
-  // 0x3600...0000, there is no deployer — but the contract's own footprint
-  // is what makes it trustworthy. In that case, treat the contract itself as
-  // a "deployer-equivalent" with a max-trust baseline, scaled by significance.
   let deployerPoints = 0;
-  let usedDeployerFallback = false;
-  if (deployer) {
-    try {
-      const ds = await scoreAddress(deployer);
-      // Deployer contributes proportional to wallet score × significance.
-      // 100-score deployer with 10x mult would maxout — clamped via final cap.
-      deployerPoints = (ds.score / 100) * 30 * sig.multiplier;
-    } catch (err) {
-      console.error(`[token-scoring] deployer score failed: ${(err as Error).message}`);
-    }
-  } else if (sig.multiplier >= 3) {
-    // No deployer (system contract / precompile / unindexed creation) but the
-    // contract itself is significant. Use its significance as a trust signal.
-    // Baseline = 30 pts × multiplier, capped naturally by the 0..100 final clamp.
-    usedDeployerFallback = true;
+  if (deployerScore) {
+    deployerPoints = (deployerScore.score / 100) * 30 * sig.multiplier;
+  } else if (!deployer && sig.multiplier >= 3) {
+    // System precompile / unindexed creation. Award based on the contract's
+    // own significance — but caps below still apply, so this never alone
+    // promotes a token to HIGH_ELITE without the deployment count.
     deployerPoints = 30 * sig.multiplier;
   }
 
-  // Combine — clamp to 0..100
-  let score = Math.round(buyerPoints + deployerPoints);
-  if (score > 100) score = 100;
+  // Combine and apply bot-flag penalties (each flag deducts BOT_FLAG_PENALTY)
+  let raw = buyerPoints + deployerPoints - botFlags.length * BOT_FLAG_PENALTY;
+  if (raw < 0) raw = 0;
+
+  // Hard caps per spec
+  const tokenAgeDays = tokenAgeMs > 0 ? tokenAgeMs / DAY_MS : 0;
+  const txCount = counters.transactionsCount;
+
+  let cap = 100;
+
+  // Bot-flagged tokens never reach HIGH (60+)
+  if (botFlags.length > 0) cap = Math.min(cap, 59);
+
+  // Fresh tokens (very young or low activity) capped at MEDIUM
+  const isFresh = tokenAgeDays < 7 || txCount < 10;
+  if (isFresh) cap = Math.min(cap, 59);
+
+  // 0 deployments — never above 79 (no HIGH_ELITE per spec). The 85 absolute
+  // ceiling in the spec is satisfied by 79 ≤ 85.
+  if (deployerDeployments === 0) cap = Math.min(cap, 79);
+
+  // HIGH_ELITE eligibility
+  const eliteOk =
+    deployerDeployments >= 10 &&
+    tokenAgeDays > 180 &&
+    txCount > 500 &&
+    botFlags.length === 0;
+  if (!eliteOk) cap = Math.min(cap, 79);
+
+  // Score == 100 requires exceptional across every signal
+  const perfectOk =
+    eliteOk &&
+    deployerDeployments >= 25 &&
+    tokenAgeDays > 365 &&
+    txCount > 5000;
+  if (!perfectOk) cap = Math.min(cap, 99);
+
+  let score = Math.round(raw);
+  if (score > cap) score = cap;
   if (score < 0) score = 0;
-  // If no purchased holders at all and no deployer trust, hard zero
+
+  // No purchased holders and no deployer trust → hard zero
   if (purchased.length === 0 && deployerPoints === 0) score = 0;
 
   console.log(
-    `[token-scoring] ${address} score=${score} buyers=${buyerPoints.toFixed(1)} ` +
-      `deployer=${deployerPoints.toFixed(1)} sig=${sig.multiplier}x (${sig.reason})` +
-      (usedDeployerFallback ? ' [precompile-fallback]' : '') +
-      (botFlagged ? ' [bot-flagged]' : '')
+    `[token-scoring] ${address} score=${score} cap=${cap} ` +
+      `buyers=${buyerPoints.toFixed(1)} deployer=${deployerPoints.toFixed(1)} ` +
+      `deployments=${deployerDeployments} ageDays=${tokenAgeDays.toFixed(1)} ` +
+      `txs=${txCount} sig=${sig.multiplier}x flags=[${botFlags.join(',')}]`
   );
 
-  // Trend
   let trend: Trend = 'stable';
   if (prevScore !== null) {
     const delta = score - prevScore;
@@ -451,22 +610,21 @@ export async function computeTokenScore(
     _internal: {
       rawBuyerScore: buyerPoints,
       rawDeployerScore: deployerPoints,
-      botFlagged,
-      holderCount: effectiveHolderCount,
-      transferCount: transfers.length,
-      transactionsCount: counters.transactionsCount,
+      deployerDeployments,
+      tokenAgeDays,
+      transactionsCount: txCount,
+      botFlags,
       significanceMultiplier: sig.multiplier,
+      appliedCap: cap,
     },
   };
 }
 
-// Refresh schedule based on token age
 export function refreshIntervalMs(tokenAgeMs: number): number {
-  const day = 24 * 60 * 60 * 1000;
-  if (tokenAgeMs < 7 * day) return 60 * 60 * 1000; // 1 hour
-  if (tokenAgeMs < 30 * day) return 6 * 60 * 60 * 1000; // 6 hours
-  if (tokenAgeMs < 90 * day) return 24 * 60 * 60 * 1000; // 24 hours
-  return 72 * 60 * 60 * 1000; // 72 hours
+  if (tokenAgeMs < 7 * DAY_MS) return HOUR_MS;
+  if (tokenAgeMs < 30 * DAY_MS) return 6 * HOUR_MS;
+  if (tokenAgeMs < 90 * DAY_MS) return 24 * HOUR_MS;
+  return 72 * HOUR_MS;
 }
 
 export async function fetchTokenAgeMs(address: string): Promise<number> {
@@ -481,6 +639,6 @@ export async function fetchTokenAgeMs(address: string): Promise<number> {
     const ts = Number(block.timestamp) * 1000;
     return Date.now() - ts;
   } catch {
-    return 0; // unknown — treat as fresh, 1hr refresh
+    return 0;
   }
 }

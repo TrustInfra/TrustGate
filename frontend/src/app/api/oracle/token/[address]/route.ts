@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { rescoreToken } from "@/lib/token-rescore";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -99,6 +100,46 @@ async function proxy(
 
   const headers = pickResponseHeaders(upstream);
   const body = await upstream.arrayBuffer();
+
+  // Re-score successful score responses through our formula. Pass through
+  // 402 (payment required), 202 (pending), 5xx, and any non-JSON / unexpected
+  // shape unchanged.
+  if (
+    upstream.status === 200 &&
+    req.method === "GET" &&
+    (headers.get("content-type") ?? "").toLowerCase().includes("application/json")
+  ) {
+    try {
+      const text = new TextDecoder().decode(body);
+      const parsed: unknown = JSON.parse(text);
+      if (
+        typeof parsed === "object" &&
+        parsed !== null &&
+        typeof (parsed as { score?: unknown }).score === "number"
+      ) {
+        const rawScore = (parsed as { score: number }).score;
+        const rescored = await rescoreToken(rawScore, context.params.address);
+        const newBody = JSON.stringify(rescored);
+        const newHeaders = new Headers(headers);
+        newHeaders.set("content-type", "application/json; charset=utf-8");
+        // Body changed — drop validators based on the upstream payload.
+        newHeaders.delete("etag");
+        newHeaders.delete("last-modified");
+        return new NextResponse(newBody, {
+          status: 200,
+          statusText: "OK",
+          headers: newHeaders,
+        });
+      }
+    } catch (err) {
+      // If rescoring fails (Arcscan flake, parse failure, anything), fall
+      // through to passthrough so the user still gets a response.
+      console.error(
+        "[token-rescore] post-processing failed, passing upstream through:",
+        err instanceof Error ? err.message : err
+      );
+    }
+  }
 
   return new NextResponse(body, {
     status: upstream.status,
