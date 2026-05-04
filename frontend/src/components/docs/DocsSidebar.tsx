@@ -10,6 +10,7 @@ import {
   Cable,
   LayoutDashboard,
   Boxes,
+  Code2,
   Terminal,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -22,6 +23,7 @@ export const DOC_SECTIONS = [
   { href: "/docs/api-reference", label: "API Reference", icon: Cable },
   { href: "/docs/dashboard-guide", label: "Dashboard Guide", icon: LayoutDashboard },
   { href: "/docs/integration", label: "Integration", icon: Boxes },
+  { href: "/docs/widget-integration", label: "Widget", icon: Code2 },
   { href: "/docs/local-setup", label: "Local Setup", icon: Terminal },
 ] as const;
 
