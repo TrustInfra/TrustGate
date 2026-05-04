@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { rescoreWallet } from "@/lib/wallet-rescore";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -72,8 +73,9 @@ async function proxy(
   req: NextRequest,
   context: { params: { address: string } }
 ): Promise<NextResponse> {
-  const address = encodeURIComponent(context.params.address);
-  const url = `${ORACLE_BASE}/oracle/token/${address}${req.nextUrl.search}`;
+  const address = context.params.address;
+  const encoded = encodeURIComponent(address);
+  const url = `${ORACLE_BASE}/oracle/${encoded}${req.nextUrl.search}`;
 
   const init: RequestInit = {
     method: req.method,
@@ -99,6 +101,51 @@ async function proxy(
 
   const headers = pickResponseHeaders(upstream);
   const body = await upstream.arrayBuffer();
+
+  // Re-score successful score responses through our formula. 402, 202, 5xx,
+  // and anything without a numeric score field pass through unchanged.
+  if (
+    upstream.status === 200 &&
+    req.method === "GET" &&
+    /^0x[0-9a-fA-F]{40}$/.test(address) &&
+    (headers.get("content-type") ?? "").toLowerCase().includes("application/json")
+  ) {
+    try {
+      const text = new TextDecoder().decode(body);
+      const parsed: unknown = JSON.parse(text);
+      if (
+        typeof parsed === "object" &&
+        parsed !== null &&
+        typeof (parsed as { score?: unknown }).score === "number"
+      ) {
+        const original = parsed as Record<string, unknown> & { score: number };
+        const rescored = await rescoreWallet(original.score, address);
+        // Override the three score-derived fields. Preserve everything else
+        // upstream returned (breakdown, queriedAt, network, source, etc.).
+        const merged: Record<string, unknown> = {
+          ...original,
+          score: rescored.score,
+          tier: rescored.tier,
+          recommendation: rescored.recommendation,
+        };
+        const newBody = JSON.stringify(merged);
+        const newHeaders = new Headers(headers);
+        newHeaders.set("content-type", "application/json; charset=utf-8");
+        newHeaders.delete("etag");
+        newHeaders.delete("last-modified");
+        return new NextResponse(newBody, {
+          status: 200,
+          statusText: "OK",
+          headers: newHeaders,
+        });
+      }
+    } catch (err) {
+      console.error(
+        "[wallet-rescore] post-processing failed, passing upstream through:",
+        err instanceof Error ? err.message : err
+      );
+    }
+  }
 
   return new NextResponse(body, {
     status: upstream.status,

@@ -156,7 +156,7 @@ export default function OraclePage() {
     try {
       // Step 1 — challenge the oracle, expect HTTP 402
       setPhase('challenge');
-      const challenge = await fetch(`${ORACLE_PROXY}/oracle/${address}`, {
+      const challenge = await fetch(`${ORACLE_PROXY}/${address}`, {
         cache: 'no-store',
       });
 
@@ -250,7 +250,7 @@ export default function OraclePage() {
         typeof btoa === 'function'
           ? btoa(payload)
           : Buffer.from(payload, 'utf-8').toString('base64');
-      const paid = await fetch(`${ORACLE_PROXY}/oracle/${address}`, {
+      const paid = await fetch(`${ORACLE_PROXY}/${address}`, {
         cache: 'no-store',
         headers: {
           'X-Payment': xPaymentHeader,
@@ -395,7 +395,7 @@ response = requests.get(
           )}
 
           {result && phase === 'done' && (
-            <ScoreCard result={result} paymentTx={paymentTx} />
+            <ScoreCard result={result} />
           )}
         </section>
 
@@ -510,45 +510,14 @@ function StatCard({ label, value }: { label: string; value: string | number }) {
   );
 }
 
-function ScoreCard({
-  result,
-  paymentTx,
-}: {
-  result: ScoreResult;
-  paymentTx: `0x${string}` | null;
-}) {
+function ScoreCard({ result }: { result: ScoreResult }) {
   return (
     <div className="mt-6 rounded-xl border border-zinc-800 bg-zinc-950 p-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="font-mono text-xs text-zinc-500">{result.address}</p>
-          <p className="mt-2 text-4xl font-bold">{result.score}</p>
-          <p className="mt-1 text-sm text-zinc-400">
-            tier <span className="text-zinc-200">{result.tier}</span> · recommendation{' '}
-            <span className="text-zinc-200">{result.recommendation}</span>
-          </p>
-        </div>
-      </div>
-      <div className="mt-6 grid grid-cols-2 gap-3 text-sm md:grid-cols-4">
-        <Cell label="Tx count" value={result.breakdown.txCount} />
-        <Cell label="USDC bal" value={result.breakdown.usdcBalance} />
-        <Cell label="Contract calls" value={result.breakdown.contractInteractions} />
-        <Cell label="Deployments" value={result.breakdown.deployments} />
-      </div>
-      {paymentTx && (
-        <p className="mt-4 font-mono text-[11px] text-zinc-500 break-all">
-          Settled by tx {paymentTx}
-        </p>
-      )}
-    </div>
-  );
-}
-
-function Cell({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="rounded-lg bg-zinc-900/60 p-3">
-      <p className="text-xs text-zinc-500">{label}</p>
-      <p className="mt-1 font-semibold tabular-nums">{value}</p>
+      <p className="text-4xl font-bold">{result.score}</p>
+      <p className="mt-1 text-sm text-zinc-400">
+        tier <span className="text-zinc-200">{result.tier}</span> · recommendation{' '}
+        <span className="text-zinc-200">{result.recommendation}</span>
+      </p>
     </div>
   );
 }
