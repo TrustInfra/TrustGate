@@ -42,6 +42,8 @@ type QueryPhase =
 interface TokenScoreResult {
   score: number;
   tier: string;
+  contractType?: string;
+  txCount?: number;
 }
 
 interface TokenStatsRecentQuery {
@@ -234,13 +236,22 @@ export default function TokenShieldPage() {
       }
 
       if (challenge.status !== 402) {
+        let body: unknown = null;
         let detail = "";
         try {
-          detail = JSON.stringify(await challenge.json());
+          body = await challenge.json();
+          detail = JSON.stringify(body);
         } catch {
           detail = await challenge.text();
         }
-        throw new Error(`Oracle returned ${challenge.status}. ${detail}`.trim());
+        const friendly =
+          body && typeof body === "object" && body !== null &&
+          typeof (body as { error?: unknown }).error === "string"
+            ? (body as { error: string }).error
+            : null;
+        throw new Error(
+          friendly ?? `Oracle returned ${challenge.status}. ${detail}`.trim()
+        );
       }
 
       const requirement = (await challenge.json()) as PaymentRequirement;
@@ -524,9 +535,12 @@ export default function TokenShieldPage() {
 }
 
 function ResultCard({ result }: { result: TokenScoreResult }) {
+  const isContract = result.contractType === "CONTRACT";
+  const label = isContract ? "Contract Score" : "ERC-20 Token Score";
   return (
     <section className="mb-12 rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6">
-      <div className="flex flex-wrap items-end gap-4">
+      <p className="text-xs uppercase tracking-widest text-zinc-500">{label}</p>
+      <div className="mt-3 flex flex-wrap items-end gap-4">
         <div className="text-5xl font-bold tabular-nums">{result.score}</div>
         <span
           className={`rounded border px-2.5 py-1 text-xs font-semibold tracking-wide ${tierClass(result.tier)}`}
@@ -534,6 +548,11 @@ function ResultCard({ result }: { result: TokenScoreResult }) {
           {result.tier}
         </span>
       </div>
+      {typeof result.txCount === "number" && (
+        <p className="mt-3 text-sm text-zinc-400 tabular-nums">
+          {result.txCount.toLocaleString()} transactions recorded
+        </p>
+      )}
     </section>
   );
 }
