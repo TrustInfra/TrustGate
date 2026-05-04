@@ -21,7 +21,6 @@ import {
   Activity,
   AlertTriangle,
   Loader2,
-  ShieldCheck,
 } from "lucide-react";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
@@ -359,66 +358,12 @@ function ScoreBreakdown({
 
   return (
     <div className="p-3 rounded-md bg-bg-surface border border-border space-y-2">
-      <div className="flex items-center justify-between mb-1">
-        <span className="text-[10px] uppercase tracking-wider text-text-muted">
-          Score breakdown
-        </span>
-        {result.tier === "HIGH_ELITE" && (
-          <span className="inline-flex items-center gap-1 text-[10px] font-medium text-tier-high">
-            <ShieldCheck size={10} />
-            Verified
-          </span>
-        )}
-      </div>
-
-      <BreakdownRow
-        label={result.components.transactions.label}
-        points={result.components.transactions.points}
-        note={result.components.transactions.note}
-      />
-      <BreakdownRow
-        label={result.components.usdcBalance.label}
-        points={result.components.usdcBalance.points}
-        note={result.components.usdcBalance.note}
-        muted={result.components.usdcBalance.points === 0}
-      />
-      <BreakdownRow
-        label={result.components.contractInteractions.label}
-        points={result.components.contractInteractions.points}
-        note={result.components.contractInteractions.note}
-        muted={result.components.contractInteractions.points === 0}
-      />
-      <BreakdownRow
-        label={result.components.contractDeployments.label}
-        points={result.components.contractDeployments.points}
-        note={result.components.contractDeployments.note}
-        muted={result.components.contractDeployments.points === 0}
-      />
-
-      {result.capped && (
-        <p className="text-[10px] text-text-muted italic">
-          Capped at 97 — only wallets with 100+ contract interactions can reach 100
-        </p>
-      )}
-
-      <div className="flex items-center justify-between pt-2 border-t border-border">
-        <span className="text-[11px] font-semibold text-text">Total score</span>
-        <span className="font-mono text-sm font-semibold text-text">
-          {result.finalScore} / 100
-        </span>
-      </div>
-
       <div className="flex items-center justify-between">
-        <span className="text-[11px] text-text-secondary">Tier</span>
-        <span className={`text-[11px] font-semibold ${tierColor}`}>
+        <span className="font-mono text-2xl font-semibold text-text">
+          {result.finalScore}
+        </span>
+        <span className={`text-xs font-semibold ${tierColor}`}>
           {tierLabel}
-        </span>
-      </div>
-
-      <div className="flex items-center justify-between">
-        <span className="text-[11px] text-text-muted">Score source</span>
-        <span className="text-[10px] font-mono text-text-muted">
-          Arc Onchain Activity
         </span>
       </div>
 
@@ -438,35 +383,6 @@ function ScoreBreakdown({
   );
 }
 
-function BreakdownRow({
-  label,
-  points,
-  note,
-  muted,
-}: {
-  label: string;
-  points: number;
-  note: string;
-  muted?: boolean;
-}) {
-  return (
-    <div className="flex items-start justify-between gap-3">
-      <div>
-        <p className="text-[11px] text-text-secondary">{label}</p>
-        <p className={`text-[10px] ${muted ? "text-text-muted italic" : "text-text-muted"}`}>
-          {note}
-        </p>
-      </div>
-      <span
-        className={`font-mono text-xs font-semibold shrink-0 ${
-          muted ? "text-text-muted" : "text-text"
-        }`}
-      >
-        {points > 0 ? `+${points}` : points} pts
-      </span>
-    </div>
-  );
-}
 
 function ClaimPaymentCard() {
   const { address } = useAccount();
