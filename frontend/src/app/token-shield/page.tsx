@@ -11,9 +11,18 @@ import {
 import { ConnectKitButton } from "connectkit";
 import { CONTRACT_ADDRESSES, arcTestnet } from "@/lib/constants";
 import { erc20Abi } from "@/lib/abi/ERC20";
+import {
+  HistoryEntry,
+  loadHistory,
+  maskAddress,
+  prependEntry,
+  relativeTime,
+  saveHistory,
+} from "@/lib/recent-history";
 
 const TOKEN_ORACLE_PROXY = "/api/oracle/token";
 const TOKEN_STATS_PROXY = "/api/oracle/oracle/token/stats";
+const HISTORY_KEY = "trustgate_token_history";
 
 const PAYMENT_AMOUNT_RAW = 1000n;
 const PAYMENT_AMOUNT_HUMAN = "0.001";
@@ -102,25 +111,6 @@ function phaseLabel(phase: QueryPhase): string {
   }
 }
 
-function maskAddress(address: string): string {
-  if (!/^0x[0-9a-fA-F]{40}$/.test(address)) return address;
-  return `${address.slice(0, 6)}...${address.slice(-4)}`;
-}
-
-function relativeTime(value: string): string {
-  const ts = Date.parse(value);
-  if (Number.isNaN(ts)) return value;
-  const diff = Date.now() - ts;
-  const sec = Math.floor(diff / 1000);
-  if (sec < 60) return `${sec}s ago`;
-  const min = Math.floor(sec / 60);
-  if (min < 60) return `${min}m ago`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}h ago`;
-  const day = Math.floor(hr / 24);
-  return `${day}d ago`;
-}
-
 function humaniseWalletError(message: string): string {
   if (/user rejected|user denied|rejected the request/i.test(message)) {
     return "Wallet signature was rejected. Click the button again to retry.";
@@ -138,6 +128,25 @@ export default function TokenShieldPage() {
   const [error, setError] = useState<string | null>(null);
   const [paymentTx, setPaymentTx] = useState<`0x${string}` | null>(null);
   const [stats, setStats] = useState<TokenStats | null>(null);
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
+
+  useEffect(() => {
+    setHistory(loadHistory(HISTORY_KEY));
+  }, []);
+
+  const recordHistory = (entry: HistoryEntry): void => {
+    setHistory((prev) => {
+      const next = prependEntry(prev, entry);
+      saveHistory(HISTORY_KEY, next);
+      return next;
+    });
+  };
+
+  const pickRecent = (addr: string): void => {
+    setAddress(addr);
+    setError(null);
+    if (phase === "done" || phase === "error") setPhase("idle");
+  };
 
   const { address: walletAddress, isConnected } = useAccount();
   const chainId = useChainId();
@@ -214,6 +223,12 @@ export default function TokenShieldPage() {
           throw new Error("Oracle returned an unexpected response shape.");
         }
         setResult(data);
+        recordHistory({
+          address,
+          score: data.score,
+          tier: data.tier,
+          at: new Date().toISOString(),
+        });
         setPhase("done");
         return;
       }
@@ -313,6 +328,12 @@ export default function TokenShieldPage() {
         throw new Error("Oracle returned an unexpected response shape.");
       }
       setResult(data);
+      recordHistory({
+        address,
+        score: data.score,
+        tier: data.tier,
+        at: new Date().toISOString(),
+      });
       setPhase("done");
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -410,6 +431,49 @@ export default function TokenShieldPage() {
 
         {/* Result */}
         {result && phase === "done" && <ResultCard result={result} />}
+
+        {/* Recent Checks (localStorage, last 5) */}
+        {history.length > 0 && (
+          <section className="mb-12 mt-12">
+            <h2 className="mb-3 text-sm uppercase tracking-widest text-zinc-500">
+              Recent Checks
+            </h2>
+            <div className="overflow-hidden rounded-2xl border border-zinc-800">
+              <table className="w-full text-sm">
+                <thead className="bg-zinc-900/60 text-left text-xs uppercase tracking-wider text-zinc-500">
+                  <tr>
+                    <th className="px-4 py-3">Token</th>
+                    <th className="px-4 py-3">Score</th>
+                    <th className="px-4 py-3">Tier</th>
+                    <th className="px-4 py-3">When</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {history.map((entry, i) => (
+                    <tr
+                      key={`${entry.address}-${entry.at}-${i}`}
+                      onClick={() => pickRecent(entry.address)}
+                      className="cursor-pointer border-t border-zinc-800/50 transition-colors hover:bg-zinc-900/40"
+                    >
+                      <td className="px-4 py-3 font-mono">{maskAddress(entry.address)}</td>
+                      <td className="px-4 py-3 tabular-nums">{entry.score}</td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`rounded border px-2 py-0.5 text-xs ${tierClass(entry.tier)}`}
+                        >
+                          {entry.tier}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-zinc-500">
+                        {relativeTime(entry.at)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
 
         {/* Live Feed */}
         {stats && stats.recentQueries && stats.recentQueries.length > 0 && (

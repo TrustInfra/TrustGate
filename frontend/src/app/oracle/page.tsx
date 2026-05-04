@@ -11,6 +11,16 @@ import {
 import { ConnectKitButton } from 'connectkit';
 import { CONTRACT_ADDRESSES, arcTestnet } from '@/lib/constants';
 import { erc20Abi } from '@/lib/abi/ERC20';
+import {
+  HistoryEntry,
+  loadHistory,
+  maskAddress,
+  prependEntry,
+  relativeTime,
+  saveHistory,
+} from '@/lib/recent-history';
+
+const HISTORY_KEY = 'trustgate_oracle_history';
 
 // Browser calls go through the Next.js proxy at /api/oracle/* to avoid mixed
 // content issues — the upstream HTTP oracle URL only lives on the server.
@@ -105,6 +115,25 @@ export default function OraclePage() {
   const [error, setError] = useState<string | null>(null);
   const [paymentTx, setPaymentTx] = useState<`0x${string}` | null>(null);
   const [tab, setTab] = useState<'js' | 'py' | 'curl'>('js');
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
+
+  useEffect(() => {
+    setHistory(loadHistory(HISTORY_KEY));
+  }, []);
+
+  const recordHistory = (entry: HistoryEntry): void => {
+    setHistory((prev) => {
+      const next = prependEntry(prev, entry);
+      saveHistory(HISTORY_KEY, next);
+      return next;
+    });
+  };
+
+  const pickRecent = (addr: string): void => {
+    setAddress(addr);
+    setError(null);
+    if (phase === 'done' || phase === 'error') setPhase('idle');
+  };
 
   const { address: walletAddress, isConnected } = useAccount();
   const chainId = useChainId();
@@ -164,6 +193,12 @@ export default function OraclePage() {
         // Dev-mode or already paid path — surface the result directly.
         const data = (await challenge.json()) as ScoreResult;
         setResult(data);
+        recordHistory({
+          address,
+          score: data.score,
+          tier: data.tier,
+          at: new Date().toISOString(),
+        });
         setPhase('done');
         return;
       }
@@ -270,6 +305,12 @@ export default function OraclePage() {
       }
       const data = (await paid.json()) as ScoreResult;
       setResult(data);
+      recordHistory({
+        address,
+        score: data.score,
+        tier: data.tier,
+        at: new Date().toISOString(),
+      });
       setPhase('done');
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -399,10 +440,10 @@ response = requests.get(
           )}
         </section>
 
-        {/* Live Feed */}
-        {stats && stats.recentQueries.length > 0 && (
+        {/* Recent Checks (localStorage, last 5) */}
+        {history.length > 0 && (
           <section className="mb-16">
-            <h2 className="mb-4 text-2xl font-semibold">Live Query Feed</h2>
+            <h2 className="mb-4 text-2xl font-semibold">Recent Checks</h2>
             <div className="overflow-hidden rounded-2xl border border-zinc-800">
               <table className="w-full text-sm">
                 <thead className="bg-zinc-900/60 text-left text-xs uppercase tracking-wider text-zinc-500">
@@ -410,25 +451,27 @@ response = requests.get(
                     <th className="px-4 py-3">Address</th>
                     <th className="px-4 py-3">Score</th>
                     <th className="px-4 py-3">Tier</th>
-                    <th className="px-4 py-3">Paid</th>
                     <th className="px-4 py-3">When</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {stats.recentQueries.slice(0, 10).map((q, i) => (
-                    <tr key={i} className="border-t border-zinc-800/50">
-                      <td className="px-4 py-3 font-mono">{q.addressMasked}</td>
-                      <td className="px-4 py-3">{q.score}</td>
+                  {history.map((entry, i) => (
+                    <tr
+                      key={`${entry.address}-${entry.at}-${i}`}
+                      onClick={() => pickRecent(entry.address)}
+                      className="border-t border-zinc-800/50 cursor-pointer transition-colors hover:bg-zinc-900/40"
+                    >
+                      <td className="px-4 py-3 font-mono">{maskAddress(entry.address)}</td>
+                      <td className="px-4 py-3 tabular-nums">{entry.score}</td>
                       <td className="px-4 py-3">
                         <span
-                          className={`rounded border px-2 py-0.5 text-xs ${TIER_COLORS[q.tier] || ''}`}
+                          className={`rounded border px-2 py-0.5 text-xs ${TIER_COLORS[entry.tier] || ''}`}
                         >
-                          {q.tier}
+                          {entry.tier}
                         </span>
                       </td>
-                      <td className="px-4 py-3">{q.paid ? 'Yes' : '—'}</td>
                       <td className="px-4 py-3 text-zinc-500">
-                        {new Date(q.at).toLocaleTimeString()}
+                        {relativeTime(entry.at)}
                       </td>
                     </tr>
                   ))}
