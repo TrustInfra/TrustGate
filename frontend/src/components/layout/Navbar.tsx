@@ -16,7 +16,26 @@ const NAV_LINKS = [
   { href: "/agents/live", label: "Live Agents" },
   { href: "/demo", label: "Demo" },
   { href: "/docs", label: "Docs" },
+  { href: "/docs/widget-integration", label: "Widget" },
 ];
+
+const ALL_HREFS = NAV_LINKS.map((l) => l.href);
+
+function isActiveLink(href: string, pathname: string): boolean {
+  if (href === "/") return pathname === "/";
+  if (!pathname.startsWith(href)) return false;
+  if (pathname !== href && pathname.charAt(href.length) !== "/") return false;
+  // Longest matching prefix wins so /docs/widget-integration highlights
+  // "Widget" instead of both "Widget" and "Docs".
+  for (const other of ALL_HREFS) {
+    if (other === href || other === "/") continue;
+    if (other.length <= href.length) continue;
+    if (!pathname.startsWith(other)) continue;
+    if (pathname !== other && pathname.charAt(other.length) !== "/") continue;
+    return false;
+  }
+  return true;
+}
 
 export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -48,10 +67,7 @@ export default function Navbar() {
 
           <div className="hidden md:flex items-center gap-1">
             {NAV_LINKS.map((link) => {
-              const isActive =
-                link.href === "/"
-                  ? pathname === "/"
-                  : pathname.startsWith(link.href);
+              const isActive = isActiveLink(link.href, pathname);
               return (
                 <Link
                   key={link.href}
@@ -91,10 +107,7 @@ export default function Navbar() {
         {menuOpen && (
           <div className="md:hidden pb-4 border-t border-border mt-2 pt-4 space-y-1 animate-slide-down">
             {NAV_LINKS.map((link) => {
-              const isActive =
-                link.href === "/"
-                  ? pathname === "/"
-                  : pathname.startsWith(link.href);
+              const isActive = isActiveLink(link.href, pathname);
               return (
                 <Link
                   key={link.href}
