@@ -1,4 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  ContractInfo,
+  detectContractKind,
+  scoreContract,
+} from "@/lib/contract-scoring";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -10,6 +15,8 @@ const ORACLE_BASE = (
   process.env.ORACLE_URL ||
   DEFAULT_ORACLE_URL
 ).replace(/\/+$/, "");
+
+const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 
 const FORWARDABLE_REQUEST_HEADERS = new Set([
   "accept",
@@ -68,11 +75,11 @@ function pickResponseHeaders(upstream: Response): Headers {
   return out;
 }
 
-async function proxy(
+async function forwardToTokenOracle(
   req: NextRequest,
-  context: { params: { address: string } }
+  rawAddress: string
 ): Promise<NextResponse> {
-  const address = encodeURIComponent(context.params.address);
+  const address = encodeURIComponent(rawAddress);
   const url = `${ORACLE_BASE}/oracle/token/${address}${req.nextUrl.search}`;
 
   const init: RequestInit = {
@@ -105,6 +112,103 @@ async function proxy(
     statusText: upstream.statusText,
     headers,
   });
+}
+
+function jsonResponse(
+  payload: unknown,
+  status: number,
+  extraHeaders: Record<string, string> = {}
+): NextResponse {
+  const headers = new Headers();
+  for (const [k, v] of Object.entries(CORS_HEADERS)) headers.set(k, v);
+  headers.set("content-type", "application/json; charset=utf-8");
+  headers.set("Cache-Control", "no-store");
+  for (const [k, v] of Object.entries(extraHeaders)) headers.set(k, v);
+  return new NextResponse(JSON.stringify(payload), { status, headers });
+}
+
+async function handleNonTokenContract(
+  req: NextRequest,
+  address: string,
+  info: ContractInfo
+): Promise<NextResponse> {
+  const hasPayment = req.headers.has("x-payment");
+
+  // No payment yet — forward to upstream so the client receives Nald's normal
+  // 402 challenge body. We intentionally don't synthesise our own challenge:
+  // keeping the upstream shape avoids drift between ERC-20 and contract paths.
+  if (!hasPayment) {
+    return forwardToTokenOracle(req, address);
+  }
+
+  // Payment header present — score locally without hitting Nald, per spec
+  // ("run the CONTRACT SCORING flow ... instead of forwarding to Nald").
+  try {
+    const result = await scoreContract(address, info, req.nextUrl.origin);
+    return jsonResponse(result, 200);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "unknown error";
+    console.error(`[contract-score] ${address} failed:`, message);
+    return jsonResponse(
+      { error: `Contract scoring failed: ${message}` },
+      502
+    );
+  }
+}
+
+async function proxy(
+  req: NextRequest,
+  context: { params: { address: string } }
+): Promise<NextResponse> {
+  const address = context.params.address;
+
+  if (!ADDRESS_RE.test(address)) {
+    return jsonResponse({ error: "Invalid address" }, 400);
+  }
+
+  // Preflight via OPTIONS is handled separately; this branch only sees real
+  // GET/POST traffic. Detect whether the address is a contract first.
+  let detection;
+  try {
+    detection = await detectContractKind(address);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "unknown error";
+    console.error(`[token-route] detection failed for ${address}:`, message);
+    return jsonResponse(
+      { error: "Could not load contract info from Arcscan." },
+      502
+    );
+  }
+
+  if (detection.kind === "fetch-failed") {
+    return jsonResponse(
+      { error: "Could not load contract info from Arcscan." },
+      502
+    );
+  }
+
+  if (detection.kind === "not-contract") {
+    return jsonResponse(
+      {
+        error:
+          "Address is not a contract. Use the Oracle page to score wallet addresses.",
+      },
+      400
+    );
+  }
+
+  if (detection.kind === "erc20") {
+    return forwardToTokenOracle(req, address);
+  }
+
+  // detection.kind === "other-contract"
+  if (!detection.info) {
+    return jsonResponse(
+      { error: "Could not load contract info from Arcscan." },
+      502
+    );
+  }
+  return handleNonTokenContract(req, address, detection.info);
 }
 
 export async function GET(
