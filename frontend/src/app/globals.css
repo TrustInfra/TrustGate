@@ -64,6 +64,18 @@ select:focus {
   --ck-font-family: var(--font-body), system-ui, sans-serif;
 }
 
+/* Ticker scroll — used on homepage live ticker */
+@keyframes tg-ticker-scroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.tg-ticker-track {
+  animation-name: tg-ticker-scroll;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  will-change: transform;
+}
+
 /* Stagger delays */
 .stagger-1 { animation-delay: 0.05s; }
 .stagger-2 { animation-delay: 0.1s; }

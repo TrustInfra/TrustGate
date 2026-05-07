@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   Shield,
@@ -11,13 +12,285 @@ import {
   ArrowDownToLine,
   Zap,
   Wallet,
+  Coins,
+  Code2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Card from "@/components/ui/GlassCard";
 import Badge from "@/components/ui/Badge";
-import LiveStats from "@/components/landing/LiveStats";
 
-/* ───────────────────────── Trust Tier Card ───────────────────────── */
+/* ───────────────────────── Oracle stats hook ───────────────────────── */
+
+interface RecentQuery {
+  addressMasked: string;
+  score: number;
+  tier: string;
+  paid: boolean;
+  at: string;
+}
+
+interface OracleStats {
+  totalQueries: number;
+  totalUsdcEarned: string;
+  uniqueAddressesScored: number;
+  averageScore: number;
+  tierDistribution: Record<string, number>;
+  recentQueries: RecentQuery[];
+}
+
+const ORACLE_STATS_URL = "/api/oracle/oracle/stats";
+const ORACLE_STATS_POLL_MS = 15_000;
+
+function isOracleStats(value: unknown): value is OracleStats {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return (
+    typeof v.totalQueries === "number" &&
+    typeof v.totalUsdcEarned === "string" &&
+    typeof v.uniqueAddressesScored === "number" &&
+    typeof v.averageScore === "number" &&
+    Array.isArray(v.recentQueries)
+  );
+}
+
+interface OracleStatsState {
+  stats: OracleStats | null;
+  failed: boolean;
+}
+
+function useOracleStats(): OracleStatsState {
+  const [stats, setStats] = useState<OracleStats | null>(null);
+  const [failed, setFailed] = useState<boolean>(false);
+
+  useEffect(() => {
+    let active = true;
+
+    const tick = async (): Promise<void> => {
+      try {
+        const res = await fetch(ORACLE_STATS_URL, { cache: "no-store" });
+        if (!active) return;
+        if (!res.ok) {
+          setFailed(true);
+          return;
+        }
+        const body: unknown = await res.json();
+        if (!active) return;
+        if (!isOracleStats(body)) {
+          setFailed(true);
+          return;
+        }
+        setStats(body);
+        setFailed(false);
+      } catch {
+        if (active) setFailed(true);
+      }
+    };
+
+    void tick();
+    const id = setInterval(() => {
+      void tick();
+    }, ORACLE_STATS_POLL_MS);
+
+    return () => {
+      active = false;
+      clearInterval(id);
+    };
+  }, []);
+
+  return { stats, failed };
+}
+
+/* ───────────────────────── Live Ticker ───────────────────────── */
+
+const TICKER_SPEED_PX_PER_SEC = 40;
+
+const TICKER_TIER_CHIP: Record<string, string> = {
+  HIGH_ELITE: "bg-tier-high-muted text-tier-high border-tier-high/30",
+  HIGH: "bg-tier-high-muted text-tier-high border-tier-high/30",
+  MEDIUM: "bg-tier-medium-muted text-tier-medium border-tier-medium/30",
+  LOW: "bg-tier-low-muted text-tier-low border-tier-low/30",
+  BLOCKED: "bg-tier-low-muted text-tier-low border-tier-low/30",
+};
+
+function tickerTierClass(tier: string): string {
+  return (
+    TICKER_TIER_CHIP[tier] ?? "bg-bg-surface text-text-muted border-border"
+  );
+}
+
+function LiveTicker({ items }: { items: RecentQuery[] }) {
+  const trackRef = useRef<HTMLDivElement | null>(null);
+  const [durationSec, setDurationSec] = useState<number>(60);
+
+  useEffect(() => {
+    const el = trackRef.current;
+    if (!el) return;
+    // The track is rendered with the items duplicated, so scrollWidth/2 is one
+    // full sequence. Time per loop = sequence width / desired speed.
+    const halfWidth = el.scrollWidth / 2;
+    if (halfWidth <= 0) return;
+    const next = Math.max(20, halfWidth / TICKER_SPEED_PX_PER_SEC);
+    setDurationSec(next);
+  }, [items.length]);
+
+  if (items.length === 0) return null;
+
+  // Duplicate the list so translateX(-50%) lands on a seamless seam.
+  const loop: RecentQuery[] = [...items, ...items];
+
+  return (
+    <section
+      aria-label="Recent oracle queries"
+      className="border-y border-border bg-bg-surface/30 overflow-hidden"
+    >
+      <div
+        ref={trackRef}
+        className="tg-ticker-track flex items-center gap-10 whitespace-nowrap py-3"
+        style={{
+          width: "max-content",
+          animationDuration: `${durationSec}s`,
+        }}
+      >
+        {loop.map((q, i) => (
+          <div
+            key={`${q.at}-${i}`}
+            className="flex items-center gap-3 px-2"
+          >
+            <span className="font-mono text-xs text-text-muted">
+              {q.addressMasked}
+            </span>
+            <span className="text-sm font-display font-bold text-text">
+              {q.score}
+            </span>
+            <span
+              className={cn(
+                "px-2 py-0.5 rounded text-[10px] font-mono font-medium border",
+                tickerTierClass(q.tier)
+              )}
+            >
+              {q.tier}
+            </span>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/* ───────────────────────── Stats Bar ───────────────────────── */
+
+const numberFmt = new Intl.NumberFormat("en-US");
+
+function formatUsdcEarned(raw: string): string {
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return raw;
+  if (n === 0) return "0";
+  if (n < 0.001) return n.toFixed(6);
+  if (n < 1) return n.toFixed(4);
+  return n.toFixed(2);
+}
+
+interface StatCell {
+  label: string;
+  value: string;
+  accent: boolean;
+}
+
+function StatsBar({ stats }: { stats: OracleStats | null }) {
+  const cells: StatCell[] = useMemo(() => {
+    return [
+      {
+        label: "Oracle Queries",
+        value: stats ? numberFmt.format(stats.totalQueries) : "—",
+        accent: false,
+      },
+      {
+        label: "Addresses Scored",
+        value: stats ? numberFmt.format(stats.uniqueAddressesScored) : "—",
+        accent: false,
+      },
+      {
+        label: "USDC Earned",
+        value: stats ? formatUsdcEarned(stats.totalUsdcEarned) : "—",
+        accent: true,
+      },
+      {
+        label: "Avg Trust Score",
+        value: stats ? stats.averageScore.toFixed(1) : "—",
+        accent: false,
+      },
+    ];
+  }, [stats]);
+
+  return (
+    <div
+      className="w-full max-w-3xl mx-auto mt-20 grid grid-cols-2 sm:grid-cols-4 gap-4 opacity-0 animate-slide-up"
+      style={{ animationDelay: "0.55s" }}
+    >
+      {cells.map((cell) => (
+        <div key={cell.label} className="card-static px-4 py-3 text-center">
+          <p
+            className={cn(
+              "text-lg font-display font-bold",
+              cell.accent ? "text-tier-high" : "text-text"
+            )}
+          >
+            {cell.value}
+          </p>
+          <p className="text-[10px] text-text-muted uppercase tracking-wider mt-1">
+            {cell.label}
+          </p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ───────────────────────── Feature Card ───────────────────────── */
+
+interface FeatureCardProps {
+  icon: typeof Shield;
+  title: string;
+  body: string;
+  href: string;
+  linkLabel: string;
+  delay: number;
+}
+
+function FeatureCard({
+  icon: Icon,
+  title,
+  body,
+  href,
+  linkLabel,
+  delay,
+}: FeatureCardProps) {
+  return (
+    <div
+      className="card p-6 flex flex-col opacity-0 animate-slide-up"
+      style={{ animationDelay: `${delay}s` }}
+    >
+      <div className="inline-flex p-3 rounded-xl mb-4 bg-accent-muted border border-accent/10 self-start">
+        <Icon size={22} className="text-accent" />
+      </div>
+      <h3 className="text-base font-display font-bold text-text mb-2">
+        {title}
+      </h3>
+      <p className="text-sm text-text-secondary leading-relaxed mb-5 flex-1">
+        {body}
+      </p>
+      <Link
+        href={href}
+        className="inline-flex items-center gap-1.5 text-xs font-medium text-accent hover:text-accent-hover transition-colors"
+      >
+        {linkLabel}
+        <ArrowRight size={12} />
+      </Link>
+    </div>
+  );
+}
+
+/* ───────────────────────── Trust Tier Card (existing) ───────────────────────── */
 
 function TrustTierCard({
   title,
@@ -98,7 +371,7 @@ function TrustTierCard({
   );
 }
 
-/* ───────────────────────── Step Card ───────────────────────── */
+/* ───────────────────────── Step Card (existing) ───────────────────────── */
 
 function StepCard({
   number,
@@ -131,14 +404,27 @@ function StepCard({
   );
 }
 
+/* ───────────────────────── Section eyebrow ───────────────────────── */
+
+function SectionEyebrow({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="text-[11px] font-mono font-medium text-accent uppercase tracking-[0.2em] mb-3">
+      {children}
+    </p>
+  );
+}
+
 /* ═══════════════════════ MAIN PAGE ═══════════════════════ */
 
 export default function HomePage() {
+  const { stats, failed: statsFailed } = useOracleStats();
+  const tickerItems: RecentQuery[] =
+    !statsFailed && stats ? stats.recentQueries : [];
+
   return (
     <div className="relative overflow-hidden">
       {/* HERO */}
-      <section className="relative min-h-[85vh] flex flex-col items-center justify-center px-4 sm:px-6 lg:px-8">
-        {/* Subtle gradient bg */}
+      <section className="relative min-h-[80vh] flex flex-col items-center justify-center px-4 sm:px-6 lg:px-8 pt-16 pb-24">
         <div className="absolute inset-0 bg-gradient-to-b from-accent/[0.03] via-transparent to-transparent pointer-events-none" />
 
         <div className="max-w-4xl mx-auto text-center relative z-10">
@@ -151,20 +437,20 @@ export default function HomePage() {
             className="font-display font-extrabold tracking-tight leading-[1.08] animate-fade-in"
             style={{ animationDelay: "0.1s" }}
           >
-            <span className="text-text text-4xl sm:text-5xl md:text-6xl lg:text-7xl block">
-              Trust-Gated
+            <span className="block text-text text-4xl sm:text-5xl md:text-6xl lg:text-7xl">
+              The Trust Layer
             </span>
-            <span className="text-accent text-4xl sm:text-5xl md:text-6xl lg:text-7xl block mt-1">
-              USDC for Agents
+            <span className="block text-accent text-4xl sm:text-5xl md:text-6xl lg:text-7xl mt-1">
+              for Web3
             </span>
           </h1>
 
           <p
-            className="mt-6 max-w-xl mx-auto text-base text-text-secondary leading-relaxed opacity-0 animate-slide-up"
+            className="mt-6 max-w-2xl mx-auto text-base text-text-secondary leading-relaxed opacity-0 animate-slide-up"
             style={{ animationDelay: "0.25s" }}
           >
-            Deposit USDC and set per-agent spending caps. Trust scores route
-            every payment -- instant, time-locked, or escrowed -- automatically.
+            Score any wallet, token, or contract before you swap, send, or
+            settle. Live on Arc Testnet.
           </p>
 
           <div
@@ -172,66 +458,82 @@ export default function HomePage() {
             style={{ animationDelay: "0.4s" }}
           >
             <Link
-              href="/dashboard"
+              href="/oracle"
               className={cn(
                 "inline-flex items-center gap-2 px-7 py-3.5 rounded-lg text-sm font-semibold",
                 "bg-accent text-white hover:bg-accent-hover active:scale-[0.98]",
                 "transition-all duration-200"
               )}
             >
-              Open Dashboard
+              Check a Wallet
               <ArrowRight size={16} />
             </Link>
-            <a
-              href="https://faucet.circle.com"
-              target="_blank"
-              rel="noopener noreferrer"
+            <Link
+              href="/token-shield"
               className={cn(
                 "inline-flex items-center gap-2 px-7 py-3.5 rounded-lg text-sm font-medium",
-                "bg-bg-raised border border-border text-text-secondary hover:bg-bg-surface",
+                "bg-bg-raised border border-border text-text-secondary hover:bg-bg-surface hover:border-border-hover",
                 "transition-all duration-200"
               )}
             >
-              Get Testnet USDC
-            </a>
+              Check a Token
+              <ArrowRight size={16} />
+            </Link>
           </div>
         </div>
 
-        {/* Stats strip */}
-        <div
-          className="w-full max-w-3xl mx-auto mt-20 grid grid-cols-3 gap-4 opacity-0 animate-slide-up"
-          style={{ animationDelay: "0.55s" }}
-        >
-          <div className="card-static px-4 py-3 text-center">
-            <p className="text-lg font-display font-bold text-text">3</p>
-            <p className="text-[10px] text-text-muted uppercase tracking-wider">
-              Contracts
-            </p>
-          </div>
-          <div className="card-static px-4 py-3 text-center">
-            <p className="text-lg font-display font-bold text-text">3</p>
-            <p className="text-[10px] text-text-muted uppercase tracking-wider">
-              Trust Tiers
-            </p>
-          </div>
-          <div className="card-static px-4 py-3 text-center">
-            <p className="text-lg font-display font-bold text-tier-high">6</p>
-            <p className="text-[10px] text-text-muted uppercase tracking-wider">
-              USDC Decimals
-            </p>
-          </div>
-        </div>
+        <StatsBar stats={stats} />
       </section>
 
-      {/* LIVE STATS */}
-      <section className="-mt-12 mb-4 px-4 sm:px-6 lg:px-8">
-        <LiveStats />
-      </section>
+      {/* LIVE TICKER */}
+      {!statsFailed && tickerItems.length > 0 && (
+        <LiveTicker items={tickerItems} />
+      )}
 
-      {/* TRUST TIERS */}
+      {/* WHAT WE SCORE */}
       <section className="py-24 px-4 sm:px-6 lg:px-8">
         <div className="max-w-5xl mx-auto">
           <div className="text-center mb-14">
+            <SectionEyebrow>What We Score</SectionEyebrow>
+            <h2 className="text-2xl sm:text-3xl font-display font-bold text-text">
+              Trust at every layer of onchain interaction
+            </h2>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-5">
+            <FeatureCard
+              icon={ShieldCheck}
+              title="Wallet Oracle"
+              body="Query any Arc wallet. Get a trust score built from real onchain history — deployments, activity, age, and behavior."
+              href="/oracle"
+              linkLabel="Query a wallet"
+              delay={0.1}
+            />
+            <FeatureCard
+              icon={Coins}
+              title="Token Shield"
+              body="Score any token or contract. Know the deployer's credibility and whether holders are real before you interact."
+              href="/token-shield"
+              linkLabel="Check a token"
+              delay={0.2}
+            />
+            <FeatureCard
+              icon={Code2}
+              title="DEX Widget"
+              body="One script tag. Trust badges appear automatically on every token input. Free during Arc testnet. No API key."
+              href="/docs/widget-integration"
+              linkLabel="See integration"
+              delay={0.3}
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* PAYMENT ROUTING — FOR AI AGENTS */}
+      <section className="py-24 px-4 sm:px-6 lg:px-8 border-t border-border">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-14">
+            <SectionEyebrow>For AI Agents</SectionEyebrow>
             <Badge variant="accent" className="mb-4">
               <Shield size={12} />
               Payment Routing
