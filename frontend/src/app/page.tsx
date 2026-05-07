@@ -262,7 +262,7 @@ function StatsBar({
   stats: OracleStats | null;
   txStats: TxStats | null;
 }) {
-  const cells: StatCell[] = useMemo(() => {
+  const primary: StatCell[] = useMemo(() => {
     return [
       {
         label: "Oracle Queries",
@@ -270,8 +270,8 @@ function StatsBar({
         accent: false,
       },
       {
-        label: "Addresses Scored",
-        value: stats ? numberFmt.format(stats.uniqueAddressesScored) : "—",
+        label: "Avg Trust Score",
+        value: stats ? stats.averageScore.toFixed(1) : "—",
         accent: false,
       },
       {
@@ -279,11 +279,11 @@ function StatsBar({
         value: stats ? formatUsdcEarned(stats.totalUsdcEarned) : "—",
         accent: true,
       },
-      {
-        label: "Avg Trust Score",
-        value: stats ? stats.averageScore.toFixed(1) : "—",
-        accent: false,
-      },
+    ];
+  }, [stats]);
+
+  const secondary: StatCell[] = useMemo(() => {
+    return [
       {
         label: "Transactions",
         value: txStats ? numberFmt.format(txStats.total_transactions) : "—",
@@ -298,28 +298,46 @@ function StatsBar({
         accent: false,
       },
     ];
-  }, [stats, txStats]);
+  }, [txStats]);
 
   return (
     <div
-      className="w-full max-w-5xl mx-auto mt-20 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 opacity-0 animate-slide-up"
+      className="w-full max-w-3xl mx-auto mt-20 opacity-0 animate-slide-up"
       style={{ animationDelay: "0.55s" }}
     >
-      {cells.map((cell) => (
-        <div key={cell.label} className="card-static px-4 py-3 text-center">
-          <p
-            className={cn(
-              "text-lg font-display font-bold",
-              cell.accent ? "text-tier-high" : "text-text"
-            )}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {primary.map((cell) => (
+          <div key={cell.label} className="card-static px-5 py-6 text-center">
+            <p
+              className={cn(
+                "text-2xl sm:text-3xl font-display font-bold tracking-tight",
+                cell.accent ? "text-tier-high" : "text-text"
+              )}
+            >
+              {cell.value}
+            </p>
+            <p className="text-[10px] text-text-muted uppercase tracking-wider mt-2">
+              {cell.label}
+            </p>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-3 max-w-md mx-auto">
+        {secondary.map((cell) => (
+          <div
+            key={cell.label}
+            className="card-static px-4 py-2.5 text-center"
           >
-            {cell.value}
-          </p>
-          <p className="text-[10px] text-text-muted uppercase tracking-wider mt-1">
-            {cell.label}
-          </p>
-        </div>
-      ))}
+            <p className="text-sm font-display font-semibold text-text-secondary">
+              {cell.value}
+            </p>
+            <p className="text-[9px] text-text-muted uppercase tracking-wider mt-0.5">
+              {cell.label}
+            </p>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
