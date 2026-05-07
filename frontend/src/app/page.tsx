@@ -323,17 +323,14 @@ function StatsBar({
         ))}
       </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-3 max-w-md mx-auto">
+      <div className="mt-3 grid grid-cols-2 gap-2 max-w-[260px] mx-auto">
         {secondary.map((cell) => (
           <div
             key={cell.label}
-            className="card-static px-4 py-2.5 text-center"
+            className="card-static px-2 py-1 text-center"
           >
-            <p className="text-sm font-display font-semibold text-text-secondary">
+            <p className="text-xs font-display font-semibold text-text-secondary leading-tight">
               {cell.value}
-            </p>
-            <p className="text-[9px] text-text-muted uppercase tracking-wider mt-0.5">
-              {cell.label}
             </p>
           </div>
         ))}
