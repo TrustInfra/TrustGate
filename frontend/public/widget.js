@@ -51,25 +51,25 @@
       color: "#34d399",
       bg: "rgba(16,185,129,0.12)",
       border: "rgba(16,185,129,0.35)",
-      text: "✓ Trusted — HIGH ELITE",
+      text: "✅ HIGH_ELITE",
     },
     HIGH: {
       color: "#34d399",
       bg: "rgba(16,185,129,0.12)",
       border: "rgba(16,185,129,0.35)",
-      text: "✓ Trusted — HIGH",
+      text: "HIGH",
     },
     MEDIUM: {
       color: "#fbbf24",
       bg: "rgba(245,158,11,0.12)",
       border: "rgba(245,158,11,0.35)",
-      text: "⚠ Caution — MEDIUM",
+      text: "MEDIUM",
     },
     LOW: {
       color: "#f87171",
       bg: "rgba(239,68,68,0.12)",
       border: "rgba(239,68,68,0.35)",
-      text: "✗ Low Trust — LOW",
+      text: "LOW",
     },
   };
 
