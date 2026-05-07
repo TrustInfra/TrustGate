@@ -11,24 +11,24 @@ const config: Config = {
     extend: {
       colors: {
         bg: {
-          DEFAULT: "#0a0a0a",
-          raised: "#141414",
-          surface: "#1a1a1a",
-          hover: "#1f1f1f",
+          DEFAULT: "#050c0a",
+          raised: "#0a1410",
+          surface: "#0f1d18",
+          hover: "#132318",
         },
         border: {
-          DEFAULT: "#262626",
-          hover: "#333333",
+          DEFAULT: "#1a3028",
+          hover: "#234d3a",
         },
         accent: {
-          DEFAULT: "#3b82f6",
-          hover: "#2563eb",
-          muted: "rgba(59, 130, 246, 0.12)",
+          DEFAULT: "#10d9a0",
+          hover: "#06b88a",
+          muted: "rgba(16, 217, 160, 0.1)",
         },
         text: {
-          DEFAULT: "#f5f5f5",
-          secondary: "#a1a1aa",
-          muted: "#71717a",
+          DEFAULT: "#e8f5f0",
+          secondary: "#7a9e90",
+          muted: "#4d7568",
         },
         tier: {
           high: "#22c55e",
