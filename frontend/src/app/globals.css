@@ -7,27 +7,27 @@ html {
 }
 
 body {
-  background-color: #0a0a0a;
-  color: #f5f5f5;
+  background-color: #050c0a;
+  color: #e8f5f0;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
 /* Surface card */
 .card {
-  background: #141414;
-  border: 1px solid #262626;
+  background: #0a1410;
+  border: 1px solid rgba(16,217,160,0.1);
   border-radius: 12px;
   transition: border-color 0.2s ease;
 }
 
 .card:hover {
-  border-color: #333333;
+  border-color: rgba(16,217,160,0.28);
 }
 
 .card-static {
-  background: #141414;
-  border: 1px solid #262626;
+  background: #0a1410;
+  border: 1px solid rgba(16,217,160,0.1);
   border-radius: 12px;
 }
 
@@ -36,21 +36,21 @@ body {
   width: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #0a0a0a;
+  background: #050c0a;
 }
 ::-webkit-scrollbar-thumb {
-  background: #333333;
+  background: #0f1d18;
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #525252;
+  background: #1a3028;
 }
 
 /* Nav bar */
 .nav-bar {
-  background: rgba(10, 10, 10, 0.85);
+  background: rgba(5, 12, 10, 0.92);
   backdrop-filter: blur(12px);
-  border-bottom: 1px solid #1a1a1a;
+  border-bottom: 1px solid rgba(16,217,160,0.08);
 }
 
 /* Input focus ring override */
@@ -133,4 +133,78 @@ select:focus {
   border: 0;
   padding: 0;
   color: inherit;
+}
+
+/* Background paths — fixed layer behind everything */
+.bp-canvas {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* All chrome sits above the path layer */
+nav, header, main, footer, section, aside {
+  position: relative;
+  z-index: 1;
+}
+
+/* Ticker fade masks */
+.tg-ticker-wrapper {
+  position: relative;
+  overflow: hidden;
+}
+.tg-ticker-wrapper::before,
+.tg-ticker-wrapper::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 100px;
+  z-index: 2;
+  pointer-events: none;
+}
+.tg-ticker-wrapper::before {
+  left: 0;
+  background: linear-gradient(to right, #050c0a, transparent);
+}
+.tg-ticker-wrapper::after {
+  right: 0;
+  background: linear-gradient(to left, #050c0a, transparent);
+}
+
+/* Card left-accent variant */
+.card-feature {
+  background: #0a1410;
+  border: 1px solid rgba(16,217,160,0.1);
+  border-left: 2px solid rgba(16,217,160,0.4);
+  border-radius: 12px;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+.card-feature:hover {
+  border-color: rgba(16,217,160,0.2);
+  border-left-color: rgba(16,217,160,0.8);
+  background: #0d1e18;
+}
+
+/* Stat card top accent */
+.card-stat {
+  background: #0a1410;
+  border: 1px solid rgba(16,217,160,0.1);
+  border-top: 2px solid rgba(16,217,160,0.35);
+  border-radius: 12px;
+  position: relative;
+  overflow: hidden;
+}
+.card-stat::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 40px;
+  background: linear-gradient(to bottom, rgba(16,217,160,0.05), transparent);
+  pointer-events: none;
 }
