@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Barlow_Condensed, Geist_Mono, JetBrains_Mono } from "next/font/google";
+import { Barlow_Condensed, Space_Mono, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { Web3Provider } from "@/providers/Web3Provider";
 import Navbar from "@/components/layout/Navbar";
@@ -13,9 +13,9 @@ const barlowCondensed = Barlow_Condensed({
   display: "swap",
 });
 
-const geistMono = Geist_Mono({
+const spaceMono = Space_Mono({
   subsets: ["latin"],
-  weight: ["300", "400", "500", "600"],
+  weight: ["400", "700"],
   variable: "--font-body",
   display: "swap",
 });
@@ -58,9 +58,9 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${barlowCondensed.variable} ${geistMono.variable} ${jetbrains.variable}`}
+      className={`${barlowCondensed.variable} ${spaceMono.variable} ${jetbrains.variable}`}
     >
-      <body className={geistMono.className}>
+      <body className={spaceMono.className}>
         <Web3Provider>
           <div className="flex flex-col min-h-screen relative">
             <BackgroundPaths />
