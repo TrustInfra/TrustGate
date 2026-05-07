@@ -19,6 +19,65 @@ import { cn } from "@/lib/utils";
 import Card from "@/components/ui/GlassCard";
 import Badge from "@/components/ui/Badge";
 
+/* ───────────────────────── Transaction stats hook ───────────────────────── */
+
+interface TxStats {
+  total_transactions: number;
+  unique_callers: number | null;
+}
+
+const TX_STATS_URL = "/api/stats";
+const TX_STATS_POLL_MS = 15_000;
+
+function isTxStats(value: unknown): value is TxStats {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  if (typeof v.total_transactions !== "number") return false;
+  return v.unique_callers === null || typeof v.unique_callers === "number";
+}
+
+function useTxStats(): { stats: TxStats | null; failed: boolean } {
+  const [stats, setStats] = useState<TxStats | null>(null);
+  const [failed, setFailed] = useState<boolean>(false);
+
+  useEffect(() => {
+    let active = true;
+
+    const tick = async (): Promise<void> => {
+      try {
+        const res = await fetch(TX_STATS_URL, { cache: "no-store" });
+        if (!active) return;
+        if (!res.ok) {
+          setFailed(true);
+          return;
+        }
+        const body: unknown = await res.json();
+        if (!active) return;
+        if (!isTxStats(body)) {
+          setFailed(true);
+          return;
+        }
+        setStats(body);
+        setFailed(false);
+      } catch {
+        if (active) setFailed(true);
+      }
+    };
+
+    void tick();
+    const id = setInterval(() => {
+      void tick();
+    }, TX_STATS_POLL_MS);
+
+    return () => {
+      active = false;
+      clearInterval(id);
+    };
+  }, []);
+
+  return { stats, failed };
+}
+
 /* ───────────────────────── Oracle stats hook ───────────────────────── */
 
 interface RecentQuery {
@@ -196,7 +255,13 @@ interface StatCell {
   accent: boolean;
 }
 
-function StatsBar({ stats }: { stats: OracleStats | null }) {
+function StatsBar({
+  stats,
+  txStats,
+}: {
+  stats: OracleStats | null;
+  txStats: TxStats | null;
+}) {
   const cells: StatCell[] = useMemo(() => {
     return [
       {
@@ -219,12 +284,25 @@ function StatsBar({ stats }: { stats: OracleStats | null }) {
         value: stats ? stats.averageScore.toFixed(1) : "—",
         accent: false,
       },
+      {
+        label: "Transactions",
+        value: txStats ? numberFmt.format(txStats.total_transactions) : "—",
+        accent: false,
+      },
+      {
+        label: "Unique Wallets",
+        value:
+          txStats && txStats.unique_callers !== null
+            ? numberFmt.format(txStats.unique_callers)
+            : "—",
+        accent: false,
+      },
     ];
-  }, [stats]);
+  }, [stats, txStats]);
 
   return (
     <div
-      className="w-full max-w-3xl mx-auto mt-20 grid grid-cols-2 sm:grid-cols-4 gap-4 opacity-0 animate-slide-up"
+      className="w-full max-w-5xl mx-auto mt-20 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 opacity-0 animate-slide-up"
       style={{ animationDelay: "0.55s" }}
     >
       {cells.map((cell) => (
@@ -418,6 +496,7 @@ function SectionEyebrow({ children }: { children: React.ReactNode }) {
 
 export default function HomePage() {
   const { stats, failed: statsFailed } = useOracleStats();
+  const { stats: txStats } = useTxStats();
   const tickerItems: RecentQuery[] =
     !statsFailed && stats ? stats.recentQueries : [];
 
@@ -428,11 +507,6 @@ export default function HomePage() {
         <div className="absolute inset-0 bg-gradient-to-b from-accent/[0.03] via-transparent to-transparent pointer-events-none" />
 
         <div className="max-w-4xl mx-auto text-center relative z-10">
-          <Badge variant="accent" className="mb-6 opacity-0 animate-fade-in">
-            <Shield size={12} />
-            Arc Testnet
-          </Badge>
-
           <h1
             className="font-display font-extrabold tracking-tight leading-[1.08] animate-fade-in"
             style={{ animationDelay: "0.1s" }}
@@ -482,7 +556,7 @@ export default function HomePage() {
           </div>
         </div>
 
-        <StatsBar stats={stats} />
+        <StatsBar stats={stats} txStats={txStats} />
       </section>
 
       {/* LIVE TICKER */}
