@@ -19,7 +19,7 @@ export default function Footer() {
               TrustGate
             </span>
             <span className="text-xs text-text-muted">
-              Trust-gated USDC for AI agents
+              The trust layer for Web3
             </span>
           </div>
 
@@ -39,6 +39,22 @@ export default function Footer() {
               className="text-xs text-text-muted hover:text-text transition-colors"
             >
               USDC Faucet
+            </a>
+            <a
+              href="https://x.com/TrustGated"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-text-muted hover:text-text transition-colors"
+            >
+              X
+            </a>
+            <a
+              href="https://discord.gg/kbx9RAGCmx"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-text-muted hover:text-text transition-colors"
+            >
+              Discord
             </a>
           </div>
         </div>
