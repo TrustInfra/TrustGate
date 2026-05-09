@@ -102,7 +102,8 @@ All three TrustGate contracts are source-verified on Arcscan.
 - Oracle page: https://trustgated.xyz/oracle
 - Live agents: https://trustgated.xyz/agents/live
 - Docs: https://trustgated.xyz/docs
-- Demo video: https://youtu.be/MvLSx6fLaq0
+- X — x.com/TrustGated
+- Discord — discord.gg/kbx9RAGCmx
 
 ## Oracle API
 
@@ -199,6 +200,8 @@ Open `http://localhost:3000` and connect a wallet on Arc Testnet (chain ID `5042
 
 - **Ludarep** — main developer
 - **Nald** ([@0xnald](https://github.com/0xnald)) — co-builder
+
+Last updated: May 2026
 
 ## License
 
