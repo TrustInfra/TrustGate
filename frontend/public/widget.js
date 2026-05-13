@@ -51,7 +51,7 @@
       color: "#34d399",
       bg: "rgba(16,185,129,0.12)",
       border: "rgba(16,185,129,0.35)",
-      text: "✅ HIGH_ELITE",
+      text: "HIGH ELITE",
     },
     HIGH: {
       color: "#34d399",
@@ -70,6 +70,12 @@
       bg: "rgba(239,68,68,0.12)",
       border: "rgba(239,68,68,0.35)",
       text: "LOW",
+    },
+    BLOCKED: {
+      color: "#fca5a5",
+      bg: "rgba(220,38,38,0.16)",
+      border: "rgba(220,38,38,0.45)",
+      text: "BLOCKED",
     },
   };
 
@@ -132,12 +138,22 @@
     return badge;
   }
 
-  function applyStyle(badge, style) {
+  function applyStyle(badge, style, textOverride) {
     badge.style.color = style.color;
     badge.style.background = style.bg;
     badge.style.borderColor = style.border;
     badge.style.display = "block";
-    badge.textContent = style.text;
+    badge.textContent =
+      typeof textOverride === "string" ? textOverride : style.text;
+  }
+
+  function tierLabel(tier, score) {
+    var style = TIER_STYLE[tier];
+    if (tier === "HIGH_ELITE" || tier === "BLOCKED") return style.text;
+    if (typeof score === "number" && isFinite(score)) {
+      return score + " · " + style.text;
+    }
+    return style.text;
   }
 
   function hideBadge(badge) {
@@ -204,7 +220,7 @@
             hideBadge(badge);
             return;
           }
-          applyStyle(badge, TIER_STYLE[data.tier]);
+          applyStyle(badge, TIER_STYLE[data.tier], tierLabel(data.tier, data.score));
         })
         .catch(function () {
           if (state.abort !== ac) return;
