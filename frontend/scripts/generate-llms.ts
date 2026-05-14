@@ -20,7 +20,6 @@ const config: Config = {
   baseUrl: "https://trustgated.xyz",
   routes: [
     { path: "/", description: "Homepage -- product overview, trust-gated payment tiers, and live transaction stats" },
-    { path: "/agents", description: "AI Agent registry -- browse all agents registered on AgentRegistry with their trust scores" },
     { path: "/agents/live", description: "Live agent activity -- real-time feed of agent claims and payment routing" },
     { path: "/dashboard", description: "Depositor dashboard -- fund TrustGate with USDC, set per-agent allowances, and monitor claims" },
     { path: "/demo", description: "Interactive demo -- walk through a trust-gated payment flow end to end" },
