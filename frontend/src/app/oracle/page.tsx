@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   useAccount,
   useChainId,
@@ -21,6 +21,7 @@ import {
 } from '@/lib/recent-history';
 
 const HISTORY_KEY = 'trustgate_oracle_history';
+const FAILURE_COOLDOWN_MS = 3000;
 
 // Browser calls go through the Next.js proxy at /api/oracle/* to avoid mixed
 // content issues — the upstream HTTP oracle URL only lives on the server.
@@ -116,6 +117,19 @@ export default function OraclePage() {
   const [paymentTx, setPaymentTx] = useState<`0x${string}` | null>(null);
   const [tab, setTab] = useState<'js' | 'py' | 'curl'>('js');
   const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [cooldownLeft, setCooldownLeft] = useState(0);
+  const inFlightRef = useRef(false);
+
+  // Tick cooldown down every 250ms after a failed query.
+  useEffect(() => {
+    if (cooldownLeft <= 0) return;
+    const id = setTimeout(() => {
+      setCooldownLeft((prev) => Math.max(0, prev - 250));
+    }, 250);
+    return () => clearTimeout(id);
+  }, [cooldownLeft]);
+
+  const cooldownActive = cooldownLeft > 0;
 
   useEffect(() => {
     setHistory(loadHistory(HISTORY_KEY));
@@ -165,24 +179,32 @@ export default function OraclePage() {
   }, []);
 
   const query = async () => {
-    if (!isConnected || !walletAddress) {
-      setError('Connect your wallet first.');
-      return;
-    }
-    if (!/^0x[0-9a-fA-F]{40}$/.test(address)) {
-      setError('Enter a valid Arc wallet address');
-      return;
-    }
-    if (!publicClient) {
-      setError('Arc public client unavailable. Try refreshing the page.');
-      return;
-    }
-
-    setError(null);
-    setResult(null);
-    setPaymentTx(null);
+    // Synchronous guard against double-submission. A ref flips immediately on
+    // entry so a second click before the next render is a no-op, even before
+    // React updates the disabled prop.
+    if (inFlightRef.current) return;
+    if (cooldownActive) return;
+    inFlightRef.current = true;
 
     try {
+      if (!isConnected || !walletAddress) {
+        setError('Connect your wallet first.');
+        return;
+      }
+      if (!/^0x[0-9a-fA-F]{40}$/.test(address)) {
+        setError('Enter a valid Arc wallet address');
+        return;
+      }
+      if (!publicClient) {
+        setError('Arc public client unavailable. Try refreshing the page.');
+        return;
+      }
+
+      setError(null);
+      setResult(null);
+      setPaymentTx(null);
+
+      // Original flow follows.
       // Step 1 — challenge the oracle, expect HTTP 402
       setPhase('challenge');
       const challenge = await fetch(`${ORACLE_PROXY}/${address}`, {
@@ -293,6 +315,9 @@ export default function OraclePage() {
         },
       });
       if (!paid.ok) {
+        if (paid.status === 402) {
+          throw new Error(await format402Error(paid));
+        }
         let detail = '';
         try {
           detail = JSON.stringify(await paid.json());
@@ -318,6 +343,9 @@ export default function OraclePage() {
       console.error('[oracle] query failed:', err);
       setError(humaniseWalletError(message));
       setPhase('error');
+      setCooldownLeft(FAILURE_COOLDOWN_MS);
+    } finally {
+      inFlightRef.current = false;
     }
   };
 
@@ -339,8 +367,12 @@ response = requests.get(
     []
   );
 
-  const buttonLabel = phaseLabel(phase);
   const validAddress = /^0x[0-9a-fA-F]{40}$/.test(address);
+  const cooldownSeconds = Math.ceil(cooldownLeft / 1000);
+  const buttonLabel = cooldownActive
+    ? `Try again in ${cooldownSeconds}s`
+    : phaseLabel(phase);
+  const buttonDisabled = busy || !validAddress || cooldownActive;
 
   return (
     <main className="min-h-screen bg-zinc-950 text-zinc-100">
@@ -400,8 +432,8 @@ response = requests.get(
             ) : (
               <button
                 onClick={query}
-                disabled={busy || !validAddress}
-                className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-500 px-5 py-3 text-sm font-semibold text-zinc-950 transition hover:bg-emerald-400 disabled:opacity-50"
+                disabled={buttonDisabled}
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-500 px-5 py-3 text-sm font-semibold text-zinc-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {busy && <Spinner />}
                 {buttonLabel}
@@ -518,6 +550,24 @@ function humaniseWalletError(message: string): string {
     return 'Insufficient USDC for the 0.001 USDC payment plus Arc gas.';
   }
   return message;
+}
+
+async function format402Error(response: Response): Promise<string> {
+  let body: { error?: unknown; reason?: unknown } = {};
+  try {
+    body = (await response.json()) as { error?: unknown; reason?: unknown };
+  } catch {
+    // Non-JSON body — fall through to the generic message.
+  }
+  const reason = typeof body.reason === 'string' ? body.reason.toLowerCase() : '';
+  const error = typeof body.error === 'string' ? body.error.toLowerCase() : '';
+  if (reason.includes('already used') || reason.includes('replay')) {
+    return 'This payment was already processed. Start a new query.';
+  }
+  if (error.includes('payment verification failed')) {
+    return 'Payment could not be verified. Please try again.';
+  }
+  return 'Query failed. Your USDC was not charged.';
 }
 
 function Spinner() {
