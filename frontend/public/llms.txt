@@ -5,7 +5,6 @@
 ## Pages
 
 - [Homepage -- product overview, trust-gated payment tiers, and live transaction stats](https://trustgated.xyz/)
-- [AI Agent registry -- browse all agents registered on AgentRegistry with their trust scores](https://trustgated.xyz/agents)
 - [Live agent activity -- real-time feed of agent claims and payment routing](https://trustgated.xyz/agents/live)
 - [Depositor dashboard -- fund TrustGate with USDC, set per-agent allowances, and monitor claims](https://trustgated.xyz/dashboard)
 - [Interactive demo -- walk through a trust-gated payment flow end to end](https://trustgated.xyz/demo)
