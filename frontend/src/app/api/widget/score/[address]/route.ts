@@ -4,13 +4,6 @@ import { detectContractKind, scoreContract } from "@/lib/contract-scoring";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const DEFAULT_ORACLE_URL = "http://38.49.216.201:3001";
-const ORACLE_BASE = (
-  process.env.NEXT_PUBLIC_ORACLE_URL ||
-  process.env.ORACLE_URL ||
-  DEFAULT_ORACLE_URL
-).replace(/\/+$/, "");
-
 const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 
 const RATE_LIMIT_MAX = 60;
@@ -71,54 +64,6 @@ function jsonResponse(
   return new NextResponse(JSON.stringify(payload), { status, headers });
 }
 
-interface UpstreamTokenResponse {
-  score?: number;
-  tier?: string;
-}
-
-async function fetchErc20Free(
-  address: string
-): Promise<{ score: number; tier: string } | null> {
-  // The widget endpoint is free, but Nald's upstream may still require x402.
-  // Try a header-less GET; only accept the 200 path. Anything else falls
-  // through to a deterministic placeholder per spec: "for now return a
-  // cached/mock score if payment is required, we will sort with Nald later".
-  const url = `${ORACLE_BASE}/oracle/token/${encodeURIComponent(address)}`;
-  try {
-    const res = await fetch(url, {
-      headers: { accept: "application/json" },
-      cache: "no-store",
-    });
-    if (res.status !== 200) return null;
-    const data = (await res.json()) as UpstreamTokenResponse;
-    if (typeof data.score !== "number" || typeof data.tier !== "string") {
-      return null;
-    }
-    return { score: data.score, tier: data.tier };
-  } catch {
-    return null;
-  }
-}
-
-function placeholderErc20Score(address: string): {
-  score: number;
-  tier: string;
-} {
-  // Deterministic fallback: hash the address into a 0-99 bucket and map to
-  // the same tier bands the wallet/contract scorers use. Stable per-address
-  // so a DEX integrator sees the same badge on repeat loads.
-  let h = 2166136261 >>> 0;
-  for (let i = 0; i < address.length; i++) {
-    h = (h ^ address.charCodeAt(i)) >>> 0;
-    h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
-  }
-  const bucket = h % 100;
-  if (bucket >= 80) return { score: bucket, tier: "HIGH_ELITE" };
-  if (bucket >= 60) return { score: bucket, tier: "HIGH" };
-  if (bucket >= 40) return { score: bucket, tier: "MEDIUM" };
-  return { score: bucket, tier: "LOW" };
-}
-
 export async function GET(
   req: NextRequest,
   context: { params: { address: string } }
@@ -153,23 +98,14 @@ export async function GET(
     return jsonResponse({ error: "not_a_contract" }, 404);
   }
 
-  if (detection.kind === "erc20") {
-    const upstream = await fetchErc20Free(address);
-    const result = upstream ?? placeholderErc20Score(address);
-    return jsonResponse(
-      {
-        score: result.score,
-        tier: result.tier,
-        contractType: "ERC-20",
-      },
-      200
-    );
-  }
-
   if (!detection.info) {
     return jsonResponse({ error: "info_missing" }, 502);
   }
 
+  // Both ERC-20 and other contracts run the local scoreContract flow so the
+  // widget never returns a fabricated score. For non-ERC-20 contracts this
+  // matches the Token Shield page byte-for-byte; for ERC-20s the generic
+  // contract model is applied here instead of Nald's paid ERC-20 oracle.
   try {
     const result = await scoreContract(
       address,
