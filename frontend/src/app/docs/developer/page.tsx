@@ -568,12 +568,6 @@ def get_trust_score(address: str) -> dict:
           resistance, coordinated cluster detection
         </li>
       </ul>
-
-      <p className="text-text-muted">
-        <em>
-          TrustInfra | trustgated.xyz | github.com/TrustInfra/TrustGate
-        </em>
-      </p>
     </DocShell>
   );
 }

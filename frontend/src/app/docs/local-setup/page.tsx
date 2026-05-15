@@ -40,8 +40,7 @@ export default function LocalSetupPage() {
       </ul>
 
       <h2>Clone</h2>
-      <pre><code>{`git clone https://github.com/rudazy/TrustGate
-cd TrustGate`}</code></pre>
+      <pre><code>{`cd TrustGate`}</code></pre>
 
       <h2>Contracts</h2>
       <p>
