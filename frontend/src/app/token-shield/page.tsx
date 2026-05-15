@@ -293,13 +293,11 @@ export default function TokenShieldPage() {
 
       setPhase("fetch");
 
-      let nonce: number;
-      try {
-        const tx = await publicClient.getTransaction({ hash: txHash });
-        nonce = Number(tx.nonce);
-      } catch {
-        nonce = Number(receipt.transactionIndex);
-      }
+      // Fresh per-request opaque nonce. Nald's replay protection is a single
+      // global `usedNonces` set — wallet-local blockchain nonces collide
+      // across users (two payers both at tx nonce 3 → second one 409s as
+      // replay). UUIDs avoid that entirely.
+      const nonce = crypto.randomUUID();
 
       const payload = JSON.stringify({
         txHash,

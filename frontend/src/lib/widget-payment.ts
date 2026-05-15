@@ -24,6 +24,7 @@
 // lock) and shared cache — single-instance Railway/Vercel deployment is
 // the current target.
 
+import { randomUUID } from "node:crypto";
 import {
   createPublicClient,
   createWalletClient,
@@ -118,14 +119,16 @@ async function payAndBuildHeader(): Promise<{
     if (receipt.status !== "success") {
       throw new Error(`payment tx reverted on Arc: ${txHash}`);
     }
-    const tx = await ctx.publicClient.getTransaction({ hash: txHash });
+    // Fresh per-request opaque nonce. Nald's replay protection is a single
+    // global `usedNonces` set; wallet-local blockchain nonces collide across
+    // users. UUIDs guarantee uniqueness.
     const payload = JSON.stringify({
       scheme: "exact",
       network: "Arc Testnet",
       txHash,
       from: ctx.account.address,
       amount: PAYMENT_AMOUNT_USDC,
-      nonce: String(tx.nonce),
+      nonce: randomUUID(),
     });
     const header = Buffer.from(payload, "utf-8").toString("base64");
     return { header, txHash };
