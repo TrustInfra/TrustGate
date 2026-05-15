@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { detectContractKind, scoreContract } from "@/lib/contract-scoring";
+import { scoreErc20ViaUpstream } from "@/lib/widget-payment";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -98,14 +99,29 @@ export async function GET(
     return jsonResponse({ error: "not_a_contract" }, 404);
   }
 
+  // ERC-20 tokens go to upstream Nald with a server-side x402 payment so the
+  // widget returns the same authoritative score Token Shield does. The hot
+  // wallet pays — caller pays nothing. See lib/widget-payment.ts.
+  if (detection.kind === "erc20") {
+    try {
+      const result = await scoreErc20ViaUpstream(address);
+      return jsonResponse(result, 200);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "unknown";
+      console.error(
+        `[widget-score] erc20 upstream failed for ${address}:`,
+        message
+      );
+      return jsonResponse({ error: "scoring_unavailable" }, 502);
+    }
+  }
+
+  // Non-ERC-20 contracts: local scoring (no upstream call, no payment). This
+  // matches the Token Shield non-ERC-20 path byte-for-byte.
   if (!detection.info) {
     return jsonResponse({ error: "info_missing" }, 502);
   }
 
-  // Both ERC-20 and other contracts run the local scoreContract flow so the
-  // widget never returns a fabricated score. For non-ERC-20 contracts this
-  // matches the Token Shield page byte-for-byte; for ERC-20s the generic
-  // contract model is applied here instead of Nald's paid ERC-20 oracle.
   try {
     const result = await scoreContract(
       address,
