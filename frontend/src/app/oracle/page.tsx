@@ -280,18 +280,13 @@ export default function OraclePage() {
 
       // Step 5 — replay the oracle request with the proof header.
       // The oracle expects X-Payment to be a base64-encoded JSON envelope
-      // with the payment tx hash, the sender, and the tx nonce.
+      // with the payment tx hash, the sender, and a fresh opaque nonce.
       setPhase('fetch');
 
-      let nonce: number;
-      try {
-        const tx = await publicClient.getTransaction({ hash: txHash });
-        nonce = Number(tx.nonce);
-      } catch {
-        // Fall back to receipt transactionIndex if the tx fetch fails
-        // (e.g. RPC pruning) — the oracle accepts either as a tie-breaker.
-        nonce = Number(receipt.transactionIndex);
-      }
+      // Nald's replay protection is a single global `usedNonces` set —
+      // wallet-local blockchain nonces collide across users. UUIDs are
+      // globally unique so every request is accepted.
+      const nonce = crypto.randomUUID();
 
       const payload = JSON.stringify({
         txHash,
