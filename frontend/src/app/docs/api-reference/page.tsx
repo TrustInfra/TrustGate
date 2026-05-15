@@ -55,8 +55,9 @@ X-Payment: <base64(JSON{txHash, nonce})>
 
       <h2>GET /trust/:address</h2>
       <p>
-        Returns the trust score, tier, and full breakdown for a single Arc
-        wallet. The address must be a 40-character hex string with the{" "}
+        Returns the trust score, tier, and routing recommendation for a
+        single Arc wallet. The address must be a 40-character hex string
+        with the{" "}
         <code>0x</code> prefix.
       </p>
 
@@ -70,16 +71,6 @@ X-Payment: <base64(JSON{txHash, nonce})>
   "score": 57,
   "tier": "MEDIUM",
   "recommendation": "Time-locked routing (24h hold)",
-  "breakdown": {
-    "txPoints": 40,
-    "usdcPoints": 0,
-    "contractPoints": 7,
-    "deploymentPoints": 10,
-    "txCount": 29,
-    "usdcBalance": "13879355",
-    "contractInteractions": 13,
-    "deployments": 16
-  },
   "queriedAt": "2026-04-25T10:42:13.094Z",
   "network": "arc-testnet",
   "source": "Arc Onchain Activity"
@@ -101,14 +92,6 @@ X-Payment: <base64(JSON{txHash, nonce})>
         <li>
           <strong>recommendation</strong> — the routing path TrustGate would
           take for this score, in plain English.
-        </li>
-        <li>
-          <strong>breakdown</strong> — every signal that contributed to the
-          score, including the raw counts.
-        </li>
-        <li>
-          <strong>breakdown.usdcBalance</strong> — raw 6-decimal USDC balance
-          (divide by 10⁶ for human units).
         </li>
         <li>
           <strong>queriedAt</strong> — ISO-8601 timestamp of the snapshot.
@@ -135,8 +118,8 @@ X-Payment: <base64(JSON{txHash, nonce})>
       <h3>Response (200)</h3>
       <pre><code>{`{
   "results": [
-    { "address": "0x60C0...5c62", "score": 57, "tier": "MEDIUM", "breakdown": { ... } },
-    { "address": "0x52E1...33CC", "score": 92, "tier": "HIGH",   "breakdown": { ... } }
+    { "address": "0x60C0...5c62", "score": 57, "tier": "MEDIUM" },
+    { "address": "0x52E1...33CC", "score": 92, "tier": "HIGH" }
   ],
   "queriedAt": "2026-04-25T10:42:13.094Z",
   "network": "arc-testnet"
