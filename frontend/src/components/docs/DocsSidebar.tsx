@@ -12,6 +12,7 @@ import {
   Boxes,
   Code2,
   Terminal,
+  Braces,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -21,6 +22,7 @@ export const DOC_SECTIONS = [
   { href: "/docs/trust-scoring", label: "Trust Scoring", icon: ShieldCheck },
   { href: "/docs/contracts", label: "Contracts", icon: FileCode2 },
   { href: "/docs/api-reference", label: "API Reference", icon: Cable },
+  { href: "/docs/developer", label: "Developer", icon: Braces },
   { href: "/docs/dashboard-guide", label: "Dashboard Guide", icon: LayoutDashboard },
   { href: "/docs/integration", label: "Integration", icon: Boxes },
   { href: "/docs/widget-integration", label: "Widget", icon: Code2 },

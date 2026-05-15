@@ -58,243 +58,275 @@ export default function TrustScoringPage() {
   return (
     <DocShell
       eyebrow="Trust Scoring"
-      title="How Trust Scoring Works"
-      lede="TrustGate runs two separate scoring systems — one for wallets, one for tokens and contracts. Both return a score from 0 to 100 and map to the same five tiers. Neither uses personal data, off-chain signals, or manual review. Everything comes from onchain activity on Arc."
+      title="How TrustGate Scores Addresses"
+      lede="TrustGate scores two address types: wallet addresses via the Oracle, and contract addresses via Token Shield. All scores are on a 0 to 100 scale. Exact formula weights are intentionally not published to prevent gaming."
     >
-      <h2>The five tiers</h2>
+      <h2>Wallet Scoring (Oracle)</h2>
+      <p>
+        Used for any EOA (externally owned account) queried through the
+        Oracle.
+      </p>
 
+      <h3>What Raises a Wallet Score</h3>
+      <p>
+        <strong>Contract Deployments.</strong> The single most important
+        signal. Deploying contracts onchain separates builders from users.
+        The significance of what you deployed matters — a protocol used by
+        thousands of wallets carries far more weight than an empty or
+        unknown contract. Long-term builders with multiple meaningful
+        deployments score highest.
+      </p>
+      <p>
+        <strong>Transaction History.</strong> Wallets with little or no
+        onchain activity score lower. Sustained, long-term transaction
+        history across multiple protocols is a strong positive signal.
+      </p>
+      <p>
+        <strong>Wallet Age.</strong> Derived from the timestamp of the
+        oldest outgoing transaction. Older wallets with consistent activity
+        score higher. Very new wallets are capped regardless of other
+        signals.
+      </p>
+      <p>
+        <strong>Contract Interactions.</strong> Genuine participation
+        across diverse protocols signals a real ecosystem participant, not
+        a manufactured identity.
+      </p>
+      <p>
+        <strong>USDC Balance.</strong> Demonstrated financial presence on
+        Arc contributes positively.
+      </p>
+      <p>
+        <strong>Activity Spread.</strong> Consistent activity spread across
+        many months signals long-term presence, not a burst campaign
+        designed to inflate scores quickly.
+      </p>
+
+      <h3>Tier Bands</h3>
       <div className="not-prose my-4 overflow-x-auto rounded-lg border border-border bg-bg-surface">
         <table className="w-full">
           <thead>
             <tr className="text-[10px] uppercase tracking-wider text-text-muted">
               <th className="px-3 py-2 text-left font-medium">Tier</th>
               <th className="px-3 py-2 text-left font-medium">Score</th>
-              <th className="px-3 py-2 text-left font-medium">Payment behavior</th>
+              <th className="px-3 py-2 text-left font-medium">
+                Who This Is
+              </th>
             </tr>
           </thead>
           <tbody>
             <TierRow
-              tier="HIGH ELITE"
-              range="95 – 100"
-              behavior="Instant settlement, marked verified"
-              color="text-tier-high"
-            />
-            <TierRow
-              tier="HIGH"
-              range="70 – 94"
-              behavior="Instant settlement"
-              color="text-tier-high"
-            />
-            <TierRow
-              tier="MEDIUM"
-              range="40 – 69"
-              behavior="Time-locked 24h"
-              color="text-tier-medium"
-            />
-            <TierRow
               tier="LOW"
-              range="1 – 39"
-              behavior="Escrow until depositor approves"
+              range="0 to 39"
+              behavior="New, inactive, or flagged wallet"
               color="text-tier-low"
             />
             <TierRow
-              tier="BLOCKED"
-              range="0"
-              behavior="Claim reverts"
-              color="text-text-muted"
+              tier="MEDIUM"
+              range="40 to 59"
+              behavior="Active user with limited builder history, or any bot flag present"
+              color="text-tier-medium"
+            />
+            <TierRow
+              tier="HIGH"
+              range="60 to 79"
+              behavior="Active developer or sustained long-term participant"
+              color="text-tier-high"
+            />
+            <TierRow
+              tier="HIGH_ELITE"
+              range="80 to 100"
+              behavior="Serious long-term builders only"
+              color="text-tier-high"
             />
           </tbody>
         </table>
       </div>
 
       <p>
-        <strong>HIGH ELITE</strong> — Exceptional depth across every signal.
-        The rarest tier. Instant settlement. Marked as verified in the
-        TrustGate system.
+        <strong>HIGH_ELITE</strong> reflects sustained long-term builder
+        behavior across multiple dimensions. Missing any critical condition
+        hard-caps the score below this tier.
       </p>
       <p>
-        <strong>HIGH</strong> — Strong consistent onchain history.
-        Established wallets and tokens with real engagement. Instant
-        settlement.
+        <strong>A perfect score</strong> reflects exceptional long-term
+        ecosystem participation across every signal category
+        simultaneously.
+      </p>
+
+      <h3>Payment Routing</h3>
+      <div className="not-prose my-4 overflow-x-auto rounded-lg border border-border bg-bg-surface">
+        <table className="w-full">
+          <thead>
+            <tr className="text-[10px] uppercase tracking-wider text-text-muted">
+              <th className="px-3 py-2 text-left font-medium">
+                Score Range
+              </th>
+              <th className="px-3 py-2 text-left font-medium">
+                Recommendation
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <ScoreRow cells={["0", "BLOCKED"]} bold />
+            <ScoreRow cells={["Low range", "TIME_LOCKED"]} />
+            <ScoreRow cells={["Mid range", "INSTANT"]} />
+            <ScoreRow cells={["High range", "INSTANT_PRIORITY"]} />
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Bot Detection</h3>
+      <p>
+        TrustGate detects velocity anomalies, timer-based automation,
+        self-interaction loops, coordinated activity, and synthetic
+        transaction histories. Any single detected signal hard-caps the
+        wallet at MEDIUM tier regardless of all other signals. There are
+        no exceptions.
+      </p>
+
+      <h2>Contract Scoring (Token Shield)</h2>
+      <p>
+        Token Shield auto-detects the contract type and applies the
+        correct scoring model.
+      </p>
+      <ul>
+        <li>ERC-20 address → ERC-20 Token Scoring</li>
+        <li>
+          Non-ERC-20 contract → Contract Scoring (free, no payment
+          required)
+        </li>
+        <li>Not a contract → error directing to Oracle page</li>
+      </ul>
+
+      <h3>ERC-20 Token Scoring</h3>
+      <p>
+        <strong>Holder Quality Weighting.</strong> Only wallets that
+        purchased the token count. Airdrop recipients are ignored
+        completely. This removes the fake holder count attack vector
+        entirely — rug pulls cannot boost scores by airdropping to
+        thousands of fresh wallets.
       </p>
       <p>
-        <strong>MEDIUM</strong> — Active but still building history. Real
-        activity exists but not yet the depth that HIGH shows. Payments
-        time-locked 24 hours. Not a penalty — a checkpoint while trust
-        develops.
+        Holder weight is based on the buyer&apos;s wallet trust tier.
+        High-trust buyers contribute meaningfully. Low-trust buyers
+        contribute very little. Airdrop recipients contribute nothing.
       </p>
       <p>
-        <strong>LOW</strong> — New or sparse activity. Some history exists
-        but not enough to establish a reliable pattern. Funds held in
-        escrow until depositor approves.
+        <strong>Deployer Credibility.</strong> The deployer wallet is
+        scored through the wallet oracle. Their trust tier is applied as a
+        significance multiplier on the token score. Trust propagates from
+        builder to product.
       </p>
       <p>
-        <strong>BLOCKED</strong> — Zero transaction history. No activity
-        means no score. Claims revert automatically. Not permanent — start
-        transacting on Arc and the score will reflect that.
+        <strong>Score Updates.</strong> New tokens update more frequently.
+        Established tokens update less frequently — changes carry more
+        significance. A rising score on a new token is a positive signal.
+        A falling score on an established token is a warning.
       </p>
 
-      <h2>Wallet scoring</h2>
-      <p>What we look at:</p>
-      <ul>
-        <li>
-          <strong>Transaction History</strong> — The most important signal.
-          Volume and consistency of transactions on Arc over time. We look
-          at how much activity happened — not what the transactions were.
-        </li>
-        <li>
-          <strong>USDC Activity</strong> — Wallets holding and moving
-          meaningful USDC demonstrate real economic participation in the
-          network.
-        </li>
-        <li>
-          <strong>Smart Contract Interactions</strong> — Active protocol
-          users score higher than wallets that only do simple transfers.
-          We look at whether the wallet has actually called contracts and
-          used protocols.
-        </li>
-        <li>
-          <strong>Contract Deployments</strong> — The strongest positive
-          signal. A wallet that has deployed contracts on Arc has
-          demonstrated a deeper level of commitment than one that has only
-          transacted. Required to reach HIGH ELITE.
-        </li>
-        <li>
-          <strong>Consistency</strong> — Steady activity over time scores
-          higher than a single burst of transactions. Sustained engagement
-          matters more than one-time activity.
-        </li>
-      </ul>
-
-      <p>What flags a wallet:</p>
-      <ul>
-        <li>Never sent a transaction on Arc</li>
-        <li>All activity happened in one short window with nothing since</li>
-        <li>No interaction with any smart contract or protocol</li>
-        <li>USDC balance has never moved</li>
-        <li>Wallet exists only to hold funds, not participate</li>
-      </ul>
-
-      <h2>Token and contract scoring</h2>
+      <h3>Non-ERC-20 Contract Scoring</h3>
       <p>
-        When you query a token contract, TrustGate scores it across three
-        signals:
+        Scored across six dimensions: verification status, contract age,
+        transaction volume, unique interactors, deployer trust, and Arc
+        ecosystem recognition.
       </p>
-      <ul>
-        <li>
-          <strong>Purchase Ratio — 50% of the score.</strong> What
-          percentage of holders actually bought the token versus received
-          it via airdrop or direct transfer from the deployer. A token
-          where 90% of holders were airdropped it scores significantly
-          lower than one where 90% of holders purchased it on a DEX. This
-          is the core signal — organic buying behavior is the strongest
-          indicator of a legitimate token.
-        </li>
-        <li>
-          <strong>Holder Trust — 30% of the score.</strong> The average
-          TrustGate wallet score of holders who purchased the token.
-          Credible, established wallets buying a token is a strong
-          positive signal. Fresh wallets or BLOCKED addresses buying carry
-          minimal weight.
-        </li>
-        <li>
-          <strong>Deployer Credibility — 20% of the score.</strong> The
-          TrustGate wallet score of the contract deployer. A HIGH or HIGH
-          ELITE deployer signals an experienced builder. A BLOCKED or LOW
-          deployer is a red flag regardless of holder behavior.
-        </li>
-      </ul>
-
-      <p>What flags a token:</p>
-      <ul>
-        <li>
-          80% or more of buyers purchased within the same 3-hour window —
-          this signals coordinated buying, and those buyers are heavily
-          discounted in the score
-        </li>
-        <li>
-          Majority of holders received tokens via airdrop or deployer
-          transfer rather than purchasing
-        </li>
-        <li>Deployer wallet has LOW or BLOCKED trust score</li>
-        <li>Very few unique purchasers relative to total holders</li>
-      </ul>
-
-      <h2>What does NOT affect your score</h2>
-      <ul>
-        <li>Which wallet address you use</li>
-        <li>Who you have transacted with</li>
-        <li>The size of individual transactions</li>
-        <li>Off-chain reputation or social signals</li>
-        <li>Any manual input or review</li>
-      </ul>
       <p>
-        Scores are deterministic. The same wallet or token will always
-        return the same score at the same point in time. No human touches
-        it.
+        <strong>Verification</strong> is weighted heavily. Unverified
+        contracts are capped regardless of all other signals — publishing
+        source code is a trust signal. Verified contracts can reach the
+        highest tiers.
       </p>
-
-      <h2>For developers integrating TrustGate</h2>
-      <p>When a user asks why their score is what it is:</p>
-      <ul>
-        <li>
-          <strong>BLOCKED</strong> — No transaction history on Arc yet.
-        </li>
-        <li>
-          <strong>LOW</strong> — Some activity exists but not enough
-          consistent history to establish trust.
-        </li>
-        <li>
-          <strong>MEDIUM</strong> — Active but still building the depth of
-          engagement that HIGH wallets show. For tokens — real buyers
-          exist but holder quality or purchase ratio needs to strengthen.
-        </li>
-        <li>
-          <strong>HIGH</strong> — Strong consistent onchain history.
-        </li>
-        <li>
-          <strong>HIGH ELITE</strong> — Among the most established on the
-          network.
-        </li>
-      </ul>
       <p>
-        You do not need to expose internal mechanics to your users. The
-        tier name and this plain-language description is enough for any
-        integration.
+        <strong>Contract age</strong> matters. A contract running without
+        incident for many months is more credible than one deployed last
+        week.
       </p>
-
-      <h2>Improving a score</h2>
-      <p>Wallet scores:</p>
-      <ul>
-        <li>
-          <strong>BLOCKED to LOW</strong> — start transacting on Arc.
-        </li>
-        <li>
-          <strong>LOW to MEDIUM</strong> — build consistent activity over
-          time.
-        </li>
-        <li>
-          <strong>MEDIUM to HIGH</strong> — interact with protocols, not
-          just transfers.
-        </li>
-        <li>
-          <strong>HIGH to HIGH ELITE</strong> — deploy contracts and
-          maintain sustained high-volume activity.
-        </li>
-      </ul>
-
-      <p>Token scores improve as:</p>
-      <ul>
-        <li>
-          More wallets purchase via DEX rather than receive via airdrop
-        </li>
-        <li>Purchasing holders build stronger onchain history</li>
-        <li>Time passes and the holder base diversifies</li>
-      </ul>
       <p>
-        There is no shortcut. The score reflects what actually happened
-        onchain.
+        <strong>Unique interactors</strong> matter more than raw
+        transaction count. Many different wallets interacting is
+        fundamentally different from one wallet calling the contract many
+        times. Diversity signals organic adoption.
       </p>
+      <p>
+        <strong>Deployer trust</strong> propagates directly to the
+        contract score. A HIGH_ELITE deployer is a strong positive signal.
+        A LOW deployer is a red flag regardless of what the contract does
+        on the surface.
+      </p>
+      <p>
+        <strong>Arc ecosystem recognition</strong> rewards contracts
+        genuinely embedded in the Arc DeFi ecosystem.
+      </p>
+
+      <h3>Contract Flags</h3>
+      <p>
+        <strong>Interaction Velocity.</strong> Organic adoption is
+        gradual. A contract receiving an unusually high number of
+        transactions shortly after deployment signals coordinated or
+        automated activity. Hard cap at MEDIUM tier.
+      </p>
+      <p>
+        <strong>Unverified Hard Cap.</strong> Not a bot flag. A
+        transparency cap. Unverified contracts can still score HIGH but
+        can never reach HIGH_ELITE regardless of all other signals.
+      </p>
+
+      <h3>Tier Bands (Contract)</h3>
+      <div className="not-prose my-4 overflow-x-auto rounded-lg border border-border bg-bg-surface">
+        <table className="w-full">
+          <thead>
+            <tr className="text-[10px] uppercase tracking-wider text-text-muted">
+              <th className="px-3 py-2 text-left font-medium">Tier</th>
+              <th className="px-3 py-2 text-left font-medium">Score</th>
+              <th className="px-3 py-2 text-left font-medium">
+                Description
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <TierRow
+              tier="LOW"
+              range="0 to 39"
+              behavior="Suspicious, very new, or low-activity"
+              color="text-tier-low"
+            />
+            <TierRow
+              tier="MEDIUM"
+              range="40 to 59"
+              behavior="Limited history or velocity-flagged"
+              color="text-tier-medium"
+            />
+            <TierRow
+              tier="HIGH"
+              range="60 to 79"
+              behavior="Active with real usage (unverified contracts cap here)"
+              color="text-tier-high"
+            />
+            <TierRow
+              tier="HIGH_ELITE"
+              range="80 to 100"
+              behavior="Verified, established, high-usage, trusted deployer, Arc-native"
+              color="text-tier-high"
+            />
+          </tbody>
+        </table>
+      </div>
+
+      <h2>Arcscan vs TrustGate</h2>
+      <p>
+        <strong>Arcscan provides raw data:</strong> deployer address,
+        creation timestamp, verification status, transaction history,
+        address counters, token type classification.
+      </p>
+      <p>
+        <strong>TrustGate decides quality:</strong> whether activity
+        patterns indicate bots, how deployer history translates to trust,
+        whether timing signals manipulation, how interactor diversity
+        signals credibility, whether Arc ecosystem connections add
+        legitimacy, and the final score and tier.
+      </p>
+      <p>Arcscan shows you data. TrustGate tells you whether to trust it.</p>
     </DocShell>
   );
 }
