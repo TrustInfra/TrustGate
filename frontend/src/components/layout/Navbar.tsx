@@ -14,6 +14,7 @@ const PRIMARY_LINKS: NavLink[] = [
   { href: "/", label: "Home" },
   { href: "/oracle", label: "Oracle" },
   { href: "/token-shield", label: "Token Shield" },
+  { href: "/roadmap", label: "Roadmap" },
   { href: "/docs", label: "Docs" },
 ];
 
