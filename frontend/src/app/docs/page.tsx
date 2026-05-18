@@ -32,27 +32,26 @@ export default function DocsOverview() {
     <DocShell
       eyebrow="Overview"
       title="TrustGate"
-      lede="Trust-gated USDC payment infrastructure for AI agents. Onchain trust scoring on Arc routes every payment through instant settlement, a 24-hour time-lock, or escrow — picked automatically from the agent's tier."
+      lede="TrustGate is a behavioral trust oracle for wallets and contracts on Arc. Score any address by onchain history, deployment credibility, holder behavior, and bot detection signals. Trust scores route payments, gate protocol access, and surface risk — automatically."
     >
       <h2>What it is</h2>
       <p>
-        TrustGate is a payment layer purpose-built for autonomous agents.
-        Depositors fund a pooled USDC balance, set per-agent allowances, and
-        delegate routing to an onchain trust score. Agents claim against those
-        allowances directly, and the contract picks instant transfer,
-        time-lock, or escrow based on the agent&apos;s tier — no off-chain
-        approvals, no human in the loop.
+        TrustGate is a behavioral trust oracle for wallets and contracts on
+        Arc. Score any address by onchain history, deployment credibility,
+        holder behavior, and bot detection signals. Trust scores route
+        payments, gate protocol access, and surface risk — automatically.
       </p>
 
       <h2>The problem</h2>
       <p>
-        Mainstream L1 gas fees ($2 – $5 per transaction) make sub-cent agent
-        micropayments economically unviable. ERC-20{" "}
-        <code>approve()</code> is also all-or-nothing — once granted, an agent
-        has unlimited spending authority until revocation. There is no
-        primitive that lets reputation shape the settlement path, so any
-        agent-to-agent commerce inherits the worst trust assumptions of the
-        network.
+        Web3 protocols, DEXs, and AI agents operate blind. There is no shared
+        primitive for knowing whether a wallet is a legitimate participant or
+        a coordinated attacker, whether a token has a credible holder base or
+        a manufactured one, or whether a deployer has a clean history or a
+        pattern of rugs. Every protocol builds its own heuristics or ignores
+        the problem entirely. The result is billions lost to exploits, rugs,
+        and coordinated attacks that onchain behavioral data could have
+        flagged in advance.
       </p>
 
       <h2>The solution</h2>
