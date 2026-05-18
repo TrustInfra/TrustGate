@@ -175,7 +175,34 @@ async function fetchUpstream(
 }
 
 const scoreCache = new Map<string, CachedScore>();
+const cacheTimers = new Map<string, NodeJS.Timeout>();
 const inFlight = new Map<string, Promise<WidgetScore>>();
+
+// Eager eviction: at insert time we schedule the entry's removal at the TTL
+// boundary. This guarantees the cache truly clears after the intended window
+// instead of relying on a later query for the same address to lazily notice
+// the expiry. Lazy fallback on the read path covers timer skew or processes
+// that have been suspended past the deadline.
+function evictCacheEntry(key: string): void {
+  scoreCache.delete(key);
+  const timer = cacheTimers.get(key);
+  if (timer) {
+    clearTimeout(timer);
+    cacheTimers.delete(key);
+  }
+}
+
+function setCacheEntry(key: string, result: WidgetScore): void {
+  evictCacheEntry(key);
+  scoreCache.set(key, {
+    result,
+    expiresAt: Date.now() + SCORE_CACHE_TTL_MS,
+  });
+  const timer = setTimeout(() => evictCacheEntry(key), SCORE_CACHE_TTL_MS);
+  // Don't hold the Node event loop open just for cache GC.
+  timer.unref();
+  cacheTimers.set(key, timer);
+}
 
 export async function scoreErc20ViaUpstream(
   address: string
@@ -184,7 +211,10 @@ export async function scoreErc20ViaUpstream(
   const now = Date.now();
 
   const cached = scoreCache.get(key);
-  if (cached && cached.expiresAt > now) return cached.result;
+  if (cached) {
+    if (cached.expiresAt > now) return cached.result;
+    evictCacheEntry(key);
+  }
 
   const existing = inFlight.get(key);
   if (existing) return existing;
@@ -193,10 +223,7 @@ export async function scoreErc20ViaUpstream(
     try {
       const { header, txHash } = await payAndBuildHeader();
       const result = await fetchUpstream(address, header, txHash);
-      scoreCache.set(key, {
-        result,
-        expiresAt: Date.now() + SCORE_CACHE_TTL_MS,
-      });
+      setCacheEntry(key, result);
       return result;
     } finally {
       inFlight.delete(key);
