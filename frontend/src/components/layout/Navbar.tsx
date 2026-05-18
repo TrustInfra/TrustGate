@@ -17,11 +17,11 @@ const PRIMARY_LINKS: NavLink[] = [
 ];
 
 const MORE_LINKS: NavLink[] = [
-  { href: "/roadmap", label: "Roadmap" },
   { href: "/docs", label: "Docs" },
   { href: "/dashboard", label: "Dashboard" },
-  { href: "/agents/live", label: "Live Agents" },
   { href: "/demo", label: "Demo" },
+  { href: "/agents/live", label: "Live Agents" },
+  { href: "/roadmap", label: "Roadmap" },
   { href: "/docs/widget-integration", label: "Widget" },
 ];
 

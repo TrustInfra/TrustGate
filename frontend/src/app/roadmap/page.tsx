@@ -17,6 +17,7 @@ import {
   TrendingUp,
   Users,
   History,
+  Bot,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Badge from "@/components/ui/Badge";
@@ -107,6 +108,12 @@ const UPCOMING_PHASES: Phase[] = [
     title: "Phase 6 -- Multichain Expansion",
     body: "Arc to Base, Ethereum, Arbitrum, and Polygon. Chain-specific scoring weights. Cross-chain composite score -- a builder with years of history on Ethereum does not appear LOW on Arc just because they arrived recently. Cross-chain deployer tracking -- a deployer who rugged on one chain is flagged on every chain.",
     icon: Network,
+  },
+  {
+    id: "phase-7b",
+    title: "Phase 7b -- Agent Reputation Layer (Long Term)",
+    body: "As autonomous agents begin holding USDC, executing transactions, interacting with contracts, and coordinating with other agents onchain, behavioral trust becomes critical for agentic commerce.\n\nTrustGate expands beyond wallets, contracts, and tokens into agent reputation infrastructure. The goal is not identity verification. The goal is persistent behavioral reputation for autonomous economic actors.\n\nScoring signals:\n- Successful payment settlement history\n- Transaction and execution reliability\n- Frequency of failed or reverted actions\n- Interaction quality with trusted contracts\n- Cross-agent coordination patterns\n- Spam or exploit-linked behavior\n- Treasury management consistency\n- Long-term operational uptime\n- Trust propagation from integrated protocols and agents\n\nThis creates a behavioral trust layer for machine-to-machine commerce where:\n- Agents can evaluate other agents before interacting\n- Protocols can set minimum trust thresholds for autonomous execution\n- Developers can integrate reputation scoring directly into agent workflows\n- Malicious or unreliable agents accumulate persistent negative reputation over time\n\nFuture integrations may include Circle Agent Stack, autonomous payment frameworks, agent marketplaces, delegated execution systems, and agent-to-agent settlement infrastructure.\n\nTrustGate remains focused on one core problem: behavioral trust for economic actors onchain -- whether human-controlled or autonomous.",
+    icon: Bot,
   },
   {
     id: "phase-7",
@@ -262,14 +269,54 @@ function PhaseCard({
       </div>
 
       <div className="space-y-3">
-        {paragraphs.map((p, i) => (
-          <p
-            key={i}
-            className="text-sm text-text-secondary leading-relaxed"
-          >
-            {p}
-          </p>
-        ))}
+        {paragraphs.map((p, i) => {
+          const lines = p.split("\n");
+          const hasBullets = lines.some((l) => l.trim().startsWith("- "));
+
+          if (!hasBullets) {
+            return (
+              <p
+                key={i}
+                className="text-sm text-text-secondary leading-relaxed"
+              >
+                {p}
+              </p>
+            );
+          }
+
+          const leadLines: string[] = [];
+          const bulletLines: string[] = [];
+          let inBullets = false;
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (trimmed.startsWith("- ")) {
+              inBullets = true;
+              bulletLines.push(trimmed.slice(2));
+            } else if (!inBullets) {
+              leadLines.push(line);
+            }
+          }
+
+          return (
+            <div key={i} className="space-y-2">
+              {leadLines.length > 0 && (
+                <p className="text-sm text-text-secondary leading-relaxed">
+                  {leadLines.join(" ")}
+                </p>
+              )}
+              <ul className="space-y-1.5 list-disc list-outside pl-5 marker:text-text-muted">
+                {bulletLines.map((b, j) => (
+                  <li
+                    key={j}
+                    className="text-sm text-text-secondary leading-relaxed"
+                  >
+                    {b}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          );
+        })}
       </div>
     </article>
   );
