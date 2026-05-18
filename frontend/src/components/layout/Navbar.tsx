@@ -14,11 +14,11 @@ const PRIMARY_LINKS: NavLink[] = [
   { href: "/", label: "Home" },
   { href: "/oracle", label: "Oracle" },
   { href: "/token-shield", label: "Token Shield" },
-  { href: "/roadmap", label: "Roadmap" },
-  { href: "/docs", label: "Docs" },
 ];
 
 const MORE_LINKS: NavLink[] = [
+  { href: "/roadmap", label: "Roadmap" },
+  { href: "/docs", label: "Docs" },
   { href: "/dashboard", label: "Dashboard" },
   { href: "/agents/live", label: "Live Agents" },
   { href: "/demo", label: "Demo" },
