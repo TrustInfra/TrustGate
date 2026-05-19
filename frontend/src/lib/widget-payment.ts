@@ -6,7 +6,7 @@
 // authoritative ERC-20 score Token Shield gets, without asking the caller
 // to sign anything.
 //
-// In-memory result cache (5 min TTL) and in-flight request dedup prevent
+// In-memory result cache (1 hour TTL) and in-flight request dedup prevent
 // paying twice for the same address in quick succession. A single mutex
 // chain serialises all wallet tx broadcasts so nonces never collide on a
 // single-instance deployment.
@@ -49,7 +49,7 @@ const PAYMENT_AMOUNT_RAW = parseUnits(PAYMENT_AMOUNT_USDC, 6); // 1000n at 6 dec
 const RECIPIENT = CONTRACT_ADDRESSES.trustGate;
 const USDC = CONTRACT_ADDRESSES.usdc;
 
-const SCORE_CACHE_TTL_MS = 5 * 60_000;
+const SCORE_CACHE_TTL_MS = 3_600_000;
 
 export interface WidgetScore {
   score: number;
