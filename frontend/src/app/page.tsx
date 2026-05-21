@@ -538,8 +538,9 @@ export default function HomePage() {
             className="mt-6 max-w-2xl mx-auto text-base text-text-secondary leading-relaxed opacity-0 animate-slide-up"
             style={{ animationDelay: "0.25s" }}
           >
-            Score any wallet, token, or contract before you swap, send, or
-            settle. Live on Arc Testnet.
+            TrustGate is behavioral state infrastructure for onchain systems.
+            Score any wallet, token, or contract by what it has actually done
+            — not who it claims to be.
           </p>
 
           <div
