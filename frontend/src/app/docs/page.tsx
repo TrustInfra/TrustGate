@@ -32,26 +32,27 @@ export default function DocsOverview() {
     <DocShell
       eyebrow="Overview"
       title="TrustGate"
-      lede="TrustGate is a behavioral trust oracle for wallets and contracts on Arc. Score any address by onchain history, deployment credibility, holder behavior, and bot detection signals. Trust scores route payments, gate protocol access, and surface risk — automatically."
+      lede="TrustGate is behavioral state infrastructure for wallets and contracts on Arc. Score any address by onchain history, deployment credibility, holder behavior, and coordination signals. Trust scores route payments, gate protocol access, and surface risk — automatically."
     >
       <h2>What it is</h2>
       <p>
-        TrustGate is a behavioral trust oracle for wallets and contracts on
-        Arc. Score any address by onchain history, deployment credibility,
-        holder behavior, and bot detection signals. Trust scores route
-        payments, gate protocol access, and surface risk — automatically.
+        TrustGate is behavioral state infrastructure for wallets and contracts
+        on Arc. Score any address by onchain history, deployment credibility,
+        holder behavior, and coordination signals. Trust scores route payments,
+        gate protocol access, and surface risk — automatically.
+      </p>
+      <p>
+        Most trust systems analyze identity or static reputation. TrustGate
+        models behavioral state over time. That distinction is the product.
       </p>
 
       <h2>The problem</h2>
       <p>
-        Web3 protocols, DEXs, and AI agents operate blind. There is no shared
-        primitive for knowing whether a wallet is a legitimate participant or
-        a coordinated attacker, whether a token has a credible holder base or
-        a manufactured one, or whether a deployer has a clean history or a
-        pattern of rugs. Every protocol builds its own heuristics or ignores
-        the problem entirely. The result is billions lost to exploits, rugs,
-        and coordinated attacks that onchain behavioral data could have
-        flagged in advance.
+        Most trust systems analyze identity or static reputation. Web3
+        protocols, DEXs, and AI agents need something different: a system that
+        models behavioral state over time — what an address has actually done,
+        how that behavior has changed, and whether coordination patterns signal
+        risk. TrustGate is that system.
       </p>
 
       <h2>The solution</h2>

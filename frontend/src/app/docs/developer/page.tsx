@@ -60,7 +60,7 @@ export default function DeveloperPage() {
     <DocShell
       eyebrow="Developer"
       title="TrustGate Developer Documentation"
-      lede="TrustGate is a behavioral trust oracle for wallets and contracts on Arc. Query any address and receive a trust score, tier, confidence level, and behavioral flags."
+      lede="TrustGate is behavioral state infrastructure for onchain systems. Query any address and receive a behavioral trust score, tier, confidence level, and coordination flags."
     >
       <pre><code>{`curl https://api.trustgated.xyz/oracle/wallet/0xYourAddressHere`}</code></pre>
 
@@ -507,24 +507,12 @@ def get_trust_score(address: str) -> dict:
         <p>TrustGate analyzes behavioral reputation, not identity.</p>
       </blockquote>
       <p>
-        TrustGate makes no claim about who owns a wallet. It makes
-        claims about what that wallet has done onchain.
-      </p>
-      <ul>
-        <li>No KYC data collected or required</li>
-        <li>No biometric or social identity linked</li>
-        <li>No human identity claims made</li>
-        <li>No social graph deanonymization</li>
-        <li>
-          Behavioral patterns only — what was done, when, and with whom
-          onchain
-        </li>
-      </ul>
-      <p>
-        This positioning matters for institutional integration, governed
-        protocol deployment, and regulated environments. Behavioral
-        reputation infrastructure is a fundamentally different category
-        from identity systems.
+        TrustGate models behavioral reputation, not personal identity. It
+        cannot tell you who owns a wallet. It can tell you what that wallet
+        has done, how its behavior has changed over time, and whether its
+        patterns signal risk. This distinction matters legally and
+        operationally — behavioral reputation infrastructure is a
+        fundamentally different category from identity systems.
       </p>
       <p>
         TrustGate scores reflect immutable onchain history.

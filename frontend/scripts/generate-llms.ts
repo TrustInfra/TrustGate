@@ -16,7 +16,7 @@ interface Config {
 const config: Config = {
   title: "TrustGate",
   description:
-    "The trust layer for Web3. Trust scores route USDC payments to AI agents (instant, 24h time-locked, or escrowed by tier), and Token Shield scores any token or contract for deployer credibility and holder authenticity.",
+    "TrustGate is behavioral state infrastructure for onchain systems. Score any wallet, token, or contract by what it has actually done — not who it claims to be. Most trust systems analyze identity or static reputation. TrustGate models behavioral state over time. Trust builds slowly. Trust collapses quickly. TrustGate makes that asymmetry operational.",
   baseUrl: "https://trustgated.xyz",
   routes: [
     { path: "/", description: "Homepage -- product overview, trust-gated payment tiers, and live transaction stats" },

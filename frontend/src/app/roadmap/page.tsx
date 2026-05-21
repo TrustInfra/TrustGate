@@ -25,7 +25,7 @@ import Badge from "@/components/ui/Badge";
 export const metadata = {
   title: "Roadmap -- TrustGate",
   description:
-    "Building the trust layer for Web3. One oracle. Every chain. Every use case.",
+    "Behavioral state infrastructure for autonomous onchain systems. Trust builds slowly. Trust collapses quickly.",
 };
 
 type PhaseStatus = "completed" | "in-progress" | "upcoming";
@@ -391,8 +391,8 @@ export default function RoadmapPage() {
             TrustGate Roadmap
           </h1>
           <p className="mt-5 max-w-2xl mx-auto text-base sm:text-lg text-text-secondary leading-relaxed">
-            Building the trust layer for Web3. One oracle. Every chain. Every
-            use case.
+            Behavioral state infrastructure for autonomous onchain systems.
+            Trust builds slowly. Trust collapses quickly.
           </p>
         </div>
       </section>
@@ -506,17 +506,13 @@ export default function RoadmapPage() {
             <h2 className="text-xl sm:text-2xl font-display font-bold text-text mb-4">
               TrustGate analyzes behavioral reputation, not identity.
             </h2>
-            <p className="text-sm text-text-secondary leading-relaxed mb-4">
-              TrustGate makes no claim about who owns a wallet. It makes claims
-              about what that wallet has done onchain. No KYC. No biometric
-              identity. No social graph deanonymization. No human identity
-              claims. Behavioral patterns only.
-            </p>
             <p className="text-sm text-text-secondary leading-relaxed">
-              This distinction matters legally and philosophically. Behavioral
-              reputation infrastructure is a fundamentally different category
-              from identity systems -- with fundamentally different implications
-              for regulatory scrutiny and institutional adoption.
+              TrustGate models behavioral reputation, not personal identity. It
+              cannot tell you who owns a wallet. It can tell you what that
+              wallet has done, how its behavior has changed over time, and
+              whether its patterns signal risk. This distinction matters legally
+              and operationally — behavioral reputation infrastructure is a
+              fundamentally different category from identity systems.
             </p>
           </div>
         </div>
