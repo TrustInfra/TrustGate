@@ -33,11 +33,10 @@ export const metadata: Metadata = {
     "Deposit USDC, set per-agent allowances, and let trust scores route payments. Instant, time-locked, or escrowed -- determined by reputation.",
   icons: {
     icon: [
-      { url: "/favicon.svg", type: "image/svg+xml" },
-      { url: "/favicon.ico", sizes: "32x32" },
-    ],
-    apple: "/apple-touch-icon.png",
-  },
+    { url: "/favicon.png", sizes: "32x32", type: "image/png" },
+  ],
+  apple: "/apple-touch-icon.png",
+},
   openGraph: {
     title: "TrustGate -- Trust-Gated Payments for AI Agents",
     description:
