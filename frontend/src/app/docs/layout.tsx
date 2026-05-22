@@ -1,5 +1,19 @@
+import type { Metadata } from "next";
 import DocsSidebar from "@/components/docs/DocsSidebar";
 import DocsMobileNav from "@/components/docs/DocsMobileNav";
+
+export const metadata: Metadata = {
+  title: "Docs | TrustGate",
+  description:
+    "Developer documentation for TrustGate -- integrate trust scoring, query the oracle, register agents, and gate access using on-chain reputation. REST, widgets, and contract references.",
+  openGraph: {
+    title: "Docs | TrustGate",
+    description:
+      "Developer documentation for TrustGate -- integrate trust scoring, query the oracle, register agents, and gate access using on-chain reputation. REST, widgets, and contract references.",
+    type: "website",
+    url: "https://trustgated.xyz/docs",
+  },
+};
 
 export default function DocsLayout({ children }: { children: React.ReactNode }) {
   return (

@@ -28,9 +28,9 @@ const jetbrains = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "TrustGate -- Trust-Gated Payments for AI Agents",
+  title: "TrustGate | Trust Layer for Web3",
   description:
-    "Deposit USDC, set per-agent allowances, and let trust scores route payments. Instant, time-locked, or escrowed -- determined by reputation.",
+    "TrustGate scores wallets and tokens on-chain using behavioral signals -- bot detection, deployment history, transaction patterns -- and gates access to payments and services. Built on Arc.",
   icons: {
     icon: [
     { url: "/favicon.png", sizes: "32x32", type: "image/png" },
@@ -38,9 +38,9 @@ export const metadata: Metadata = {
   apple: "/apple-touch-icon.png",
 },
   openGraph: {
-    title: "TrustGate -- Trust-Gated Payments for AI Agents",
+    title: "TrustGate | Trust Layer for Web3",
     description:
-      "Deposit USDC, set per-agent allowances, and let trust scores route payments.",
+      "TrustGate scores wallets and tokens on-chain using behavioral signals -- bot detection, deployment history, transaction patterns -- and gates access to payments and services. Built on Arc.",
     type: "website",
   },
 };
