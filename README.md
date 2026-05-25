@@ -4,12 +4,16 @@ A behavioral trust scoring primitive for the Arc testnet. TrustGate scores any
 wallet, token, or contract based on its onchain activity, returning a normalized
 trust score and a discrete tier other applications can gate on.
 
-Scoring combines Arcscan onchain data with two graph algorithms:
+Scoring is derived entirely from Arcscan onchain data, using the following
+signals:
 
-- **EigenTrust** — transitive, reputation-weighted trust propagation across the
-  interaction graph (Kamvar et al.).
-- **AgentRank** — a PageRank variant over attestations and interactions, using a
-  damping factor and convergence checks to rank actors by inbound trust.
+- **Transaction count** — total onchain activity volume.
+- **Contract deployments** — number of contracts the address has deployed.
+- **Wallet age** — time elapsed since the address's first onchain activity.
+- **Interaction patterns** — the diversity and structure of an address's
+  interactions with other accounts and contracts.
+- **Bot detection signals** — heuristics that flag automated or sybil-like
+  behavior.
 
 Live at [trustgated.xyz](https://trustgated.xyz).
 
