@@ -4,7 +4,7 @@ import DocShell from "@/components/docs/DocShell";
 export const metadata = { title: "Integration — TrustGate Docs" };
 
 const ORACLE_URL =
-  process.env.NEXT_PUBLIC_ORACLE_URL ?? "https://oracle.trustgated.xyz";
+  process.env.NEXT_PUBLIC_ORACLE_URL ?? "https://your-oracle-host.example.com";
 
 export default function IntegrationPage() {
   return (

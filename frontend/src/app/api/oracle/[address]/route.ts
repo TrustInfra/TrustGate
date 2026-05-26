@@ -4,13 +4,17 @@ import { rescoreWallet } from "@/lib/wallet-rescore";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const DEFAULT_ORACLE_URL = "https://oracle.trustgated.xyz";
-
 const ORACLE_BASE = (
   process.env.NEXT_PUBLIC_ORACLE_URL ||
   process.env.ORACLE_URL ||
-  DEFAULT_ORACLE_URL
+  ""
 ).replace(/\/+$/, "");
+
+if (!ORACLE_BASE) {
+  throw new Error(
+    "Oracle URL is not configured. Set ORACLE_URL or NEXT_PUBLIC_ORACLE_URL.",
+  );
+}
 
 const FORWARDABLE_REQUEST_HEADERS = new Set([
   "accept",

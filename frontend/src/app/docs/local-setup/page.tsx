@@ -69,7 +69,7 @@ npm run dev`}</code></pre>
 
       <h3>Environment variables</h3>
       <pre><code>{`# Required
-NEXT_PUBLIC_ORACLE_URL=https://oracle.trustgated.xyz
+NEXT_PUBLIC_ORACLE_URL=https://your-oracle-host.example.com
 
 # Optional — enables WalletConnect mobile flows
 NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your_project_id`}</code></pre>

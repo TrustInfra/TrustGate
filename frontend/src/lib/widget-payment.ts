@@ -37,12 +37,17 @@ import { privateKeyToAccount, type PrivateKeyAccount } from "viem/accounts";
 import { erc20Abi } from "@/lib/abi/ERC20";
 import { arcTestnet, CONTRACT_ADDRESSES } from "@/lib/constants";
 
-const DEFAULT_ORACLE_URL = "https://oracle.trustgated.xyz";
 const ORACLE_BASE = (
   process.env.ORACLE_URL ||
   process.env.NEXT_PUBLIC_ORACLE_URL ||
-  DEFAULT_ORACLE_URL
+  ""
 ).replace(/\/+$/, "");
+
+if (!ORACLE_BASE) {
+  throw new Error(
+    "Oracle URL is not configured. Set ORACLE_URL or NEXT_PUBLIC_ORACLE_URL.",
+  );
+}
 
 const PAYMENT_AMOUNT_USDC = "0.001";
 const PAYMENT_AMOUNT_RAW = parseUnits(PAYMENT_AMOUNT_USDC, 6); // 1000n at 6 decimals
