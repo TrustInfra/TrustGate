@@ -32,7 +32,7 @@ this client component to keep it simple (drop it in
 import { useEffect, useState } from 'react';
 
 const ORACLE_BASE =
-  process.env.NEXT_PUBLIC_ORACLE_URL || 'https://trustgate-oracle.up.railway.app';
+  process.env.NEXT_PUBLIC_ORACLE_URL || 'https://oracle.trustgated.xyz';
 
 export default function LiveTrustGateStats() {
   const [oracleQueries, setOracleQueries] = useState<number | null>(null);
@@ -91,7 +91,7 @@ Add to the existing TrustGate frontend Vercel project (Settings → Environment
 Variables):
 
 ```
-NEXT_PUBLIC_ORACLE_URL=https://trustgate-oracle.up.railway.app
+NEXT_PUBLIC_ORACLE_URL=https://oracle.trustgated.xyz
 ```
 
 Replace with your actual Railway URL once the oracle is deployed.

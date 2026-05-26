@@ -347,17 +347,17 @@ export default function OraclePage() {
   const codeExamples = useMemo(
     () => ({
       js: `const response = await fetch(
-  'https://trustgate-oracle.up.railway.app/oracle/0xYOUR_ADDRESS',
+  'https://oracle.trustgated.xyz/oracle/0xYOUR_ADDRESS',
   { headers: { 'X-Payment': x402Token } }
 )
 const trust = await response.json()`,
       py: `import requests
 response = requests.get(
-  'https://trustgate-oracle.up.railway.app/oracle/0xYOUR_ADDRESS',
+  'https://oracle.trustgated.xyz/oracle/0xYOUR_ADDRESS',
   headers={'X-Payment': x402_token}
 )`,
       curl: `curl -H "X-Payment: YOUR_TOKEN" \\
-  https://trustgate-oracle.up.railway.app/oracle/0xYOUR_ADDRESS`,
+  https://oracle.trustgated.xyz/oracle/0xYOUR_ADDRESS`,
     }),
     []
   );

@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 const ORACLE_BASE =
-  process.env.NEXT_PUBLIC_ORACLE_URL || 'https://trustgate-oracle.up.railway.app';
+  process.env.NEXT_PUBLIC_ORACLE_URL || 'https://oracle.trustgated.xyz';
 
 export async function GET() {
   try {

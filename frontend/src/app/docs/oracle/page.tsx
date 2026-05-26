@@ -3,7 +3,7 @@ export const metadata = {
   description: 'TrustGate Oracle: payable trust scoring API for Arc testnet.',
 };
 
-const ORACLE_URL = 'https://trustgate-oracle.up.railway.app';
+const ORACLE_URL = 'https://oracle.trustgated.xyz';
 
 export default function OracleDocsPage() {
   return (
