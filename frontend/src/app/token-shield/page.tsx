@@ -236,13 +236,16 @@ export default function TokenShieldPage() {
       }
 
       if (challenge.status !== 402) {
+        // Read the body once; a Response stream can only be consumed a single
+        // time. Try to parse it as JSON, otherwise use the raw text.
+        const raw = await challenge.text();
         let body: unknown = null;
-        let detail = "";
+        let detail = raw;
         try {
-          body = await challenge.json();
+          body = JSON.parse(raw);
           detail = JSON.stringify(body);
         } catch {
-          detail = await challenge.text();
+          // Non-JSON body — keep the raw text.
         }
         const friendly =
           body && typeof body === "object" && body !== null &&
@@ -322,11 +325,14 @@ export default function TokenShieldPage() {
         },
       });
       if (!paid.ok) {
-        let detail = "";
+        // Read the body once; a Response stream can only be consumed a single
+        // time. Try to pretty-print it as JSON, otherwise use the raw text.
+        const raw = await paid.text();
+        let detail = raw;
         try {
-          detail = JSON.stringify(await paid.json());
+          detail = JSON.stringify(JSON.parse(raw));
         } catch {
-          detail = await paid.text();
+          // Non-JSON body — keep the raw text.
         }
         throw new Error(
           `Oracle rejected payment proof (${paid.status}). ${detail}`.trim()

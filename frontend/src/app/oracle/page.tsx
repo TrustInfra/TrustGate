@@ -226,11 +226,14 @@ export default function OraclePage() {
       }
 
       if (challenge.status !== 402) {
-        let detail = '';
+        // Read the body once; a Response stream can only be consumed a single
+        // time. Try to pretty-print it as JSON, otherwise use the raw text.
+        const raw = await challenge.text();
+        let detail = raw;
         try {
-          detail = JSON.stringify(await challenge.json());
+          detail = JSON.stringify(JSON.parse(raw));
         } catch {
-          detail = await challenge.text();
+          // Non-JSON body — keep the raw text.
         }
         throw new Error(`Oracle returned ${challenge.status}. ${detail}`.trim());
       }
@@ -313,11 +316,14 @@ export default function OraclePage() {
         if (paid.status === 402) {
           throw new Error(await format402Error(paid));
         }
-        let detail = '';
+        // Read the body once; a Response stream can only be consumed a single
+        // time. Try to pretty-print it as JSON, otherwise use the raw text.
+        const raw = await paid.text();
+        let detail = raw;
         try {
-          detail = JSON.stringify(await paid.json());
+          detail = JSON.stringify(JSON.parse(raw));
         } catch {
-          detail = await paid.text();
+          // Non-JSON body — keep the raw text.
         }
         throw new Error(
           `Oracle rejected payment proof (${paid.status}). ${detail}`.trim()
