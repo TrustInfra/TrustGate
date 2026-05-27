@@ -24,12 +24,39 @@ const DAY_MS = 24 * HOUR_MS;
 const SIGNALS_TTL_MS = 5 * 60 * 1000;
 const TX_PAGES = 5;
 
+// Hard caps and tier gates.
+const HARD_CAP = 0;
+const NON_ELITE_CAP = 0;
+const NON_PERFECT_CAP = 0;
+
+// HIGH_ELITE gate thresholds (all must hold simultaneously).
+const HIGH_ELITE_MIN_DEPLOYMENTS = 0;
+const HIGH_ELITE_QUALITY_DEPLOYMENTS = 0; // deployments with 100+ independent interactors
+const HIGH_ELITE_MIN_ACTIVE_MONTHS = 0;
+const HIGH_ELITE_MIN_CATEGORIES = 0;
+const HIGH_ELITE_MIN_AGE_DAYS = 0;
+const HIGH_ELITE_MIN_TXS = 0;
+
+// Score-of-100 gate thresholds (all HIGH_ELITE conditions plus these).
+const PERFECT_MIN_DEPLOYMENTS = 0;
+const PERFECT_QUALITY_DEPLOYMENTS = 0; // deployments with 500+ independent interactors
+const PERFECT_MIN_TXS = 0;
+const PERFECT_MIN_AGE_DAYS = 0;
+
+// Confidence thresholds.
+const CONFIDENCE_HIGH_AGE_DAYS = 0;
+const CONFIDENCE_HIGH_TXS = 0;
+const CONFIDENCE_HIGH_QUALITY_DEPLOYMENTS = 0;
+const CONFIDENCE_LOW_AGE_DAYS = 0;
+const CONFIDENCE_LOW_TXS = 0;
+
 export type WalletTier = "LOW" | "MEDIUM" | "HIGH" | "HIGH_ELITE";
 export type WalletRecommendation =
   | "BLOCKED"
   | "TIME_LOCKED"
   | "INSTANT"
   | "INSTANT_PRIORITY";
+export type Confidence = "HIGH" | "MEDIUM" | "LOW";
 
 type BotFlag =
   | "velocity"
@@ -42,6 +69,17 @@ interface Signals {
   walletAgeDays: number;
   txCount: number;
   botFlags: BotFlag[];
+  // Number of distinct calendar months with at least one outgoing tx. Derived
+  // from the tx sample timestamps.
+  activeMonths: number;
+  // Deployment-quality signals. These require an oracle wallet-graph (which
+  // wallets are independent of the deployer, and per-deployment interactor
+  // counts). The oracle does not expose that yet, so these fall back to 0 and
+  // the HIGH_ELITE / perfect gates stay conservatively closed until the data
+  // is available. See gatherSignals.
+  deploymentsWithQualityInteractors: number; // deployments with 100+ independent interactors
+  deploymentsWith500Interactors: number; // deployments with 500+ independent interactors
+  categoryDiversity: number; // distinct contract categories deployed
 }
 
 interface SignalsCacheEntry {
@@ -162,6 +200,20 @@ function walletAgeDaysFrom(txs: ArcscanTx[]): number {
   return Math.max(0, (Date.now() - oldest) / DAY_MS);
 }
 
+function countActiveMonths(txs: ArcscanTx[]): number {
+  // Distinct YYYY-MM buckets across the outgoing tx sample. A proxy for how
+  // long the wallet has been genuinely active, not just how old it is.
+  const months = new Set<string>();
+  for (const tx of txs) {
+    if (!tx.timestamp) continue;
+    const t = Date.parse(tx.timestamp);
+    if (Number.isNaN(t)) continue;
+    const d = new Date(t);
+    months.add(`${d.getUTCFullYear()}-${d.getUTCMonth()}`);
+  }
+  return months.size;
+}
+
 // --- bot detectors (apply the same logic as token-scoring.ts) ---
 
 function detectVelocity(txs: ArcscanTx[]): boolean {
@@ -253,39 +305,84 @@ export function recommendationFor(score: number): WalletRecommendation {
   return "INSTANT_PRIORITY";
 }
 
-interface FormulaResult {
+// RescoreResult is the internal shape. `confidence` is computed and returned
+// here for internal use and frontend display, but MUST be stripped before the
+// public API response — the public oracle proxy only forwards score/tier/
+// recommendation (see api/oracle/[address]/route.ts).
+export interface RescoreResult {
   score: number;
   tier: WalletTier;
   recommendation: WalletRecommendation;
+  confidence: Confidence;
 }
 
-function applyFormula(rawScore: number, signals: Signals): FormulaResult {
-  const { deployments, walletAgeDays, txCount, botFlags } = signals;
+function computeConfidence(signals: Signals): Confidence {
+  const { walletAgeDays, txCount, deploymentsWithQualityInteractors } = signals;
+  if (
+    walletAgeDays >= CONFIDENCE_HIGH_AGE_DAYS &&
+    txCount >= CONFIDENCE_HIGH_TXS &&
+    deploymentsWithQualityInteractors >= CONFIDENCE_HIGH_QUALITY_DEPLOYMENTS
+  ) {
+    return "HIGH";
+  }
+  if (walletAgeDays < CONFIDENCE_LOW_AGE_DAYS || txCount < CONFIDENCE_LOW_TXS) {
+    return "LOW";
+  }
+  return "MEDIUM";
+}
 
+function applyFormula(rawScore: number, signals: Signals): RescoreResult {
+  const {
+    deployments,
+    walletAgeDays,
+    txCount,
+    botFlags,
+    activeMonths,
+    deploymentsWithQualityInteractors,
+    deploymentsWith500Interactors,
+    categoryDiversity,
+  } = signals;
+
+  // Penalty always applies, even for a single isolated signal.
   let raw = rawScore - botFlags.length * BOT_FLAG_PENALTY;
   if (raw < 0) raw = 0;
 
   let cap = 100;
-  if (botFlags.length > 0) cap = Math.min(cap, 59);
 
+  // Bot hard caps. A single isolated signal (other than self-interaction) is a
+  // penalty only — no hard cap. Two or more signals, OR self-interaction
+  // (signal 3) alone, hard-cap at 59 with no exceptions.
+  const selfInteraction = botFlags.includes("self-interaction");
+  const botHardCap = botFlags.length >= 0 || selfInteraction;
+  if (botHardCap) cap = Math.min(cap, HARD_CAP);
+
+  // Fresh-wallet hard cap.
   const isFresh = walletAgeDays < 0 || txCount < 0;
-  if (isFresh) cap = Math.min(cap, 59);
+  if (isFresh) cap = Math.min(cap, HARD_CAP);
 
-  if (deployments === 0) cap = Math.min(cap, 79);
+  // HIGH_ELITE gate: every condition must hold simultaneously. Under 25
+  // deployments alone makes HIGH_ELITE unreachable (cap 79). The quality,
+  // calendar-spread, and category-diversity sub-conditions depend on oracle
+  // wallet-graph data that is not exposed yet, so they fall back to 0 in
+  // gatherSignals and keep the elite gate conservatively closed until then.
+  const highEliteOk =
+    deployments >= HIGH_ELITE_MIN_DEPLOYMENTS &&
+    deploymentsWithQualityInteractors >= HIGH_ELITE_QUALITY_DEPLOYMENTS &&
+    !botHardCap &&
+    activeMonths >= HIGH_ELITE_MIN_ACTIVE_MONTHS &&
+    categoryDiversity >= HIGH_ELITE_MIN_CATEGORIES &&
+    walletAgeDays >= HIGH_ELITE_MIN_AGE_DAYS &&
+    txCount >= HIGH_ELITE_MIN_TXS;
+  if (!highEliteOk) cap = Math.min(cap, NON_ELITE_CAP);
 
-  const eliteOk =
-    deployments >= 10 &&
-    walletAgeDays > 180 &&
-    txCount > 500 &&
-    botFlags.length === 0;
-  if (!eliteOk) cap = Math.min(cap, 79);
-
+  // Score-of-100 gate: all HIGH_ELITE conditions plus the perfect thresholds.
   const perfectOk =
-    eliteOk &&
-    deployments >= 25 &&
-    walletAgeDays > 365 &&
-    txCount > 5000;
-  if (!perfectOk) cap = Math.min(cap, 99);
+    highEliteOk &&
+    deployments >= PERFECT_MIN_DEPLOYMENTS &&
+    deploymentsWith500Interactors >= PERFECT_QUALITY_DEPLOYMENTS &&
+    txCount >= PERFECT_MIN_TXS &&
+    walletAgeDays >= PERFECT_MIN_AGE_DAYS;
+  if (!perfectOk) cap = Math.min(cap, NON_PERFECT_CAP);
 
   let score = Math.round(raw);
   if (score > cap) score = cap;
@@ -295,6 +392,7 @@ function applyFormula(rawScore: number, signals: Signals): FormulaResult {
     score,
     tier: tierFor(score),
     recommendation: recommendationFor(score),
+    confidence: computeConfidence(signals),
   };
 }
 
@@ -312,6 +410,7 @@ async function gatherSignals(address: string): Promise<Signals> {
 
   const deployments = countDeployments(walletTxs);
   const walletAgeDays = walletAgeDaysFrom(walletTxs);
+  const activeMonths = countActiveMonths(walletTxs);
 
   const botFlags: BotFlag[] = [];
   if (detectVelocity(walletTxs)) botFlags.push("velocity");
@@ -320,11 +419,24 @@ async function gatherSignals(address: string): Promise<Signals> {
   if (detectCleanHistoryManipulation(walletTxs, walletAgeDays))
     botFlags.push("clean-history");
 
+  // TODO: derive these from oracle wallet-graph data when available — per
+  // deployment, count only interactors with no on-chain link to the deployer
+  // (exclude deployer-linked wallets), and classify deployed contracts into
+  // distinct categories. Until the oracle exposes that graph, fall back to 0,
+  // which keeps the HIGH_ELITE / perfect gates closed rather than guessing.
+  const deploymentsWithQualityInteractors = 0;
+  const deploymentsWith500Interactors = 0;
+  const categoryDiversity = 0;
+
   const signals: Signals = {
     deployments,
     walletAgeDays,
     txCount,
     botFlags,
+    activeMonths,
+    deploymentsWithQualityInteractors,
+    deploymentsWith500Interactors,
+    categoryDiversity,
   };
 
   signalsCache.set(lower, {
@@ -344,7 +456,7 @@ async function gatherSignals(address: string): Promise<Signals> {
 export async function rescoreWallet(
   rawScore: number,
   address: string
-): Promise<FormulaResult> {
+): Promise<RescoreResult> {
   const signals = await gatherSignals(address);
   return applyFormula(rawScore, signals);
 }

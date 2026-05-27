@@ -4,6 +4,7 @@ import {
   detectContractKind,
   scoreContract,
 } from "@/lib/contract-scoring";
+import { assembleAndScoreNft } from "@/lib/nft-contract";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -203,6 +204,34 @@ async function proxy(
 
   if (detection.kind === "erc20") {
     return forwardToTokenOracle(req, address);
+  }
+
+  if (detection.kind === "nft") {
+    if (!detection.info) {
+      return jsonResponse(
+        { error: "Could not load contract info from Arcscan." },
+        502
+      );
+    }
+    // NFT scoring is free — no payment, no Nald oracle. Score locally and
+    // return 200 immediately so the client never sees a 402 challenge.
+    try {
+      const result = await assembleAndScoreNft(
+        address,
+        {
+          isErc721: detection.info.isErc721,
+          isErc1155: detection.info.isErc1155,
+          isVerified: detection.info.isVerified,
+          creatorAddress: detection.info.creatorAddress,
+        },
+        req.nextUrl.origin
+      );
+      return jsonResponse(result, 200);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "unknown error";
+      console.error(`[nft-score] ${address} failed:`, message);
+      return jsonResponse({ error: `NFT scoring failed: ${message}` }, 502);
+    }
   }
 
   // detection.kind === "other-contract"
