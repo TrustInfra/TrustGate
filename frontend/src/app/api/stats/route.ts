@@ -43,8 +43,22 @@ interface AddressTxPage {
   next_page_params?: Record<string, string | number> | null;
 }
 
+// Retry once after a 1s delay so a transient fetch failure (e.g. upstream
+// rate limiting) doesn't immediately surface as an error.
+async function fetchWithRetry(
+  url: string,
+  init: RequestInit
+): Promise<Response> {
+  try {
+    return await fetch(url, init);
+  } catch {
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    return await fetch(url, init);
+  }
+}
+
 async function fetchCount(address: string): Promise<number> {
-  const res = await fetch(`${ARCSCAN_API}/addresses/${address}/counters`, {
+  const res = await fetchWithRetry(`${ARCSCAN_API}/addresses/${address}/counters`, {
     headers: { accept: "application/json" },
     cache: "no-store",
   });
@@ -70,7 +84,7 @@ async function collectCallers(
       ? `${ARCSCAN_API}/addresses/${address}/transactions?${qs}`
       : `${ARCSCAN_API}/addresses/${address}/transactions`;
 
-    const res = await fetch(url, {
+    const res = await fetchWithRetry(url, {
       headers: { accept: "application/json" },
       cache: "no-store",
     });

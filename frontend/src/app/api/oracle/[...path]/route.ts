@@ -48,6 +48,20 @@ const CORS_HEADERS: Record<string, string> = {
   "Access-Control-Max-Age": "86400",
 };
 
+// Cache only the read-only stats endpoint so RPC rate limits don't fail it.
+// Payment/POST flows must never be cached or retried, so this is scoped tightly.
+const ORACLE_STATS_CACHE_TTL_MS = 60 * 1000;
+
+interface OracleStatsCacheEntry {
+  body: ArrayBuffer;
+  status: number;
+  statusText: string;
+  contentType: string | null;
+  at: number;
+}
+
+let oracleStatsCache: OracleStatsCacheEntry | null = null;
+
 function buildUpstreamUrl(path: string[], search: string): string {
   const safe = path.map((seg) => encodeURIComponent(seg)).join("/");
   return `${ORACLE_BASE}/${safe}${search}`;
@@ -77,12 +91,63 @@ function pickResponseHeaders(upstream: Response): Headers {
   return out;
 }
 
+function isStatsRequest(segments: string[], search: string): boolean {
+  return (
+    search === "" &&
+    segments.length === 2 &&
+    segments[0] === "oracle" &&
+    segments[1] === "stats"
+  );
+}
+
+function buildStatsCacheResponse(entry: OracleStatsCacheEntry): NextResponse {
+  const headers = new Headers();
+  if (entry.contentType) {
+    headers.set("content-type", entry.contentType);
+  }
+  for (const [k, v] of Object.entries(CORS_HEADERS)) {
+    headers.set(k, v);
+  }
+  headers.set("Cache-Control", "no-store");
+  headers.set("X-Cache", "HIT");
+  return new NextResponse(entry.body, {
+    status: entry.status,
+    statusText: entry.statusText,
+    headers,
+  });
+}
+
+// Retry once after a 1s delay so a transient upstream/RPC failure doesn't
+// surface as an error. Only used for idempotent (GET/HEAD) requests.
+async function fetchWithRetry(
+  url: string,
+  init: RequestInit
+): Promise<Response> {
+  try {
+    return await fetch(url, init);
+  } catch {
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    return await fetch(url, init);
+  }
+}
+
 async function proxy(
   req: NextRequest,
   context: { params: { path?: string[] } }
 ): Promise<NextResponse> {
   const segments = context.params.path ?? [];
   const url = buildUpstreamUrl(segments, req.nextUrl.search);
+  const isIdempotent = req.method === "GET" || req.method === "HEAD";
+  const cacheable =
+    req.method === "GET" && isStatsRequest(segments, req.nextUrl.search);
+
+  if (
+    cacheable &&
+    oracleStatsCache &&
+    Date.now() - oracleStatsCache.at < ORACLE_STATS_CACHE_TTL_MS
+  ) {
+    return buildStatsCacheResponse(oracleStatsCache);
+  }
 
   const init: RequestInit = {
     method: req.method,
@@ -97,7 +162,9 @@ async function proxy(
 
   let upstream: Response;
   try {
-    upstream = await fetch(url, init);
+    upstream = isIdempotent
+      ? await fetchWithRetry(url, init)
+      : await fetch(url, init);
   } catch (err) {
     const message = err instanceof Error ? err.message : "unknown error";
     return NextResponse.json(
@@ -108,6 +175,16 @@ async function proxy(
 
   const headers = pickResponseHeaders(upstream);
   const body = await upstream.arrayBuffer();
+
+  if (cacheable && upstream.ok) {
+    oracleStatsCache = {
+      body,
+      status: upstream.status,
+      statusText: upstream.statusText,
+      contentType: upstream.headers.get("content-type"),
+      at: Date.now(),
+    };
+  }
 
   return new NextResponse(body, {
     status: upstream.status,
