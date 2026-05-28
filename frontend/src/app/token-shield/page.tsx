@@ -105,10 +105,60 @@ function confidenceClass(confidence: Confidence): string {
   return CONFIDENCE_COLORS[confidence] ?? TIER_FALLBACK;
 }
 
-function isTokenScoreResult(value: unknown): value is TokenScoreResult {
-  if (typeof value !== "object" || value === null) return false;
+// TrustGate trust bands. Used to derive a tier when the oracle returns a score
+// without an explicit tier/recommendation field.
+function deriveTierFromScore(score: number): string {
+  if (score < 40) return "LOW";
+  if (score < 60) return "MEDIUM";
+  if (score < 80) return "HIGH";
+  return "HIGH_ELITE";
+}
+
+// Nald's oracle has returned token scores under several field names across
+// versions (score / trustScore / trust_score) and sometimes labels the band as
+// `recommendation` rather than `tier`. Accept the response as long as a numeric
+// score-like field is present; derive the tier from the score when no band
+// field exists. Returns null only when no recognizable score field is found at
+// all, in which case the caller surfaces the unexpected-shape error.
+function normalizeTokenScore(value: unknown): TokenScoreResult | null {
+  if (typeof value !== "object" || value === null) return null;
   const v = value as Record<string, unknown>;
-  return typeof v.score === "number" && typeof v.tier === "string";
+
+  let score: number | null = null;
+  for (const key of ["score", "trustScore", "trust_score"]) {
+    const raw = v[key];
+    if (typeof raw === "number" && Number.isFinite(raw)) {
+      score = raw;
+      break;
+    }
+  }
+  if (score === null) return null;
+
+  let tier: string | null = null;
+  for (const key of ["tier", "recommendation"]) {
+    const raw = v[key];
+    if (typeof raw === "string" && raw.trim().length > 0) {
+      tier = raw.trim();
+      break;
+    }
+  }
+
+  const result: TokenScoreResult = {
+    score,
+    tier: tier ?? deriveTierFromScore(score),
+  };
+
+  if (typeof v.contractType === "string") result.contractType = v.contractType;
+  if (typeof v.txCount === "number") result.txCount = v.txCount;
+  if (Array.isArray(v.flags)) {
+    result.flags = v.flags.filter((f): f is string => typeof f === "string");
+  }
+  if (v.confidence === "HIGH" || v.confidence === "MEDIUM" || v.confidence === "LOW") {
+    result.confidence = v.confidence;
+  }
+  if (typeof v.label === "string") result.label = v.label;
+
+  return result;
 }
 
 function phaseLabel(phase: QueryPhase): string {
@@ -236,14 +286,17 @@ export default function TokenShieldPage() {
 
       if (challenge.status === 200) {
         const data: unknown = await challenge.json();
-        if (!isTokenScoreResult(data)) {
+        // eslint-disable-next-line no-console
+        console.error("[token-shield] raw oracle response (200):", data);
+        const normalized = normalizeTokenScore(data);
+        if (!normalized) {
           throw new Error("Oracle returned an unexpected response shape.");
         }
-        setResult(data);
+        setResult(normalized);
         recordHistory({
           address,
-          score: data.score,
-          tier: data.tier,
+          score: normalized.score,
+          tier: normalized.tier,
           at: new Date().toISOString(),
         });
         setPhase("done");
@@ -354,14 +407,17 @@ export default function TokenShieldPage() {
         );
       }
       const data: unknown = await paid.json();
-      if (!isTokenScoreResult(data)) {
+      // eslint-disable-next-line no-console
+      console.error("[token-shield] raw oracle response (paid):", data);
+      const normalized = normalizeTokenScore(data);
+      if (!normalized) {
         throw new Error("Oracle returned an unexpected response shape.");
       }
-      setResult(data);
+      setResult(normalized);
       recordHistory({
         address,
-        score: data.score,
-        tier: data.tier,
+        score: normalized.score,
+        tier: normalized.tier,
         at: new Date().toISOString(),
       });
       setPhase("done");

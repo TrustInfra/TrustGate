@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { detectContractKind, scoreContract } from "@/lib/contract-scoring";
+import { detectContractKind } from "@/lib/contract-scoring";
 import { scoreErc20ViaUpstream } from "@/lib/widget-payment";
 
 export const dynamic = "force-dynamic";
@@ -95,10 +95,6 @@ export async function GET(
     return jsonResponse({ error: "detection_failed" }, 502);
   }
 
-  if (detection.kind === "not-contract") {
-    return jsonResponse({ error: "not_a_contract" }, 404);
-  }
-
   // ERC-20 tokens go to upstream Nald with a server-side x402 payment so the
   // widget returns the same authoritative score Token Shield does. The hot
   // wallet pays — caller pays nothing. See lib/widget-payment.ts.
@@ -116,31 +112,12 @@ export async function GET(
     }
   }
 
-  // Non-ERC-20 contracts: local scoring (no upstream call, no payment). This
-  // matches the Token Shield non-ERC-20 path byte-for-byte.
-  if (!detection.info) {
-    return jsonResponse({ error: "info_missing" }, 502);
-  }
-
-  try {
-    const result = await scoreContract(
-      address,
-      detection.info,
-      req.nextUrl.origin
-    );
-    return jsonResponse(
-      {
-        score: result.score,
-        tier: result.tier,
-        contractType: result.contractType,
-      },
-      200
-    );
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "unknown";
-    console.error(`[widget-score] scoring failed for ${address}:`, message);
-    return jsonResponse({ error: "scoring_failed" }, 502);
-  }
+  // Everything else is Not a Tradeable Token: NFT contracts (ERC-721/ERC-1155),
+  // other non-token contracts, and wallet addresses (EOAs). The widget only
+  // scores ERC-20s, so it returns an explicit NTT marker for these instead of a
+  // misleading trust score. detection.kind here is one of "nft",
+  // "other-contract", or "not-contract".
+  return jsonResponse({ score: null, tier: "NTT", label: "NTT" }, 200);
 }
 
 export async function OPTIONS(): Promise<NextResponse> {

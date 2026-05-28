@@ -86,8 +86,11 @@
     text: "Checking trust score…",
   };
 
+  var BADGE_CSS_FONT =
+    "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+
   var BADGE_CSS = [
-    "font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    "font-family: " + BADGE_CSS_FONT,
     "font-size: 12px",
     "font-weight: 500",
     "letter-spacing: 0.01em",
@@ -139,12 +142,25 @@
   }
 
   function applyStyle(badge, style, textOverride) {
+    badge.style.fontFamily = BADGE_CSS_FONT;
     badge.style.color = style.color;
     badge.style.background = style.bg;
     badge.style.borderColor = style.border;
     badge.style.display = "block";
     badge.textContent =
       typeof textOverride === "string" ? textOverride : style.text;
+  }
+
+  // NTT (Not a Tradeable Token) is rendered as plain text in the badge's own
+  // font: no tier color, no background, no border. Returned for NFT contracts,
+  // non-token contracts, and wallet addresses.
+  function applyNttStyle(badge) {
+    badge.style.fontFamily = BADGE_CSS_FONT;
+    badge.style.color = "inherit";
+    badge.style.background = "transparent";
+    badge.style.borderColor = "transparent";
+    badge.style.display = "block";
+    badge.textContent = "NTT";
   }
 
   function tierLabel(tier, score) {
@@ -212,6 +228,10 @@
           if (state.lastQuery !== lower) return;
           if (state.abort !== ac) return;
           state.abort = null;
+          if (data && data.tier === "NTT") {
+            applyNttStyle(badge);
+            return;
+          }
           if (
             !data ||
             typeof data.tier !== "string" ||

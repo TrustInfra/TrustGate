@@ -159,6 +159,10 @@ export default function WidgetIntegrationPage() {
           <strong>LOW</strong> — red low-trust badge.
         </li>
         <li>
+          <strong>NTT</strong> — Not a Tradeable Token. Returned for NFT
+          contracts, non-token contracts, and wallet addresses.
+        </li>
+        <li>
           <strong>Invalid or unknown address</strong> — no badge is rendered.
           The widget never replaces or styles the host input itself, so your
           DEX layout is untouched.
