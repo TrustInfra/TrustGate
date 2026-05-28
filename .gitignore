@@ -38,3 +38,5 @@ deployments/localhost/
 *.log
 npm-debug.log*
 .claude
+"TASKS.md" 
+"VPS-TOKEN-SCORING-UPDATE.md" 
