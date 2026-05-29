@@ -102,6 +102,12 @@
       border: "rgba(220,38,38,0.45)",
       text: "BLOCKED",
     },
+    VERIFIED: {
+      color: "#60a5fa",
+      bg: "rgba(59,130,246,0.12)",
+      border: "rgba(59,130,246,0.35)",
+      text: "VERIFIED",
+    },
   };
 
   var LOADING_STYLE = {
@@ -225,7 +231,8 @@
 
   function tierLabel(tier, score) {
     var style = TIER_STYLE[tier];
-    if (tier === "HIGH_ELITE" || tier === "BLOCKED") return style.text;
+    if (tier === "HIGH_ELITE" || tier === "BLOCKED" || tier === "VERIFIED")
+      return style.text;
     if (typeof score === "number" && isFinite(score)) {
       return score + " · " + style.text;
     }
@@ -351,7 +358,10 @@
   // ("HIGH_ELITE").
   function inlineLabel(tier, score, displayStyle) {
     var text = TIER_STYLE[tier].text;
+    // VERIFIED is an issuer attestation, not a numeric band — never prefix a
+    // score, regardless of the requested display style.
     if (
+      tier !== "VERIFIED" &&
       displayStyle === "full" &&
       typeof score === "number" &&
       isFinite(score)

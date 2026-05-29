@@ -60,6 +60,17 @@ const ARC_ECOSYSTEM_PREFIXES: string[] = [
   "0x89b5", // FiatTokenProxy
 ];
 
+// Official Circle-issued token contracts on Arc Testnet, stored lowercased.
+// These receive a dedicated VERIFIED tier instead of a numeric score: bot and
+// concentration heuristics are meaningless for canonical issuer tokens. Matched
+// by exact full address only — unlike ARC_ECOSYSTEM_PREFIXES, no prefix logic.
+const VERIFIED_ISSUERS = new Set<string>([
+  "0x3600000000000000000000000000000000000000", // USDC
+  "0x89b50855aa3be2f677cd6303cec089b5f319d72a", // EURC
+  "0xe9185f0c5f296ed1797aae4238d26ccabeadb86c", // USYC
+  "0xf0c4a4ce82a5746abaad9425360ab04fbba432bf", // cirBTC
+]);
+
 interface ArcscanTokenInfo {
   type?: string | null;
 }
@@ -138,7 +149,7 @@ export interface ContractScoreInput {
 
 export interface ContractScoreOutput {
   score: number;
-  tier: "LOW" | "MEDIUM" | "HIGH" | "HIGH_ELITE";
+  tier: "LOW" | "MEDIUM" | "HIGH" | "HIGH_ELITE" | "VERIFIED";
   contractType: "CONTRACT";
   isVerified: boolean;
   txCount: number;
@@ -421,6 +432,13 @@ function isArcEcosystem(addr: string): boolean {
   return false;
 }
 
+// Exact-match check against the official issuer allowlist. Lowercases the input
+// so callers may pass checksummed addresses. No prefix logic — only a full
+// canonical address matches, unlike isArcEcosystem.
+export function isVerifiedIssuer(address: string): boolean {
+  return VERIFIED_ISSUERS.has(address.toLowerCase());
+}
+
 function detectVelocity(txs: ArcscanTx[]): boolean {
   if (txs.length < VELOCITY_THRESHOLD) return false;
   const timestamps = txs
@@ -519,6 +537,13 @@ export async function scoreContract(
     flags.push("UPGRADE_PATTERN_RISK");
   }
 
+  // Official issuer tokens (USDC, EURC, USYC) bypass numeric tiering. Bot and
+  // concentration flags carry no meaning for canonical issuer contracts, so
+  // clear them and force the dedicated VERIFIED tier below. tierFor is
+  // intentionally not run for these.
+  const verified = isVerifiedIssuer(address);
+  if (verified) flags.length = 0;
+
   const confidence = computeConfidence(
     ageDays,
     signals.uniqueInteractors,
@@ -538,7 +563,7 @@ export async function scoreContract(
 
   return {
     score,
-    tier: tierFor(score),
+    tier: verified ? "VERIFIED" : tierFor(score),
     contractType: "CONTRACT",
     isVerified: info.isVerified,
     txCount: signals.txCount,

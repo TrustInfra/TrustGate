@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   ContractInfo,
   detectContractKind,
+  isVerifiedIssuer,
   scoreContract,
 } from "@/lib/contract-scoring";
 import { assembleAndScoreNft } from "@/lib/nft-contract";
@@ -169,6 +170,13 @@ async function proxy(
 
   if (!ADDRESS_RE.test(address)) {
     return jsonResponse({ error: "Invalid address" }, 400);
+  }
+
+  // Official issuer tokens skip detection, the upstream VPS oracle forward, and
+  // the x402 payment entirely. They get the dedicated VERIFIED tier with no
+  // numeric score, before any forwardToTokenOracle call can happen.
+  if (isVerifiedIssuer(address)) {
+    return jsonResponse({ score: null, tier: "VERIFIED", label: "VERIFIED" }, 200);
   }
 
   // Preflight via OPTIONS is handled separately; this branch only sees real

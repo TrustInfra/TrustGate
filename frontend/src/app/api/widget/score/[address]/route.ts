@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { detectContractKind } from "@/lib/contract-scoring";
+import { detectContractKind, isVerifiedIssuer } from "@/lib/contract-scoring";
 import { scoreErc20ViaUpstream } from "@/lib/widget-payment";
 
 export const dynamic = "force-dynamic";
@@ -80,6 +80,13 @@ export async function GET(
   const address = context.params.address;
   if (!ADDRESS_RE.test(address)) {
     return jsonResponse({ error: "invalid_address" }, 400);
+  }
+
+  // Official issuer tokens skip detection, the upstream VPS oracle, and the
+  // server-side x402 payment entirely. They get the dedicated VERIFIED tier
+  // with no numeric score. Shape mirrors the NTT response below.
+  if (isVerifiedIssuer(address)) {
+    return jsonResponse({ score: null, tier: "VERIFIED", label: "VERIFIED" }, 200);
   }
 
   let detection;

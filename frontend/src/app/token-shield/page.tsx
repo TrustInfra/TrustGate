@@ -87,6 +87,7 @@ const TIER_COLORS: Record<string, string> = {
   SAFE: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
   HIGH_ELITE: "bg-cyan-500/15 text-cyan-300 border-cyan-500/30",
   TRUSTED: "bg-cyan-500/15 text-cyan-300 border-cyan-500/30",
+  VERIFIED: "bg-blue-500/15 text-blue-300 border-blue-500/30",
 };
 
 const TIER_FALLBACK = "bg-zinc-800 text-zinc-300 border-zinc-700";
@@ -542,7 +543,7 @@ export default function TokenShieldPage() {
                       className="cursor-pointer border-t border-zinc-800/50 transition-colors hover:bg-zinc-900/40"
                     >
                       <td className="px-4 py-3 font-mono">{maskAddress(entry.address)}</td>
-                      <td className="px-4 py-3 tabular-nums">{entry.score}</td>
+                      <td className="px-4 py-3 tabular-nums">{entry.tier === "VERIFIED" ? "-" : entry.score}</td>
                       <td className="px-4 py-3">
                         <span
                           className={`rounded border px-2 py-0.5 text-xs ${tierClass(entry.tier)}`}
@@ -585,7 +586,7 @@ export default function TokenShieldPage() {
                     return (
                       <tr key={i} className="border-t border-zinc-800/50">
                         <td className="px-4 py-3 font-mono">{masked}</td>
-                        <td className="px-4 py-3 tabular-nums">{q.score}</td>
+                        <td className="px-4 py-3 tabular-nums">{q.tier === "VERIFIED" ? "-" : q.score}</td>
                         <td className="px-4 py-3">
                           <span
                             className={`rounded border px-2 py-0.5 text-xs ${tierClass(q.tier)}`}
@@ -611,6 +612,9 @@ export default function TokenShieldPage() {
 
 function ResultCard({ result }: { result: TokenScoreResult }) {
   const isContract = result.contractType === "CONTRACT";
+  // Official issuer tokens carry a VERIFIED attestation, not a numeric band, so
+  // the score number is suppressed and only the tier badge is shown.
+  const isVerified = result.tier === "VERIFIED";
   const label =
     result.label ?? (isContract ? "Contract Score" : "ERC-20 Token Score");
   const flags = Array.isArray(result.flags) ? result.flags : [];
@@ -618,7 +622,9 @@ function ResultCard({ result }: { result: TokenScoreResult }) {
     <section className="mb-12 rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6">
       <p className="text-xs uppercase tracking-widest text-zinc-500">{label}</p>
       <div className="mt-3 flex flex-wrap items-end gap-4">
-        <div className="text-5xl font-bold tabular-nums">{result.score}</div>
+        {!isVerified && (
+          <div className="text-5xl font-bold tabular-nums">{result.score}</div>
+        )}
         <span
           className={`rounded border px-2.5 py-1 text-xs font-semibold tracking-wide ${tierClass(result.tier)}`}
         >
