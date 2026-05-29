@@ -22,16 +22,20 @@ Live at [trustgated.xyz](https://trustgated.xyz).
 ## Drop-in Widget
 
 The widget is the primary primitive. Embedding a live trust score is one script
-tag and one data attribute — no build step, no SDK, no API key.
+tag plus two data attributes on the element you want scored — no build step, no
+SDK, no API key.
 
 ```html
-<script src="https://trustgated.xyz/widget.js"
-   data-address="0xYourAddress">
-</script>
+<!-- Load the widget once, anywhere on the page -->
+<script src="https://www.trustgated.xyz/widget.js"></script>
+
+<!-- Tag any element with both attributes; the badge renders right after it -->
+<span data-trustgate="token-shield" data-trustgate-address="0xTokenAddress">USDC</span>
 ```
 
-The script reads `data-address`, fetches the score, and renders the badge inline
-at the script's location.
+The widget scans the page for elements carrying both `data-trustgate="token-shield"`
+and `data-trustgate-address`, fetches the score, and renders the badge inline
+immediately after each matched element — including elements added later.
 
 ### Backing endpoint
 
