@@ -11,6 +11,21 @@
  *
  * Self-contained: no dependencies, no globals beyond a single namespace
  * marker, no side effects on the host page beyond the badge element.
+ *
+ * Inline badge mode (second mode): any element — not just inputs — carrying
+ * both data-trustgate="token-shield" and data-trustgate-address="0x…" is
+ * scored silently in the background and gets a compact badge rendered
+ * immediately after it, sized to sit inline beside a token name:
+ *
+ *   <span data-trustgate="token-shield" data-trustgate-address="0x…">USDC</span>
+ *
+ * The optional data-trustgate-style attribute picks the badge text: "full"
+ * shows score + tier ("87 · HIGH_ELITE"), "minimal" shows the tier only
+ * ("HIGH_ELITE"). When absent, it defaults to "minimal".
+ *
+ * NTT (non-tradeable) results, scoring failures, and timeouts render nothing.
+ * Elements are picked up on load and via MutationObserver so dynamically
+ * rendered token lists are covered.
  */
 (function () {
   "use strict";
@@ -106,6 +121,41 @@
     "pointer-events: none",
     "user-select: none",
     "z-index: 1",
+  ].join("; ");
+
+  // ---- Inline badge mode -------------------------------------------------
+  // A second, opt-in mode for non-input elements (span, td, li, …) that carry
+  // both data-trustgate="token-shield" and data-trustgate-address="0x…". Each
+  // matching element is scored silently and gets a compact badge rendered
+  // immediately after it, sized to sit inline next to a token name. NTT
+  // results, failures, and timeouts render nothing.
+  //
+  // The optional data-trustgate-style attribute controls the badge text:
+  //   "full"    → score + tier, e.g. "87 · HIGH_ELITE"
+  //   "minimal" → tier only,     e.g. "HIGH_ELITE"
+  // When the attribute is absent or unrecognized, "minimal" is used.
+  var ADDRESS_ATTR = "data-trustgate-address";
+  var STYLE_ATTR = "data-trustgate-style";
+  var INLINE_BADGE_ATTR = "data-trustgate-inline-badge";
+  var INLINE_ADDR_PROP = "__trustgateInlineAddr";
+  var INLINE_TIMEOUT_MS = 8000;
+
+  var INLINE_BADGE_CSS = [
+    "font-family: " + BADGE_CSS_FONT,
+    "font-size: 10px",
+    "font-weight: 600",
+    "letter-spacing: 0.02em",
+    "line-height: 1.2",
+    "padding: 1px 5px",
+    "margin: 0 0 0 6px",
+    "border-radius: 4px",
+    "border: 1px solid transparent",
+    "display: inline-block",
+    "vertical-align: middle",
+    "white-space: nowrap",
+    "box-sizing: border-box",
+    "pointer-events: none",
+    "user-select: none",
   ].join("; ");
 
   // Per-input state stored on the element itself (avoids a Map keyed by node
@@ -250,6 +300,124 @@
     }, DEBOUNCE_MS);
   }
 
+  function removeInlineBadge(el) {
+    var existing = el.nextElementSibling;
+    if (
+      existing &&
+      existing.nodeType === 1 &&
+      existing.getAttribute &&
+      existing.getAttribute(INLINE_BADGE_ATTR) === "true"
+    ) {
+      if (existing.parentNode) existing.parentNode.removeChild(existing);
+    }
+  }
+
+  function ensureInlineBadge(el) {
+    var existing = el.nextElementSibling;
+    if (
+      existing &&
+      existing.nodeType === 1 &&
+      existing.getAttribute &&
+      existing.getAttribute(INLINE_BADGE_ATTR) === "true"
+    ) {
+      return existing;
+    }
+    var badge = document.createElement("span");
+    badge.setAttribute(INLINE_BADGE_ATTR, "true");
+    badge.style.cssText = INLINE_BADGE_CSS;
+    if (el.parentNode) el.parentNode.insertBefore(badge, el.nextSibling);
+    return badge;
+  }
+
+  // Resolve the requested display style. Defaults to "minimal" when the
+  // attribute is absent or holds an unrecognized value.
+  function resolveInlineStyle(el) {
+    var v = (el.getAttribute(STYLE_ATTR) || "").trim().toLowerCase();
+    return v === "full" ? "full" : "minimal";
+  }
+
+  // Inline badge text. "full" prepends the numeric score ("87 · HIGH_ELITE")
+  // for every tier when a finite score is available; "minimal" is tier only
+  // ("HIGH_ELITE").
+  function inlineLabel(tier, score, displayStyle) {
+    var text = TIER_STYLE[tier].text;
+    if (
+      displayStyle === "full" &&
+      typeof score === "number" &&
+      isFinite(score)
+    ) {
+      return score + " · " + text;
+    }
+    return text;
+  }
+
+  function renderInlineBadge(el, tier, score) {
+    var style = TIER_STYLE[tier];
+    var badge = ensureInlineBadge(el);
+    badge.style.fontFamily = BADGE_CSS_FONT;
+    badge.style.color = style.color;
+    badge.style.background = style.bg;
+    badge.style.borderColor = style.border;
+    badge.textContent = inlineLabel(tier, score, resolveInlineStyle(el));
+  }
+
+  function scoreInline(el, address) {
+    var ac =
+      typeof AbortController !== "undefined" ? new AbortController() : null;
+    var timer = ac
+      ? setTimeout(function () {
+          try {
+            ac.abort();
+          } catch (e) {
+            /* noop */
+          }
+        }, INLINE_TIMEOUT_MS)
+      : 0;
+    fetchScore(address, ac ? ac.signal : undefined)
+      .then(function (data) {
+        if (timer) clearTimeout(timer);
+        // Bail if the element's address changed while in flight (covers
+        // virtualized lists that recycle DOM nodes).
+        if (el[INLINE_ADDR_PROP] !== address) return;
+        if (
+          !data ||
+          typeof data.tier !== "string" ||
+          data.tier === "NTT" ||
+          !TIER_STYLE.hasOwnProperty(data.tier)
+        ) {
+          // NTT / unknown / failure: render nothing in inline mode.
+          return;
+        }
+        renderInlineBadge(el, data.tier, data.score);
+      })
+      .catch(function () {
+        if (timer) clearTimeout(timer);
+        // Failures and timeouts are silent in inline mode.
+      });
+  }
+
+  function attachInline(el) {
+    var addr = (el.getAttribute(ADDRESS_ATTR) || "").trim().toLowerCase();
+    // Idempotent per address: skip if we already handled this exact value, so
+    // repeated scans and unrelated mutations don't re-score needlessly.
+    if (el[INLINE_ADDR_PROP] === addr) return;
+    el[INLINE_ADDR_PROP] = addr;
+    removeInlineBadge(el);
+    if (!ADDRESS_RE.test(addr)) return;
+    scoreInline(el, addr);
+  }
+
+  // Route a matched element to the correct mode. Presence of a
+  // data-trustgate-address attribute opts the element into inline badge mode;
+  // everything else keeps the original input behavior untouched.
+  function route(el) {
+    if (el.hasAttribute && el.hasAttribute(ADDRESS_ATTR)) {
+      attachInline(el);
+    } else {
+      attach(el);
+    }
+  }
+
   function attach(input) {
     if (input[ATTACHED_FLAG]) return;
     input[ATTACHED_FLAG] = true;
@@ -264,7 +432,7 @@
   function scan(root) {
     if (!root || !root.querySelectorAll) return;
     var nodes = root.querySelectorAll(SELECTOR);
-    for (var i = 0; i < nodes.length; i++) attach(nodes[i]);
+    for (var i = 0; i < nodes.length; i++) route(nodes[i]);
   }
 
   function init() {
@@ -272,11 +440,24 @@
     if (typeof MutationObserver === "undefined") return;
     var obs = new MutationObserver(function (mutations) {
       for (var i = 0; i < mutations.length; i++) {
-        var added = mutations[i].addedNodes;
+        var m = mutations[i];
+        if (m.type === "attributes") {
+          var target = m.target;
+          if (
+            target &&
+            target.nodeType === 1 &&
+            target.matches &&
+            target.matches(SELECTOR)
+          ) {
+            route(target);
+          }
+          continue;
+        }
+        var added = m.addedNodes;
         for (var j = 0; j < added.length; j++) {
           var node = added[j];
           if (!node || node.nodeType !== 1) continue;
-          if (node.matches && node.matches(SELECTOR)) attach(node);
+          if (node.matches && node.matches(SELECTOR)) route(node);
           scan(node);
         }
       }
@@ -284,6 +465,8 @@
     obs.observe(document.documentElement || document.body, {
       childList: true,
       subtree: true,
+      attributes: true,
+      attributeFilter: [ADDRESS_ATTR],
     });
   }
 

@@ -1,0 +1,457 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>TrustGate · Inline badge mode demo</title>
+    <meta
+      name="description"
+      content="Demo of TrustGate widget.js inline badge mode — trust score badges rendered next to token names in any element."
+    />
+    <style>
+      :root {
+        --bg: #0a0a0a;
+        --surface: #111111;
+        --surface-2: #141414;
+        --border: #1f1f1f;
+        --text: #f5f5f5;
+        --muted: #666666;
+        --accent: #44dcea;
+        --sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+          sans-serif;
+        --mono: ui-monospace, "SF Mono", "JetBrains Mono", "Geist Mono", Menlo,
+          Consolas, monospace;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--mono);
+        font-size: 14px;
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+      }
+      .wrap {
+        max-width: 880px;
+        margin: 0 auto;
+        padding: 64px 24px 96px;
+      }
+      header {
+        border-bottom: 1px solid var(--border);
+        padding-bottom: 28px;
+        margin-bottom: 40px;
+      }
+      .eyebrow {
+        font-size: 11px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--accent);
+        margin: 0 0 12px;
+      }
+      h1 {
+        font-family: var(--sans);
+        font-size: 30px;
+        font-weight: 600;
+        letter-spacing: 0.01em;
+        margin: 0 0 14px;
+      }
+      .lede {
+        color: var(--muted);
+        max-width: 60ch;
+        margin: 0;
+      }
+      h2 {
+        font-family: var(--sans);
+        font-size: 18px;
+        font-weight: 600;
+        letter-spacing: 0.01em;
+        margin: 48px 0 8px;
+      }
+      .hint {
+        color: var(--muted);
+        margin: 0 0 18px;
+        max-width: 64ch;
+      }
+      .note {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-left: 2px solid var(--accent);
+        border-radius: 4px;
+        padding: 14px 16px;
+        color: var(--muted);
+        margin: 24px 0 0;
+        font-size: 13px;
+      }
+      .note code {
+        color: var(--text);
+      }
+      code {
+        font-family: var(--mono);
+        color: var(--accent);
+      }
+      .panel {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 8px 4px;
+      }
+
+      /* Token list — rows of <span> token names. */
+      .token-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 14px 18px;
+        border-bottom: 1px solid var(--border);
+      }
+      .token-row:last-child {
+        border-bottom: none;
+      }
+      .token-logo {
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        color: var(--muted);
+        flex: none;
+      }
+      .token-name {
+        font-family: var(--sans);
+        font-weight: 600;
+        letter-spacing: 0.01em;
+      }
+      .token-addr {
+        margin-left: auto;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      /* Table layout. */
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+      th {
+        text-align: left;
+        font-family: var(--sans);
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--muted);
+        font-weight: 500;
+        padding: 12px 18px;
+        border-bottom: 1px solid var(--border);
+      }
+      td {
+        padding: 14px 18px;
+        border-bottom: 1px solid var(--border);
+      }
+      tr:last-child td {
+        border-bottom: none;
+      }
+      .ticker {
+        font-family: var(--sans);
+        font-weight: 600;
+      }
+      .addr-cell {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      /* Plain list. */
+      ul.tokens {
+        list-style: none;
+        margin: 0;
+        padding: 8px 18px;
+      }
+      ul.tokens li {
+        padding: 10px 0;
+        border-bottom: 1px solid var(--border);
+      }
+      ul.tokens li:last-child {
+        border-bottom: none;
+      }
+
+      button {
+        font-family: var(--mono);
+        font-size: 13px;
+        color: var(--text);
+        background: var(--surface-2);
+        border: 1px solid #333;
+        border-radius: 4px;
+        padding: 9px 16px;
+        cursor: pointer;
+        margin-top: 16px;
+      }
+      button:hover {
+        border-color: var(--accent);
+      }
+      footer {
+        margin-top: 64px;
+        padding-top: 24px;
+        border-top: 1px solid var(--border);
+        color: var(--muted);
+        font-size: 12px;
+      }
+      footer a {
+        color: var(--accent);
+        text-decoration: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header>
+        <p class="eyebrow">Widget · Inline badge mode</p>
+        <h1>Trust badges, inline with your token list</h1>
+        <p class="lede">
+          Tag any element &mdash; a span, table cell, or list item &mdash; with
+          <code>data-trustgate="token-shield"</code> and
+          <code>data-trustgate-address="0x&hellip;"</code>. The widget scores
+          each address in the background and drops a compact badge right next to
+          the token name. No badge is shown for non-tradeable tokens (NTT) or
+          when scoring fails.
+        </p>
+      </header>
+
+      <p class="hint">
+        This page loads the real <code>/widget.js</code> from the same origin.
+        Badges appear once each address is scored by
+        <code>/api/widget/score/&#123;address&#125;</code>.
+      </p>
+
+      <h2>Token list (span)</h2>
+      <p class="hint">
+        Each token name is a <code>&lt;span&gt;</code> carrying the address. The
+        badge renders immediately after the name. No
+        <code>data-trustgate-style</code> is set, so these use the default
+        <strong>minimal</strong> style (tier only).
+      </p>
+      <div class="panel" id="token-list">
+        <div class="token-row">
+          <span class="token-logo">U</span>
+          <span
+            class="token-name"
+            data-trustgate="token-shield"
+            data-trustgate-address="0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+            >USD Coin</span
+          >
+          <span class="token-addr">0xA0b8&hellip;eB48</span>
+        </div>
+        <div class="token-row">
+          <span class="token-logo">W</span>
+          <span
+            class="token-name"
+            data-trustgate="token-shield"
+            data-trustgate-address="0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+            >Wrapped Ether</span
+          >
+          <span class="token-addr">0xC02a&hellip;6Cc2</span>
+        </div>
+        <div class="token-row">
+          <span class="token-logo">D</span>
+          <span
+            class="token-name"
+            data-trustgate="token-shield"
+            data-trustgate-address="0x6B175474E89094C44Da98b954EedeAC495271d0F"
+            >Dai Stablecoin</span
+          >
+          <span class="token-addr">0x6B17&hellip;1d0F</span>
+        </div>
+      </div>
+
+      <h2>Table (td)</h2>
+      <p class="hint">
+        The ticker cell is a <code>&lt;td&gt;</code>. The badge sits inline after
+        the ticker text within the same cell wrapper.
+      </p>
+      <div class="panel">
+        <table>
+          <thead>
+            <tr>
+              <th>Token</th>
+              <th>Contract</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>
+                <span
+                  class="ticker"
+                  data-trustgate="token-shield"
+                  data-trustgate-address="0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599"
+                  >WBTC</span
+                >
+              </td>
+              <td class="addr-cell">0x2260&hellip;C599</td>
+            </tr>
+            <tr>
+              <td>
+                <span
+                  class="ticker"
+                  data-trustgate="token-shield"
+                  data-trustgate-address="0x514910771AF9Ca656af840dff83E8264EcF986CA"
+                  >LINK</span
+                >
+              </td>
+              <td class="addr-cell">0x5149&hellip;86CA</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2>Plain list (li)</h2>
+      <p class="hint">
+        Works on <code>&lt;li&gt;</code> too &mdash; any element type is
+        supported.
+      </p>
+      <div class="panel">
+        <ul class="tokens">
+          <li
+            data-trustgate="token-shield"
+            data-trustgate-address="0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984"
+          >
+            Uniswap (UNI)
+          </li>
+          <li
+            data-trustgate="token-shield"
+            data-trustgate-address="0x7Fc66500c84A76Ad7e9c93437bFc5Ac33E2DDaE9"
+          >
+            Aave (AAVE)
+          </li>
+        </ul>
+      </div>
+
+      <h2>Full style (score + tier)</h2>
+      <p class="hint">
+        Add <code>data-trustgate-style="full"</code> to show the numeric score
+        alongside the tier, e.g. <code>87 · HIGH_ELITE</code>. Omitting the
+        attribute &mdash; or setting <code>data-trustgate-style="minimal"</code>
+        &mdash; shows the tier only.
+      </p>
+      <div class="panel" id="token-list-full">
+        <div class="token-row">
+          <span class="token-logo">U</span>
+          <span
+            class="token-name"
+            data-trustgate="token-shield"
+            data-trustgate-style="full"
+            data-trustgate-address="0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+            >USD Coin</span
+          >
+          <span class="token-addr">0xA0b8&hellip;eB48</span>
+        </div>
+        <div class="token-row">
+          <span class="token-logo">W</span>
+          <span
+            class="token-name"
+            data-trustgate="token-shield"
+            data-trustgate-style="full"
+            data-trustgate-address="0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+            >Wrapped Ether</span
+          >
+          <span class="token-addr">0xC02a&hellip;6Cc2</span>
+        </div>
+        <div class="token-row">
+          <span class="token-logo">L</span>
+          <span
+            class="token-name"
+            data-trustgate="token-shield"
+            data-trustgate-style="full"
+            data-trustgate-address="0x514910771AF9Ca656af840dff83E8264EcF986CA"
+            >Chainlink</span
+          >
+          <span class="token-addr">0x5149&hellip;86CA</span>
+        </div>
+      </div>
+
+      <h2>Dynamically rendered tokens</h2>
+      <p class="hint">
+        Token lists are often rendered after load. The widget watches the DOM
+        with a <code>MutationObserver</code>, so rows added later are scored and
+        badged automatically.
+      </p>
+      <div class="panel" id="dynamic-list">
+        <div class="token-row" style="color: var(--muted)">
+          No tokens yet &mdash; click below to inject one.
+        </div>
+      </div>
+      <button id="add-token" type="button">Add a token row</button>
+
+      <div class="note">
+        The contract addresses on this page are well-known mainnet tokens used
+        only to exercise the markup. Replace them with the Arc testnet token
+        addresses you want to score. Addresses that resolve to NTT, fail, or
+        time out simply render no badge &mdash; that is expected behaviour for
+        inline mode.
+      </div>
+
+      <footer>
+        Powered by <code>widget.js</code> inline badge mode &middot;
+        <a href="/docs/widget-integration">Widget integration docs</a>
+      </footer>
+    </div>
+
+    <!-- Load the real widget from this origin so API_BASE resolves correctly. -->
+    <script src="/widget.js"></script>
+
+    <!-- Demo-only script: inject a token row to show MutationObserver pickup. -->
+    <script>
+      (function () {
+        var DEMO_TOKENS = [
+          { name: "Lido DAO (LDO)", addr: "0x5A98FcBEA516Cf06857215779Fd812CA3beF1B32" },
+          { name: "Curve DAO (CRV)", addr: "0xD533a949740bb3306d119CC777fa900bA034cd52" },
+          { name: "Maker (MKR)", addr: "0x9f8F72aA9304c8B593d555F12eF6589cC3A579A2" },
+          { name: "Synthetix (SNX)", addr: "0xC011a73ee8576Fb46F5E1c5751cA3B9Fe0af2a6F" },
+        ];
+        var i = 0;
+        var list = document.getElementById("dynamic-list");
+        var btn = document.getElementById("add-token");
+        if (!list || !btn) return;
+
+        btn.addEventListener("click", function () {
+          var token = DEMO_TOKENS[i % DEMO_TOKENS.length];
+          i++;
+
+          // Clear the placeholder on first insert.
+          var placeholder = list.querySelector(".token-row");
+          if (placeholder && placeholder.style.color) {
+            list.removeChild(placeholder);
+          }
+
+          var row = document.createElement("div");
+          row.className = "token-row";
+
+          var logo = document.createElement("span");
+          logo.className = "token-logo";
+          logo.textContent = token.name.charAt(0);
+
+          var name = document.createElement("span");
+          name.className = "token-name";
+          name.setAttribute("data-trustgate", "token-shield");
+          name.setAttribute("data-trustgate-address", token.addr);
+          name.textContent = token.name;
+
+          var addr = document.createElement("span");
+          addr.className = "token-addr";
+          addr.textContent =
+            token.addr.slice(0, 6) + "…" + token.addr.slice(-4);
+
+          row.appendChild(logo);
+          row.appendChild(name);
+          row.appendChild(addr);
+          list.appendChild(row);
+        });
+      })();
+    </script>
+  </body>
+</html>
