@@ -61,6 +61,16 @@
     API_BASE = window.location.origin;
   }
 
+  // Normalize the apex origin to www. The apex (trustgated.xyz) 307-redirects
+  // to www, and browsers drop Access-Control-Allow-Origin on the redirect hop,
+  // so cross-origin badge fetches from a DEX fail CORS. Forcing www lets either
+  // the apex or www snippet work. Applied once to the final value regardless of
+  // whether it came from the script src or the location.origin fallback. The
+  // "://" anchor keeps "www.trustgated.xyz" untouched (it has no "://trustgated").
+  if (API_BASE.indexOf("://trustgated.xyz") !== -1) {
+    API_BASE = API_BASE.replace("://trustgated.xyz", "://www.trustgated.xyz");
+  }
+
   var TIER_STYLE = {
     HIGH_ELITE: {
       color: "#34d399",

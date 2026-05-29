@@ -6,7 +6,7 @@ import DocShell from "@/components/docs/DocShell";
 const SCRIPT_URL = "/widget.js";
 
 const HTML_SNIPPET = `<!-- 1. Load the widget once, anywhere on the page -->
-<script src="https://trustgated.xyz/widget.js"></script>
+<script src="https://www.trustgated.xyz/widget.js"></script>
 
 <!-- 2. Tag any token-address input with data-trustgate -->
 <label>
@@ -21,7 +21,7 @@ export default function Document() {
   return (
     <>
       <Script
-        src="https://trustgated.xyz/widget.js"
+        src="https://www.trustgated.xyz/widget.js"
         strategy="afterInteractive"
       />
       {/* ...rest of the app */}
@@ -42,7 +42,7 @@ export function TokenAddressField() {
 
 const JS_SNIPPET = `// Load the widget at runtime if you can't add a <script> tag manually.
 const s = document.createElement("script");
-s.src = "https://trustgated.xyz/widget.js";
+s.src = "https://www.trustgated.xyz/widget.js";
 s.async = true;
 document.head.appendChild(s);
 
@@ -74,7 +74,7 @@ export default function WidgetIntegrationPage() {
         inputs anywhere on the page, including ones added later.
       </p>
       <pre>
-        <code>{`<script src="https://trustgated.xyz/widget.js"></script>`}</code>
+        <code>{`<script src="https://www.trustgated.xyz/widget.js"></script>`}</code>
       </pre>
 
       <h2>Live demo</h2>
