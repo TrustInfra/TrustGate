@@ -1,3 +1,5 @@
+import "server-only";
+
 // Assembles an NftScoreInput from Arcscan / Arc RPC data and scores it with
 // scoreNft. Kept separate from nft-scoring.ts so the scoring module stays a
 // pure, dependency-free function. Used by both the standalone NFT route and
@@ -6,6 +8,13 @@
 import { scoreNft, NftScoreInput, NftScoreResult } from "./nft-scoring";
 
 const ARCSCAN_API = "https://testnet.arcscan.app";
+
+// Server-only scoring constant (no NEXT_PUBLIC_ prefix), read via Number().
+// Window size for the holder-concentration signal: how many top holders feed
+// topThreeHolderPct. Unlike a cap or gate, an extreme fallback would corrupt
+// the calculation (0 disables the signal, a huge value sums every holder and
+// over-fires concentration), so the fallback preserves current behavior at 3.
+const TOP_HOLDER_WINDOW = Number(process.env.SCORING_NFT_TOP_HOLDER_WINDOW ?? 3);
 
 interface ArcscanTokenInfo {
   holders?: string | number | null;
@@ -87,7 +96,7 @@ function topThreeHolderPct(
   // Blockscout returns holders sorted by balance descending, so the first
   // three are the largest.
   const top3 = holders
-    .slice(0, 3)
+    .slice(0, TOP_HOLDER_WINDOW)
     .reduce((sum, h) => sum + toInt(h.value), 0);
   const pct = (top3 / totalSupply) * 100;
   if (!Number.isFinite(pct)) return 0;

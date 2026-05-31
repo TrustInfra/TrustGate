@@ -1,6 +1,33 @@
+import "server-only";
+
 // frontend/src/lib/nft-scoring.ts
 // NFT contract scoring — ERC-721 and ERC-1155
 // Free query, scored locally, no oracle required
+
+// Sensitive scoring constants are sourced from server-only environment
+// variables (no NEXT_PUBLIC_ prefix) so the thresholds, caps, and band edges
+// never ship to the client. Each read is wrapped in Number(). Fallbacks are
+// deliberately neutral placeholders, NOT the real production values: caps
+// default to no-cap (100), penalties to zero effect, and band/gate thresholds
+// to values so extreme the band or flag effectively never fires. A missing-env
+// deploy therefore degrades to obviously-neutered scoring rather than leaking
+// values.
+const WASH_TRADING_CAP = Number(process.env.SCORING_NFT_WASH_TRADING_CAP ?? 100);
+const CREATOR_DUMPING_CAP = Number(process.env.SCORING_NFT_CREATOR_DUMPING_CAP ?? 100);
+const HOLDER_CONCENTRATION_PCT = Number(process.env.SCORING_NFT_HOLDER_CONCENTRATION_PCT ?? 999);
+const HOLDER_CONCENTRATION_PENALTY = Number(process.env.SCORING_NFT_HOLDER_CONCENTRATION_PENALTY ?? 0);
+
+// Unique-holder-ratio band edges (uniqueHolders / totalSupply). Higher ratio is
+// better, so a missing edge defaults extreme-high and the band never matches,
+// awarding zero rather than inflating the score.
+const HOLDER_RATIO_HIGH = Number(process.env.SCORING_NFT_HOLDER_RATIO_HIGH ?? 999);
+const HOLDER_RATIO_MEDIUM = Number(process.env.SCORING_NFT_HOLDER_RATIO_MEDIUM ?? 999);
+const HOLDER_RATIO_LOW = Number(process.env.SCORING_NFT_HOLDER_RATIO_LOW ?? 999);
+
+// Confidence unique-holder thresholds. Missing values default extreme-high so
+// the HIGH and MEDIUM gates never fire and confidence degrades to LOW.
+const CONFIDENCE_HIGH_INTERACTORS = Number(process.env.SCORING_NFT_CONFIDENCE_HIGH_INTERACTORS ?? 99999);
+const CONFIDENCE_LOW_INTERACTORS = Number(process.env.SCORING_NFT_CONFIDENCE_LOW_INTERACTORS ?? 99999);
 
 export type NftScoreInput = {
   contractAddress: string;
@@ -30,9 +57,9 @@ export type NftScoreResult = {
 function scoreHolderRatio(uniqueHolders: number, totalSupply: number): number {
   if (totalSupply === 0) return 0;
   const ratio = uniqueHolders / totalSupply;
-  if (ratio >= 0) return 25;
-  if (ratio >= 0) return 15;
-  if (ratio >= 0) return 5;
+  if (ratio >= HOLDER_RATIO_HIGH) return 25;
+  if (ratio >= HOLDER_RATIO_MEDIUM) return 15;
+  if (ratio >= HOLDER_RATIO_LOW) return 5;
   return 0;
 }
 
@@ -85,13 +112,13 @@ function tierFor(score: number): NftScoreResult["tier"] {
 
 function computeConfidence(input: NftScoreInput): NftScoreResult["confidence"] {
   if (
-    input.uniqueHolders >= 0 &&
+    input.uniqueHolders >= CONFIDENCE_HIGH_INTERACTORS &&
     (input.deployerTier === "HIGH" || input.deployerTier === "HIGH_ELITE") &&
     input.floorPriceDirection !== null
   ) {
     return "HIGH";
   }
-  if (input.uniqueHolders >= 0 || input.deployerTier === "MEDIUM") {
+  if (input.uniqueHolders >= CONFIDENCE_LOW_INTERACTORS || input.deployerTier === "MEDIUM") {
     return "MEDIUM";
   }
   return "LOW";
@@ -112,15 +139,15 @@ export function scoreNft(input: NftScoreInput): NftScoreResult {
 
   // Risk flags, applied in order.
   if (input.washTradingDetected) {
-    score = Math.min(score, 100);
+    score = Math.min(score, WASH_TRADING_CAP);
     flags.push("WASH_TRADING");
   }
-  if (input.topThreeHolderPct >= 0) {
-    score = Math.max(0, score - 0);
+  if (input.topThreeHolderPct >= HOLDER_CONCENTRATION_PCT) {
+    score = Math.max(0, score - HOLDER_CONCENTRATION_PENALTY);
     flags.push("HOLDER_CONCENTRATION");
   }
   if (input.creatorDumpingDetected) {
-    score = Math.min(score, 100);
+    score = Math.min(score, CREATOR_DUMPING_CAP);
     flags.push("CREATOR_DUMPING");
   }
 

@@ -1,3 +1,5 @@
+import "server-only";
+
 // Post-processing layer for the wallet oracle proxy. Mirrors the caps,
 // bot detectors, and tier bands defined in oracle/token-scoring.ts so the
 // public proxy is the final authority on wallet scores regardless of what
@@ -6,17 +8,28 @@
 const ARCSCAN_API_URL = "https://testnet.arcscan.app";
 const ARC_RPC_URL = "https://rpc.testnet.arc.network";
 
-const BOT_FLAG_PENALTY = 0;
-const VELOCITY_TXS_PER_HOUR = 0;
-const INTERVAL_PATTERN_MIN_SAMPLE = 0;
-const INTERVAL_PATTERN_TOLERANCE = 0;
-const INTERVAL_PATTERN_DOMINANCE = 0;
-const SELF_INTERACTION_THRESHOLD = 0;
+// Sensitive scoring constants are sourced from server-only environment
+// variables (SCORING_WALLET_ prefix, no NEXT_PUBLIC_) so the thresholds, caps,
+// and gates never ship to the client. Each read is wrapped in Number().
+// Fallbacks are deliberately neutral, NOT the real production values: caps
+// default to 100 (no cap), penalties default to 0 (no effect), detection
+// thresholds default to extremes that make the flag never fire, and the
+// HIGH_ELITE / perfect gate mins default to extremes that keep the gate
+// unreachable. A missing-env deploy therefore degrades to obviously-neutered
+// scoring (no caps, no flags, elite gates closed) rather than leaking or
+// silently faking the real values.
+const BOT_FLAG_PENALTY = Number(process.env.SCORING_WALLET_BOT_FLAG_PENALTY ?? 0);
+const VELOCITY_TXS_PER_HOUR = Number(process.env.SCORING_WALLET_VELOCITY_TXS_PER_HOUR ?? 999999);
+const INTERVAL_PATTERN_MIN_SAMPLE = Number(process.env.SCORING_WALLET_INTERVAL_PATTERN_MIN_SAMPLE ?? 999999);
+const INTERVAL_PATTERN_TOLERANCE = Number(process.env.SCORING_WALLET_INTERVAL_PATTERN_TOLERANCE ?? 0);
+const INTERVAL_PATTERN_DOMINANCE = Number(process.env.SCORING_WALLET_INTERVAL_PATTERN_DOMINANCE ?? 999999);
+const SELF_INTERACTION_THRESHOLD = Number(process.env.SCORING_WALLET_SELF_INTERACTION_THRESHOLD ?? 999999);
 // Clean-history is a youth-of-wallet signal: a brand-new wallet with hundreds
 // of perfect txs is suspicious; a mature wallet with a clean record is just
-// careful. Only flag when all three hold — high volume, zero failures, fresh.
-const CLEAN_HISTORY_MIN_TXS = 0;
-const CLEAN_HISTORY_MAX_AGE_DAYS = 0;
+// careful. Only flag when all three hold: high volume, zero failures, fresh.
+// Neutral fallback closes the flag (min-txs unreachable, max-age 0).
+const CLEAN_HISTORY_MIN_TXS = Number(process.env.SCORING_WALLET_CLEAN_HISTORY_MIN_TXS ?? 999999);
+const CLEAN_HISTORY_MAX_AGE_DAYS = Number(process.env.SCORING_WALLET_CLEAN_HISTORY_MAX_AGE_DAYS ?? 0);
 
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
@@ -24,31 +37,44 @@ const DAY_MS = 24 * HOUR_MS;
 const SIGNALS_TTL_MS = 5 * 60 * 1000;
 const TX_PAGES = 5;
 
-// Hard caps and tier gates.
-const HARD_CAP = 0;
-const NON_ELITE_CAP = 0;
-const NON_PERFECT_CAP = 0;
+// Hard caps and tier gates. Caps default to 100 (no cap); gate mins default to
+// 999999 (unreachable, so a missing-env deploy keeps every elite/perfect gate
+// closed rather than accidentally open).
+const HARD_CAP = Number(process.env.SCORING_WALLET_HARD_CAP ?? 100);
+const NON_ELITE_CAP = Number(process.env.SCORING_WALLET_NON_ELITE_CAP ?? 100);
+const NON_PERFECT_CAP = Number(process.env.SCORING_WALLET_NON_PERFECT_CAP ?? 100);
+
+// Fresh-wallet gate. Neutral fallback of 0 means the gate never triggers
+// (walletAgeDays < 0 and txCount < 0 are both impossible).
+const FRESH_MAX_AGE_DAYS = Number(process.env.SCORING_WALLET_FRESH_MAX_AGE_DAYS ?? 0);
+const FRESH_MIN_TXS = Number(process.env.SCORING_WALLET_FRESH_MIN_TXS ?? 0);
+
+// Two-or-more bot flags hard-cap rule. Neutral fallback of 999999 makes the
+// count-based hard cap unreachable.
+const BOT_FLAG_HARDCAP_COUNT = Number(process.env.SCORING_WALLET_BOT_FLAG_HARDCAP_COUNT ?? 999999);
 
 // HIGH_ELITE gate thresholds (all must hold simultaneously).
-const HIGH_ELITE_MIN_DEPLOYMENTS = 0;
-const HIGH_ELITE_QUALITY_DEPLOYMENTS = 0; // deployments with 100+ independent interactors
-const HIGH_ELITE_MIN_ACTIVE_MONTHS = 0;
-const HIGH_ELITE_MIN_CATEGORIES = 0;
-const HIGH_ELITE_MIN_AGE_DAYS = 0;
-const HIGH_ELITE_MIN_TXS = 0;
+const HIGH_ELITE_MIN_DEPLOYMENTS = Number(process.env.SCORING_WALLET_HIGH_ELITE_MIN_DEPLOYMENTS ?? 999999);
+const HIGH_ELITE_QUALITY_DEPLOYMENTS = Number(process.env.SCORING_WALLET_HIGH_ELITE_QUALITY_DEPLOYMENTS ?? 999999); // deployments with 100+ independent interactors
+const HIGH_ELITE_MIN_ACTIVE_MONTHS = Number(process.env.SCORING_WALLET_HIGH_ELITE_MIN_ACTIVE_MONTHS ?? 999999);
+const HIGH_ELITE_MIN_CATEGORIES = Number(process.env.SCORING_WALLET_HIGH_ELITE_MIN_CATEGORIES ?? 999999);
+const HIGH_ELITE_MIN_AGE_DAYS = Number(process.env.SCORING_WALLET_HIGH_ELITE_MIN_AGE_DAYS ?? 999999);
+const HIGH_ELITE_MIN_TXS = Number(process.env.SCORING_WALLET_HIGH_ELITE_MIN_TXS ?? 999999);
 
 // Score-of-100 gate thresholds (all HIGH_ELITE conditions plus these).
-const PERFECT_MIN_DEPLOYMENTS = 0;
-const PERFECT_QUALITY_DEPLOYMENTS = 0; // deployments with 500+ independent interactors
-const PERFECT_MIN_TXS = 0;
-const PERFECT_MIN_AGE_DAYS = 0;
+const PERFECT_MIN_DEPLOYMENTS = Number(process.env.SCORING_WALLET_PERFECT_MIN_DEPLOYMENTS ?? 999999);
+const PERFECT_QUALITY_DEPLOYMENTS = Number(process.env.SCORING_WALLET_PERFECT_QUALITY_DEPLOYMENTS ?? 999999); // deployments with 500+ independent interactors
+const PERFECT_MIN_TXS = Number(process.env.SCORING_WALLET_PERFECT_MIN_TXS ?? 999999);
+const PERFECT_MIN_AGE_DAYS = Number(process.env.SCORING_WALLET_PERFECT_MIN_AGE_DAYS ?? 999999);
 
-// Confidence thresholds.
-const CONFIDENCE_HIGH_AGE_DAYS = 0;
-const CONFIDENCE_HIGH_TXS = 0;
-const CONFIDENCE_HIGH_QUALITY_DEPLOYMENTS = 0;
-const CONFIDENCE_LOW_AGE_DAYS = 0;
-const CONFIDENCE_LOW_TXS = 0;
+// Confidence thresholds. HIGH thresholds default to 999999 (HIGH unreachable)
+// and LOW thresholds to 0 (LOW never triggers), so a missing-env deploy reports
+// a neutral MEDIUM confidence everywhere.
+const CONFIDENCE_HIGH_AGE_DAYS = Number(process.env.SCORING_WALLET_CONFIDENCE_HIGH_AGE_DAYS ?? 999999);
+const CONFIDENCE_HIGH_TXS = Number(process.env.SCORING_WALLET_CONFIDENCE_HIGH_TXS ?? 999999);
+const CONFIDENCE_HIGH_QUALITY_DEPLOYMENTS = Number(process.env.SCORING_WALLET_CONFIDENCE_HIGH_QUALITY_DEPLOYMENTS ?? 999999);
+const CONFIDENCE_LOW_AGE_DAYS = Number(process.env.SCORING_WALLET_CONFIDENCE_LOW_AGE_DAYS ?? 0);
+const CONFIDENCE_LOW_TXS = Number(process.env.SCORING_WALLET_CONFIDENCE_LOW_TXS ?? 0);
 
 export type WalletTier = "LOW" | "MEDIUM" | "HIGH" | "HIGH_ELITE";
 export type WalletRecommendation =
@@ -353,11 +379,11 @@ function applyFormula(rawScore: number, signals: Signals): RescoreResult {
   // penalty only — no hard cap. Two or more signals, OR self-interaction
   // (signal 3) alone, hard-cap at 59 with no exceptions.
   const selfInteraction = botFlags.includes("self-interaction");
-  const botHardCap = botFlags.length >= 0 || selfInteraction;
+  const botHardCap = botFlags.length >= BOT_FLAG_HARDCAP_COUNT || selfInteraction;
   if (botHardCap) cap = Math.min(cap, HARD_CAP);
 
   // Fresh-wallet hard cap.
-  const isFresh = walletAgeDays < 0 || txCount < 0;
+  const isFresh = walletAgeDays < FRESH_MAX_AGE_DAYS || txCount < FRESH_MIN_TXS;
   if (isFresh) cap = Math.min(cap, HARD_CAP);
 
   // HIGH_ELITE gate: every condition must hold simultaneously. Under 25

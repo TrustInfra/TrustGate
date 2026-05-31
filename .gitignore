@@ -48,3 +48,6 @@ npm-debug.log*
 
 # secret-scrub rules, never commit
 /scrub-rules.txt
+
+# Vercel env paste file, holds real scoring values, never commit
+/vercel-new-vars.txt
