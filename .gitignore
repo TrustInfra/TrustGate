@@ -40,4 +40,11 @@ npm-debug.log*
 .claude
 "TASKS.md" 
 "VPS-TOKEN-SCORING-UPDATE.md" 
-"CLAUDE.md" 
+"CLAUDE.md"
+
+# stray saved-page HTML exports
+/.local.html
+/.dev.html
+
+# secret-scrub rules, never commit
+/scrub-rules.txt
