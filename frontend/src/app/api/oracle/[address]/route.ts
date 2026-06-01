@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { rescoreWallet } from "@/lib/wallet-rescore";
+import { isContractAddress } from "@/lib/contract-detect";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -78,6 +79,31 @@ async function proxy(
   context: { params: { address: string } }
 ): Promise<NextResponse> {
   const address = context.params.address;
+
+  // Reject contract addresses on the unpaid challenge call, before any payment
+  // is requested or forwarded upstream. The Oracle scores wallets; contracts
+  // are scored on Token Shield. Skipped when an X-Payment proof is present
+  // (the paid replay), since the challenge has already gated it.
+  if (!req.headers.get("x-payment")) {
+    const { isContract, rpcOk } = await isContractAddress(address);
+    if (isContract) {
+      return NextResponse.json(
+        {
+          error: "This is a contract address. Use Token Shield to score contracts.",
+          code: "CONTRACT_NOT_WALLET",
+          redirect: "/token-shield",
+        },
+        { status: 400, headers: CORS_HEADERS }
+      );
+    }
+    if (!rpcOk) {
+      console.warn(
+        "[oracle] contract pre-check RPC unavailable, proceeding as wallet:",
+        address
+      );
+    }
+  }
+
   const encoded = encodeURIComponent(address);
   const url = `${ORACLE_BASE}/oracle/${encoded}${req.nextUrl.search}`;
 
