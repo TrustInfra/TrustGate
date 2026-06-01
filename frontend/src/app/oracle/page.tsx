@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
+import { isContractAddress } from '@/lib/contract-detect';
 import {
   useAccount,
   useChainId,
@@ -114,6 +116,7 @@ export default function OraclePage() {
   const [result, setResult] = useState<ScoreResult | null>(null);
   const [phase, setPhase] = useState<QueryPhase>('idle');
   const [error, setError] = useState<string | null>(null);
+  const [contractDetected, setContractDetected] = useState(false);
   const [paymentTx, setPaymentTx] = useState<`0x${string}` | null>(null);
   const [tab, setTab] = useState<'js' | 'py' | 'curl'>('js');
   const [history, setHistory] = useState<HistoryEntry[]>([]);
@@ -187,16 +190,31 @@ export default function OraclePage() {
     inFlightRef.current = true;
 
     try {
-      if (!isConnected || !walletAddress) {
-        setError('Connect your wallet first.');
-        return;
-      }
+      setContractDetected(false);
+
       if (!/^0x[0-9a-fA-F]{40}$/.test(address)) {
         setError('Enter a valid Arc wallet address');
         return;
       }
+
+      // Contract addresses are not wallets. Catch them before asking the user to
+      // connect or pay, and point them at Token Shield instead.
+      setPhase('challenge');
+      const contractCheck = await isContractAddress(address);
+      if (contractCheck.isContract) {
+        setContractDetected(true);
+        setPhase('error');
+        return;
+      }
+
+      if (!isConnected || !walletAddress) {
+        setError('Connect your wallet first.');
+        setPhase('idle');
+        return;
+      }
       if (!publicClient) {
         setError('Arc public client unavailable. Try refreshing the page.');
+        setPhase('idle');
         return;
       }
 
@@ -204,9 +222,7 @@ export default function OraclePage() {
       setResult(null);
       setPaymentTx(null);
 
-      // Original flow follows.
       // Step 1 — challenge the oracle, expect HTTP 402
-      setPhase('challenge');
       const challenge = await fetch(`${ORACLE_PROXY}/${address}`, {
         cache: 'no-store',
       });
@@ -223,6 +239,22 @@ export default function OraclePage() {
         });
         setPhase('done');
         return;
+      }
+
+      if (challenge.status === 400) {
+        const raw = await challenge.text();
+        let parsed: { code?: string } | null = null;
+        try {
+          parsed = JSON.parse(raw);
+        } catch {
+          // non-JSON 400, fall through to generic handling
+        }
+        if (parsed?.code === 'CONTRACT_NOT_WALLET') {
+          setContractDetected(true);
+          setPhase('error');
+          return;
+        }
+        throw new Error(`Oracle returned 400. ${raw}`.trim());
       }
 
       if (challenge.status !== 402) {
@@ -414,6 +446,7 @@ response = requests.get(
               onChange={(e) => {
                 setAddress(e.target.value.trim());
                 setError(null);
+                setContractDetected(false);
                 if (phase === 'done' || phase === 'error') setPhase('idle');
               }}
               placeholder="0x..."
@@ -451,6 +484,21 @@ response = requests.get(
                   Payment tx: {paymentTx}
                 </p>
               )}
+            </div>
+          )}
+
+          {contractDetected && (
+            <div className="mt-4 rounded-lg border border-sky-500/30 bg-sky-500/10 p-4 text-sm text-sky-100">
+              <p className="font-medium">That is a contract address.</p>
+              <p className="mt-1 text-sky-200/80">
+                The Oracle scores wallets. To check a token or contract, use Token Shield.
+              </p>
+              <Link
+                href="/token-shield"
+                className="mt-3 inline-block rounded-md bg-sky-500/20 px-3 py-1.5 font-medium text-sky-100 hover:bg-sky-500/30"
+              >
+                Open Token Shield
+              </Link>
             </div>
           )}
 
