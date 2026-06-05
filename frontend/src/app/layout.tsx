@@ -27,7 +27,7 @@ const jetbrains = JetBrains_Mono({
   display: "swap",
 });
 
-const SITE_URL = "https://trustgated.xyz";
+const SITE_URL = "https://www.trustgated.xyz";
 const SITE_NAME = "TrustGate";
 const SITE_DESCRIPTION =
   "TrustGate scores wallets and tokens on-chain using behavioral signals (bot detection, deployment history, transaction patterns) and gates access to payments and services. Built on Arc.";
