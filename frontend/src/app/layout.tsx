@@ -27,26 +27,93 @@ const jetbrains = JetBrains_Mono({
   display: "swap",
 });
 
+const SITE_URL = "https://trustgated.xyz";
+const SITE_NAME = "TrustGate";
+const SITE_DESCRIPTION =
+  "TrustGate scores wallets and tokens on-chain using behavioral signals (bot detection, deployment history, transaction patterns) and gates access to payments and services. Built on Arc.";
+
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: "TrustGate | Trust Layer for Web3",
-  description:
-    "TrustGate scores wallets and tokens on-chain using behavioral signals -- bot detection, deployment history, transaction patterns -- and gates access to payments and services. Built on Arc.",
+  description: SITE_DESCRIPTION,
+  alternates: {
+    canonical: "/",
+  },
   icons: {
-    icon: [
-    { url: "/favicon.png", sizes: "32x32", type: "image/png" },
-  ],
-  apple: "/apple-touch-icon.png",
-},
+    icon: [{ url: "/favicon.png", sizes: "32x32", type: "image/png" }],
+    apple: "/apple-touch-icon.png",
+  },
   openGraph: {
     title: "TrustGate | Trust Layer for Web3",
-    description:
-      "TrustGate scores wallets and tokens on-chain using behavioral signals -- bot detection, deployment history, transaction patterns -- and gates access to payments and services. Built on Arc.",
+    description: SITE_DESCRIPTION,
     type: "website",
+    url: SITE_URL,
+    siteName: SITE_NAME,
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "TrustGate, the trust layer for Web3",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "TrustGate | Trust Layer for Web3",
+    description: SITE_DESCRIPTION,
+    images: ["/og-image.png"],
   },
 };
 
 export const viewport: Viewport = {
   themeColor: "#0a0a0a",
+};
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": `${SITE_URL}/#organization`,
+      name: SITE_NAME,
+      url: SITE_URL,
+      description: SITE_DESCRIPTION,
+      logo: {
+        "@type": "ImageObject",
+        url: `${SITE_URL}/favicon.png`,
+      },
+      sameAs: ["https://x.com/Ludarep", "https://github.com/rudazy"],
+    },
+    {
+      "@type": "WebSite",
+      "@id": `${SITE_URL}/#website`,
+      url: SITE_URL,
+      name: SITE_NAME,
+      description: SITE_DESCRIPTION,
+      publisher: {
+        "@id": `${SITE_URL}/#organization`,
+      },
+      inLanguage: "en",
+    },
+    {
+      "@type": "WebApplication",
+      "@id": `${SITE_URL}/#webapp`,
+      name: SITE_NAME,
+      url: SITE_URL,
+      description: SITE_DESCRIPTION,
+      applicationCategory: "FinanceApplication",
+      operatingSystem: "Web",
+      offers: {
+        "@type": "Offer",
+        price: "0",
+        priceCurrency: "USD",
+      },
+      publisher: {
+        "@id": `${SITE_URL}/#organization`,
+      },
+    },
+  ],
 };
 
 export default function RootLayout({
@@ -59,6 +126,12 @@ export default function RootLayout({
       lang="en"
       className={`${barlowCondensed.variable} ${spaceMono.variable} ${jetbrains.variable}`}
     >
+      <head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+      </head>
       <body className={spaceMono.className}>
         <Web3Provider>
           <div className="flex flex-col min-h-screen relative">

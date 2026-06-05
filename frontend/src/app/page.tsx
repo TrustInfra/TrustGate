@@ -527,10 +527,10 @@ export default function HomePage() {
             style={{ animationDelay: "0.1s" }}
           >
             <span className="block text-text text-4xl sm:text-5xl md:text-6xl lg:text-7xl">
-              The Trust Layer
+              TrustGate
             </span>
             <span className="block text-accent text-4xl sm:text-5xl md:text-6xl lg:text-7xl mt-1">
-              for Web3
+              The Trust Layer for Web3
             </span>
           </h1>
 
