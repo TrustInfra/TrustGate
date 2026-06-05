@@ -266,17 +266,17 @@ function StatsBar({
     return [
       {
         label: "Oracle Queries",
-        value: stats ? numberFmt.format(stats.totalQueries) : "—",
+        value: stats ? numberFmt.format(stats.totalQueries) : "...",
         accent: false,
       },
       {
         label: "Avg Trust Score",
-        value: stats ? stats.averageScore.toFixed(1) : "—",
+        value: stats ? stats.averageScore.toFixed(1) : "...",
         accent: false,
       },
       {
         label: "USDC Earned",
-        value: stats ? formatUsdcEarned(stats.totalUsdcEarned) : "—",
+        value: stats ? formatUsdcEarned(stats.totalUsdcEarned) : "...",
         accent: true,
       },
     ];
@@ -286,7 +286,7 @@ function StatsBar({
     return [
       {
         label: "Transactions",
-        value: txStats ? numberFmt.format(txStats.total_transactions) : "—",
+        value: txStats ? numberFmt.format(txStats.total_transactions) : "...",
         accent: false,
       },
       {
@@ -294,7 +294,7 @@ function StatsBar({
         value:
           txStats && txStats.unique_callers !== null
             ? numberFmt.format(txStats.unique_callers)
-            : "—",
+            : "...",
         accent: false,
       },
     ];
@@ -539,8 +539,8 @@ export default function HomePage() {
             style={{ animationDelay: "0.25s" }}
           >
             TrustGate is behavioral state infrastructure for onchain systems.
-            Score any wallet, token, or contract by what it has actually done
-            — not who it claims to be.
+            Score any wallet, token, or contract by what it has actually done,
+            not who it claims to be.
           </p>
 
           <div
@@ -594,7 +594,7 @@ export default function HomePage() {
             <FeatureCard
               icon={ShieldCheck}
               title="Wallet Oracle"
-              body="Query any Arc wallet. Get a trust score built from real onchain history — deployments, activity, age, and behavior."
+              body="Query any Arc wallet. Get a trust score built from real onchain history: deployments, activity, age, and behavior."
               href="/oracle"
               linkLabel="Query a wallet"
               delay={0.1}
@@ -619,7 +619,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* PAYMENT ROUTING — FOR AI AGENTS */}
+      {/* PAYMENT ROUTING: FOR AI AGENTS */}
       <section className="py-24 px-4 sm:px-6 lg:px-8 border-t border-border">
         <div className="max-w-5xl mx-auto">
           <div className="text-center mb-14">
@@ -704,7 +704,7 @@ export default function HomePage() {
             <StepCard
               number="04"
               title="Claim"
-              description="Agents claim USDC -- routed instantly, delayed, or escrowed by tier"
+              description="Agents claim USDC: routed instantly, delayed, or escrowed by tier"
               icon={Wallet}
             />
           </div>
