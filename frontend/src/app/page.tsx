@@ -632,7 +632,7 @@ export default function HomePage() {
               Trust-Gated Payment Flows
             </h2>
             <p className="mt-3 text-sm text-text-muted max-w-lg mx-auto">
-              EigenTrust-derived scores classify agents into tiers. Each tier
+              Behavioral trust scores classify agents into tiers. Each tier
               determines how USDC reaches the agent.
             </p>
           </div>

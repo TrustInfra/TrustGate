@@ -552,8 +552,8 @@ def get_trust_score(address: str) -> dict:
           cross-chain composite scoring
         </li>
         <li>
-          Trust Graph — EigenTrust-style network analysis, Sybil
-          resistance, coordinated cluster detection
+          Trust Graph — network analysis, Sybil resistance, coordinated
+          cluster detection
         </li>
       </ul>
     </DocShell>

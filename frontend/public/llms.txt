@@ -8,11 +8,11 @@
 - [Live agent activity -- real-time feed of agent claims and payment routing](https://trustgated.xyz/agents/live)
 - [Depositor dashboard -- fund TrustGate with USDC, set per-agent allowances, and monitor claims](https://trustgated.xyz/dashboard)
 - [Interactive demo -- walk through a trust-gated payment flow end to end](https://trustgated.xyz/demo)
-- [Trust oracle -- query EigenTrust-derived scores for any wallet or agent address](https://trustgated.xyz/oracle)
+- [Trust oracle -- query behavioral trust scores for any wallet or agent address](https://trustgated.xyz/oracle)
 - [Token Shield -- score any token or contract for deployer credibility and holder authenticity](https://trustgated.xyz/token-shield)
 - [Documentation index -- protocol overview, integration guides, and API reference](https://trustgated.xyz/docs)
 - [How TrustGate works -- register, deposit, score, claim flow explained](https://trustgated.xyz/docs/how-it-works)
-- [Trust scoring model -- wallet and token scoring via EigenTrust on Intuition data](https://trustgated.xyz/docs/trust-scoring)
+- [Trust scoring model -- wallet and token scoring via formula-based analysis of direct on-chain behavioral signals](https://trustgated.xyz/docs/trust-scoring)
 - [Trust tiers -- HIGH (75-100) instant, MEDIUM (40-74) 24h lock, LOW (0-39) escrow](https://trustgated.xyz/docs/trust-tiers)
 - [Payment flow -- USDC routing logic from deposit to agent claim by trust tier](https://trustgated.xyz/docs/payment-flow)
 - [Agent registration guide -- permissionlessly register an AI agent on AgentRegistry](https://trustgated.xyz/docs/agent-registration)
@@ -34,4 +34,4 @@
 ## Notes
 
 - Built by Ludarep
-- Last generated: 2026-05-21
+- Last generated: 2026-06-12
