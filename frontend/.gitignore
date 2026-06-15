@@ -2,3 +2,5 @@
 
 # Throwaway key-rotation helper. Reads .env.local. Never commit.
 derive-address.mjs
+.env
+.env.local

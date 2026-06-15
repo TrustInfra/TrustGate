@@ -20,6 +20,7 @@ const MORE_LINKS: NavLink[] = [
   { href: "/docs", label: "Docs" },
   { href: "/dashboard", label: "Dashboard" },
   { href: "/demo", label: "Demo" },
+  { href: "/discovery", label: "Discovery" },
   { href: "/agents/live", label: "Live Agents" },
   { href: "/roadmap", label: "Roadmap" },
   { href: "/docs/widget-integration", label: "Widget" },
