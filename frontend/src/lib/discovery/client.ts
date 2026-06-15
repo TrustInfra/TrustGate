@@ -1,6 +1,6 @@
 import type { BatchScore } from "./types";
 import { mockScoreBatch } from "./mock";
-import { isVerifiedIssuer } from "@/lib/contract-scoring";
+import { isVerifiedIssuer } from "./verified-issuers";
 
 // ============================================================================
 // scoreBatch is the ONLY thing the rest of the frontend calls. Badges, flags,
@@ -37,9 +37,9 @@ async function fetchScoreBatch(addresses: string[]): Promise<BatchScore[]> {
 }
 
 // VERIFIED overlay for Circle-issued tokens. These short-circuit to VERIFIED
-// on the frontend exactly like the single-token path. We reuse that path's
-// allowlist check (isVerifiedIssuer) so the Circle addresses live in one place,
-// contract-scoring.ts, and are never duplicated here.
+// on the frontend exactly like the single-token path. The check lives in a
+// client-safe module (verified-issuers.ts) because contract-scoring.ts is
+// server-only and cannot be imported into this client code.
 function applyVerifiedOverlay(results: BatchScore[]): BatchScore[] {
   return results.map((r) =>
     isVerifiedIssuer(r.address) ? { ...r, tier: "VERIFIED", flags: [] } : r
