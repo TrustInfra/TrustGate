@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Barlow_Condensed, Space_Mono, JetBrains_Mono } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 import { Web3Provider } from "@/providers/Web3Provider";
 import Navbar from "@/components/layout/Navbar";
@@ -141,6 +142,12 @@ export default function RootLayout({
             <Footer />
           </div>
         </Web3Provider>
+        <Script
+          defer
+          src="https://cloud.umami.is/script.js"
+          data-website-id="9637b3a5-153e-404c-8d78-e850d08b1fae"
+          strategy="afterInteractive"
+        />
       </body>
     </html>
   );
