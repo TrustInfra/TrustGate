@@ -56,6 +56,22 @@ export default function Footer() {
             >
               Discord
             </a>
+            <a
+              href="https://sui.trustgated.xyz"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-text-muted hover:text-text transition-colors"
+            >
+              TrustGate Sui
+            </a>
+            <a
+              href="https://youtube.com/@TrustGated"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-text-muted hover:text-text transition-colors"
+            >
+              YouTube
+            </a>
           </div>
         </div>
       </div>
