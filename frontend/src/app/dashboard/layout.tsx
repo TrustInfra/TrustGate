@@ -13,7 +13,7 @@ export const metadata: Metadata = {
     description:
       "Manage your TrustGate account -- view trust scores, configure agent allowances, monitor payment activity, and gate access using on-chain reputation.",
     type: "website",
-    url: "https://trustgated.xyz/dashboard",
+    url: "https://www.trustgated.xyz/dashboard",
   },
 };
 

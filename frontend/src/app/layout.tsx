@@ -84,7 +84,11 @@ const jsonLd = {
         "@type": "ImageObject",
         url: `${SITE_URL}/favicon.png`,
       },
-      sameAs: ["https://x.com/Ludarep", "https://github.com/rudazy"],
+      sameAs: [
+        "https://x.com/TrustGated",
+        "https://discord.gg/kbx9RAGCmx",
+        "https://github.com/rudazy",
+      ],
     },
     {
       "@type": "WebSite",

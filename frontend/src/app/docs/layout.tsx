@@ -11,7 +11,7 @@ export const metadata: Metadata = {
     description:
       "Developer documentation for TrustGate -- integrate trust scoring, query the oracle, register agents, and gate access using on-chain reputation. REST, widgets, and contract references.",
     type: "website",
-    url: "https://trustgated.xyz/docs",
+    url: "https://www.trustgated.xyz/docs",
   },
 };
 
