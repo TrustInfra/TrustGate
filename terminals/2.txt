@@ -1,0 +1,14 @@
+---
+pid: 15968
+cwd: "C:\Users\RIKI\TrustGate"
+command: "Set-Location C:\\Users\\RIKI\\TrustGate\\frontend; npm run dev"
+started_at: 2026-06-16T13:51:12.189Z
+running_for_ms: 1364986  
+---
+npm : File C:\Program Files\nodejs\npm.ps1 cannot be loaded because running scripts is disabled on this system. For 
+more information, see about_Execution_Policies at https:/go.microsoft.com/fwlink/?LinkID=135170.
+At line:1 char:48
++ Set-Location C:\Users\RIKI\TrustGate\frontend; npm run dev
++                                                ~~~
+    + CategoryInfo          : SecurityError: (:) [], PSSecurityException
+    + FullyQualifiedErrorId : UnauthorizedAccess

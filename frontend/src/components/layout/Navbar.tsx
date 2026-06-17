@@ -8,7 +8,7 @@ import { ChevronDown, Menu, X } from "lucide-react";
 import { ConnectKitButton } from "connectkit";
 import { cn } from "@/lib/utils";
 
-type NavLink = { href: string; label: string };
+type NavLink = { href: string; label: string; external?: boolean };
 
 const PRIMARY_LINKS: NavLink[] = [
   { href: "/", label: "Home" },
@@ -17,7 +17,7 @@ const PRIMARY_LINKS: NavLink[] = [
 ];
 
 const MORE_LINKS: NavLink[] = [
-  { href: "/docs", label: "Docs" },
+  { href: "https://docs.trustgated.xyz", label: "Docs", external: true },
   { href: "/dashboard", label: "Dashboard" },
   { href: "/demo", label: "Demo" },
   { href: "/discovery", label: "Discovery" },
@@ -158,18 +158,34 @@ export default function Navbar() {
                 >
                   {MORE_LINKS.map((link) => {
                     const isActive = isActiveLink(link.href, pathname);
+                    const itemClass = cn(
+                      "block mx-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                      isActive
+                        ? "text-text bg-bg-hover"
+                        : "text-text-muted hover:text-text-secondary hover:bg-bg-hover"
+                    );
+                    if (link.external) {
+                      return (
+                        <a
+                          key={link.href}
+                          href={link.href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          role="menuitem"
+                          onClick={() => setMoreOpen(false)}
+                          className={itemClass}
+                        >
+                          {link.label}
+                        </a>
+                      );
+                    }
                     return (
                       <Link
                         key={link.href}
                         href={link.href}
                         role="menuitem"
                         onClick={() => setMoreOpen(false)}
-                        className={cn(
-                          "block mx-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
-                          isActive
-                            ? "text-text bg-bg-hover"
-                            : "text-text-muted hover:text-text-secondary hover:bg-bg-hover"
-                        )}
+                        className={itemClass}
                       >
                         {link.label}
                       </Link>
@@ -200,17 +216,32 @@ export default function Navbar() {
           <div className="md:hidden pb-4 border-t border-border mt-2 pt-4 space-y-1 animate-slide-down">
             {ALL_LINKS.map((link) => {
               const isActive = isActiveLink(link.href, pathname);
+              const itemClass = cn(
+                "block px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
+                isActive
+                  ? "text-text bg-bg-surface"
+                  : "text-text-muted hover:text-text-secondary hover:bg-bg-hover"
+              );
+              if (link.external) {
+                return (
+                  <a
+                    key={link.href}
+                    href={link.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => setMenuOpen(false)}
+                    className={itemClass}
+                  >
+                    {link.label}
+                  </a>
+                );
+              }
               return (
                 <Link
                   key={link.href}
                   href={link.href}
                   onClick={() => setMenuOpen(false)}
-                  className={cn(
-                    "block px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
-                    isActive
-                      ? "text-text bg-bg-surface"
-                      : "text-text-muted hover:text-text-secondary hover:bg-bg-hover"
-                  )}
+                  className={itemClass}
                 >
                   {link.label}
                 </Link>

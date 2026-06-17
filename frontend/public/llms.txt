@@ -4,27 +4,27 @@
 
 ## Pages
 
-- [Homepage -- product overview, trust-gated payment tiers, and live transaction stats](https://trustgated.xyz/)
-- [Live agent activity -- real-time feed of agent claims and payment routing](https://trustgated.xyz/agents/live)
-- [Depositor dashboard -- fund TrustGate with USDC, set per-agent allowances, and monitor claims](https://trustgated.xyz/dashboard)
-- [Interactive demo -- walk through a trust-gated payment flow end to end](https://trustgated.xyz/demo)
-- [Trust oracle -- query behavioral trust scores for any wallet or agent address](https://trustgated.xyz/oracle)
-- [Token Shield -- score any token or contract for deployer credibility and holder authenticity](https://trustgated.xyz/token-shield)
-- [Documentation index -- protocol overview, integration guides, and API reference](https://trustgated.xyz/docs)
-- [How TrustGate works -- register, deposit, score, claim flow explained](https://trustgated.xyz/docs/how-it-works)
-- [Trust scoring model -- wallet and token scoring via formula-based analysis of direct on-chain behavioral signals](https://trustgated.xyz/docs/trust-scoring)
-- [Trust tiers -- HIGH (75-100) instant, MEDIUM (40-74) 24h lock, LOW (0-39) escrow](https://trustgated.xyz/docs/trust-tiers)
-- [Payment flow -- USDC routing logic from deposit to agent claim by trust tier](https://trustgated.xyz/docs/payment-flow)
-- [Agent registration guide -- permissionlessly register an AI agent on AgentRegistry](https://trustgated.xyz/docs/agent-registration)
-- [Agent loop guide -- run the autonomous TypeScript agent that claims and uses USDC](https://trustgated.xyz/docs/agent-loop)
-- [Dashboard guide -- depositor walkthrough for funding, allowances, and approvals](https://trustgated.xyz/docs/dashboard-guide)
-- [DEX widget integration -- one script tag adds trust badges to any DEX token input](https://trustgated.xyz/docs/widget-integration)
-- [Integration overview -- options for wallets, dApps, and DEXes to consume trust scores](https://trustgated.xyz/docs/integration)
-- [REST API reference -- endpoints for trust scores, oracle queries, and widget data](https://trustgated.xyz/docs/api-reference)
-- [Smart contract reference -- AgentRegistry, TrustGate, and oracle contract addresses and ABIs](https://trustgated.xyz/docs/contracts)
-- [Oracle docs -- how trust scores are computed, signed, and published on-chain](https://trustgated.xyz/docs/oracle)
-- [Margin analysis -- economic model and risk parameters for trust tiers](https://trustgated.xyz/docs/margin-analysis)
-- [Local setup -- clone, install, and run TrustGate against Arc testnet](https://trustgated.xyz/docs/local-setup)
+- [Homepage -- product overview, trust-gated payment tiers, and live transaction stats](https://www.trustgated.xyz/)
+- [Live agent activity -- real-time feed of agent claims and payment routing](https://www.trustgated.xyz/agents/live)
+- [Depositor dashboard -- fund TrustGate with USDC, set per-agent allowances, and monitor claims](https://www.trustgated.xyz/dashboard)
+- [Interactive demo -- walk through a trust-gated payment flow end to end](https://www.trustgated.xyz/demo)
+- [Trust oracle -- query behavioral trust scores for any wallet or agent address](https://www.trustgated.xyz/oracle)
+- [Token Shield -- score any token or contract for deployer credibility and holder authenticity](https://www.trustgated.xyz/token-shield)
+- [Documentation index -- protocol overview, integration guides, and API reference](https://www.trustgated.xyz/docs)
+- [How TrustGate works -- register, deposit, score, claim flow explained](https://www.trustgated.xyz/docs/how-it-works)
+- [Trust scoring model -- wallet and token scoring via formula-based analysis of direct on-chain behavioral signals](https://www.trustgated.xyz/docs/trust-scoring)
+- [Trust tiers -- HIGH (75-100) instant, MEDIUM (40-74) 24h lock, LOW (0-39) escrow](https://www.trustgated.xyz/docs/trust-tiers)
+- [Payment flow -- USDC routing logic from deposit to agent claim by trust tier](https://www.trustgated.xyz/docs/payment-flow)
+- [Agent registration guide -- permissionlessly register an AI agent on AgentRegistry](https://www.trustgated.xyz/docs/agent-registration)
+- [Agent loop guide -- run the autonomous TypeScript agent that claims and uses USDC](https://www.trustgated.xyz/docs/agent-loop)
+- [Dashboard guide -- depositor walkthrough for funding, allowances, and approvals](https://www.trustgated.xyz/docs/dashboard-guide)
+- [DEX widget integration -- one script tag adds trust badges to any DEX token input](https://www.trustgated.xyz/docs/widget-integration)
+- [Integration overview -- options for wallets, dApps, and DEXes to consume trust scores](https://www.trustgated.xyz/docs/integration)
+- [REST API reference -- endpoints for trust scores, oracle queries, and widget data](https://www.trustgated.xyz/docs/api-reference)
+- [Smart contract reference -- AgentRegistry, TrustGate, and oracle contract addresses and ABIs](https://www.trustgated.xyz/docs/contracts)
+- [Oracle docs -- how trust scores are computed, signed, and published on-chain](https://www.trustgated.xyz/docs/oracle)
+- [Margin analysis -- economic model and risk parameters for trust tiers](https://www.trustgated.xyz/docs/margin-analysis)
+- [Local setup -- clone, install, and run TrustGate against Arc testnet](https://www.trustgated.xyz/docs/local-setup)
 
 ## Links
 
@@ -34,4 +34,4 @@
 ## Notes
 
 - Built by Ludarep
-- Last generated: 2026-06-12
+- Last generated: 2026-06-16

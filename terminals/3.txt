@@ -1,0 +1,56 @@
+---
+pid: 20452
+cwd: "C:\Users\RIKI\TrustGate"
+command: "Set-Location C:\\Users\\RIKI\\TrustGate\\frontend; npm.cmd run dev"
+started_at: 2026-06-16T13:52:57.537Z
+running_for_ms: 1260008  
+---
+
+> trustgate-frontend@0.1.0 dev
+> next dev
+
+  ▲ Next.js 14.2.35
+  - Local:        http://localhost:3000
+  - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 8s
+ ○ Compiling /src/middleware ...
+ ✓ Compiled /src/middleware in 618ms (72 modules)
+ ○ Compiling /docs/widget-integration ...
+ ✓ Compiled /docs/widget-integration in 96.3s (11634 modules)
+ GET /oracle 200 in 98605ms
+ GET /token-shield 200 in 98633ms
+ GET /docs/widget-integration 200 in 98743ms
+ ✓ Compiled in 6.1s (5344 modules)
+ ○ Compiling /sitemap.xml ...
+ ✓ Compiled /sitemap.xml in 2.4s (60 modules)
+ GET /sitemap.xml 200 in 3554ms
+ ○ Compiling / ...
+ ✓ Compiled / in 13.2s (11611 modules)
+ GET / 200 in 14809ms
+ ○ Compiling /docs/widget-integration ...
+ ✓ Compiled /docs/widget-integration in 2.7s (6292 modules)
+ GET /docs/widget-integration 200 in 3906ms
+ ○ Compiling /_not-found ...
+ ✓ Compiled /_not-found in 12.4s (11638 modules)
+ GET /_next/static/css/app/layout.css?v=1781619151163 404 in 13235ms
+ GET /_next/static/chunks/app/docs/widget-integration/page.js 404 in 12632ms
+ GET /_next/static/chunks/app-pages-internals.js 404 in 12826ms
+ GET /_next/static/chunks/main-app.js?v=1781619151163 404 in 12839ms
+ GET /_next/static/chunks/app/layout.js 404 in 11602ms
+ GET /_next/static/chunks/app/docs/layout.js 404 in 12185ms
+ GET /docs/widget-integration 200 in 103ms
+ GET /_next/static/css/app/layout.css?v=1781619171211 404 in 205ms
+ GET /_next/static/chunks/app/docs/layout.js 404 in 331ms
+ GET /_next/static/chunks/app/docs/widget-integration/page.js 404 in 336ms
+ GET /_next/static/chunks/main-app.js?v=1781619171211 404 in 355ms
+ GET /_next/static/chunks/app-pages-internals.js 404 in 377ms
+ GET /_next/static/chunks/app/layout.js 404 in 379ms
+ GET /docs/widget-integration 200 in 1130ms
+ GET /_next/static/css/app/layout.css?v=1781619207606 404 in 230ms
+ GET /_next/static/chunks/main-app.js?v=1781619207606 404 in 566ms
+ GET /_next/static/chunks/app-pages-internals.js 404 in 552ms
+ GET /_next/static/chunks/app/docs/widget-integration/page.js 404 in 550ms
+ GET /_next/static/chunks/app/docs/layout.js 404 in 551ms
+ GET /_next/static/chunks/app/layout.js 404 in 558ms

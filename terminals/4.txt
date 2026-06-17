@@ -1,0 +1,12 @@
+---
+pid: 13272
+cwd: "C:\Users\RIKI\TrustGate"
+command: "$html = (curl.exe -s http://localhost:3000/docs/widget-integration); Write-Host \"=== WIDGET ===\"; Write-Host \"TITLE:\" ([regex]::Match($html, '<title>([^<]*)</title>').Groups[1].Value); Write-Host \"DESC:\" ([regex]::Match($html, 'meta name=\"description\" content=\"([^\"]*)\"').Groups[1].Value); Write-Host \"CANONICAL:\" ([regex]::Match($html, 'link rel=\"canonical\" href=\"([^\"]*)\"').Groups[1].Value); Write-Host \"OG_URL:\" ([regex]::Match($html, 'property=\"og:url\" content=\"([^\"]*)\"').Groups[1].Value)"
+started_at: 2026-06-16T13:53:09.356Z
+running_for_ms: 1189987  
+---
+=== WIDGET ===
+TITLE: TrustGate DEX Widget | Embed Onchain Trust Scoring in Inputs
+DESC: One script tag to add live wallet and token trust signals to any input field. No SDK, no API key. Works on Arc testnet and beyond.
+CANONICAL: https://www.trustgated.xyz/docs/widget-integration
+OG_URL: https://www.trustgated.xyz/docs/widget-integration

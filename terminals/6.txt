@@ -1,0 +1,11 @@
+---
+pid: 4944
+cwd: "C:\Users\RIKI\TrustGate"
+command: "$html = (curl.exe -s http://localhost:3000/token-shield); Write-Host \"=== TOKEN SHIELD ===\"; Write-Host \"TITLE:\" ([regex]::Match($html, '<title>([^<]*)</title>').Groups[1].Value); Write-Host \"CANONICAL:\" ([regex]::Match($html, 'link rel=\"canonical\" href=\"([^\"]*)\"').Groups[1].Value); Write-Host \"OG_URL:\" ([regex]::Match($html, 'property=\"og:url\" content=\"([^\"]*)\"').Groups[1].Value)"
+started_at: 2026-06-16T13:53:09.356Z
+running_for_ms: 1190004  
+---
+=== TOKEN SHIELD ===
+TITLE: Token Shield | TrustGate
+CANONICAL: https://www.trustgated.xyz/token-shield
+OG_URL: https://www.trustgated.xyz/token-shield

@@ -1,0 +1,18 @@
+---
+pid: 1656
+cwd: "C:\Users\RIKI\TrustGate\frontend"
+command: "npm run dev"
+started_at: 2026-06-16T13:49:55.918Z
+running_for_ms: 1440013  
+---
+At line:1 char:43
++ (cd "C:\\Users\\RIKI\\TrustGate\\frontend" ; npm run dev)
++                                           ~
+Missing closing ')' in expression.
+At line:1 char:57
++ (cd "C:\\Users\\RIKI\\TrustGate\\frontend" ; npm run dev)
++                                                         ~
+Unexpected token ')' in expression or statement.
+    + CategoryInfo          : ParserError: (:) [], ParentContainsErrorRecordException
+    + FullyQualifiedErrorId : MissingEndParenthesisInExpression
+ 
