@@ -1,41 +1,25 @@
-# Combined Update Task
+# TrustGate — Session Log
 
-## Do all steps in order. No git commit or push. TypeScript strict. No emojis in code.
-
----
-
-## STEP 1 — Update frontend/src/components/layout/Footer.tsx
-
-Read the file first. Then:
-
-1. Find the X/Twitter social link and update href to:
-   https://x.com/TrustGated
-
-2. Find the tagline text that reads 
-   "Trust-gated USDC for AI agents" 
-   and change it to:
-   "The trust layer for Web3"
-
-3. Add a Discord link next to the existing social links:
-   href: https://discord.gg/kbx9RAGCmx
-   Label or icon: Discord
+**Last updated:** June 27, 2026
 
 ---
 
-## STEP 2 — Update README.md in the root of the project
+## Shipped
 
-Read the file first. Then make these targeted changes only:
+- Homepage hero: two-column layout, `HeroVisual` with brand logo, HUD frame
+- Stat bar: 3 primary metrics + compact Transactions / Unique Wallets row underneath
+- Trust model v1 docs: trust vs reputation vs risk, agent definition, philosophy line
+- API: `scoringVersion` + `limitations` on wallet oracle responses
+- OG image regenerated from `logo.png`; cache-bust `?v=2` in layout metadata
+- `frontend/scripts/generate-og-image.mjs` for future OG refreshes
 
-1. In the Links section, update or add these lines:
-   - X — x.com/TrustGated
-   - Discord — discord.gg/kbx9RAGCmx
+## Next
 
-2. Remove any YouTube video embed, badge, or link 
-   anywhere in the file completely.
+1. Deploy to Vercel — OG image + hero visual go live after push
+2. Re-share `trustgated.xyz` in Discord to refresh cached preview
+3. Optional v1.1: `scoreStability`, direction drivers, trust snapshots (needs score history store)
 
-3. Add a last updated date line at the very bottom 
-   just above the MIT License line:
+## Notes
 
-   Last updated: May 2026
-
----
+- `frontend/.env.local` is gitignored — scoring secrets stay local / Vercel dashboard only
+- `mcps/` and `terminals/` are gitignored (harness noise, not project code)

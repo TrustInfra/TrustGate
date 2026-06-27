@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { rescoreWallet } from "@/lib/wallet-rescore";
+import { SCORING_VERSION } from "@/lib/scoring-version";
 import { isContractAddress } from "@/lib/contract-detect";
 
 export const dynamic = "force-dynamic";
@@ -157,6 +158,10 @@ async function proxy(
           score: rescored.score,
           tier: rescored.tier,
           recommendation: rescored.recommendation,
+          scoringVersion: SCORING_VERSION,
+          ...(rescored.limitations.length > 0
+            ? { limitations: rescored.limitations }
+            : {}),
         };
         const newBody = JSON.stringify(merged);
         const newHeaders = new Headers(headers);

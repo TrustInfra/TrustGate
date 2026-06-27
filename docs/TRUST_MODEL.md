@@ -2,7 +2,25 @@
 
 ## Overview
 
-TrustGate adapts the **EigenTrust** distributed reputation algorithm for trust-gated AI agent payments. Trust scores quantify an agent's reliability and directly determine how USDC payments are routed — instantly, with a time delay, or through depositor-approved escrow.
+> TrustGate doesn't decide who can interact. It gives every application the information needed to make better trust decisions based on observed behavior rather than identity or reputation alone.
+
+TrustGate adapts the **EigenTrust** distributed trust propagation algorithm for trust-gated AI agent payments. Trust scores quantify an agent's current behavioral reliability and directly determine how USDC payments are routed — instantly, with a time delay, or through depositor-approved escrow.
+
+### Trust, Reputation, and Risk
+
+These are three separate signals. Do not conflate them.
+
+| Signal | Question | Behavior |
+|--------|----------|----------|
+| **Trust** | Should I interact with this entity *right now*? | Reacts immediately to recent onchain activity |
+| **Reputation** | What has this entity done over months or years? | Compounds slowly; decays slowly |
+| **Risk** | What is the exposure if this interaction goes wrong? | Independent of trust — high trust does not imply low risk |
+
+A protocol with years of good history that gets compromised keeps high **reputation** but should drop to low **trust** immediately. A brand-new protocol has high **risk** and unknown **trust**, not low trust by default.
+
+### Agent Definition
+
+An **agent** is any autonomous or semi-autonomous on-chain actor capable of initiating transactions, making decisions, or interacting with smart contracts on behalf of a user or protocol. v1 scores agents via their registered wallet address. Future versions will introduce **agent identity** — one logical agent mapped to multiple wallets, chains, and execution environments.
 
 ## EigenTrust Adaptation
 

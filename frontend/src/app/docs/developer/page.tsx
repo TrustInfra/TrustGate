@@ -60,7 +60,7 @@ export default function DeveloperPage() {
     <DocShell
       eyebrow="Developer"
       title="TrustGate Developer Documentation"
-      lede="TrustGate is behavioral state infrastructure for onchain systems. Query any address and receive a behavioral trust score, tier, confidence level, and coordination flags."
+      lede="TrustGate doesn't decide who can interact. It gives every application the information needed to make better trust decisions based on observed behavior rather than identity or reputation alone."
     >
       <pre><code>{`curl https://api.trustgated.xyz/oracle/wallet/0xYourAddressHere`}</code></pre>
 
@@ -86,7 +86,36 @@ DEX  /  Lending  /  DAO  /  Wallet UI  /  AI Agent`}</code></pre>
 
       <h2>2. Core Concepts</h2>
       <p>
-        <strong>Wallet Score</strong> — A 0 to 100 behavioral score
+        <strong>Trust</strong> — The real-time decision signal. Should you
+        interact with this entity right now? Trust reacts immediately to
+        recent behavior. A compromised protocol can have years of good
+        history but collapse to LOW trust the moment exploit-linked
+        activity appears.
+      </p>
+      <p>
+        <strong>Reputation</strong> — The long-term historical record.
+        What has this entity done over months or years? Reputation
+        compounds slowly and decays slowly. Trust and reputation are
+        related but not identical — great reputation with low current
+        trust is a valid and important state.
+      </p>
+      <p>
+        <strong>Risk</strong> — Exposure to loss from a specific action
+        or context. Risk is not the inverse of trust. A brand-new
+        protocol has high risk and unknown trust. A trusted trading bot
+        using volatile leverage has high risk and high trust. Your
+        integration should evaluate both signals independently.
+      </p>
+      <p>
+        <strong>Agent</strong> — Any autonomous or semi-autonomous
+        on-chain actor capable of initiating transactions, making
+        decisions, or interacting with smart contracts on behalf of a
+        user or protocol. Today, agents are typically scored via their
+        primary wallet. Future versions will score at the agent-identity
+        level across multiple wallets and chains.
+      </p>
+      <p>
+        <strong>Wallet Score</strong> — A 0 to 100 behavioral trust score
         derived from a wallet&apos;s full onchain history. Deployments,
         transaction history, contract interactions, wallet age, USDC
         activity, and behavioral anomaly detection.
@@ -130,15 +159,20 @@ DEX  /  Lending  /  DAO  /  Wallet UI  /  AI Agent`}</code></pre>
   https://api.trustgated.xyz/oracle/wallet/0xYourAddress`}</code></pre>
       <p>Response:</p>
       <pre><code>{`{
-  "score": 82,
-  "tier": "HIGH_ELITE",
+  "score": 72,
+  "tier": "HIGH",
   "confidence": 94,
-  "recommendation": "INSTANT_PRIORITY",
+  "recommendation": "INSTANT",
+  "scoringVersion": "v1.0",
   "flags": [],
   "summary": [
     "Consistent activity across 11 months",
     "12 verified contract deployments",
     "No coordinated behavior detected"
+  ],
+  "limitations": [
+    "Limited deployment history",
+    "Deployments lack independent usage"
   ]
 }`}</code></pre>
 
@@ -172,6 +206,12 @@ DEX  /  Lending  /  DAO  /  Wallet UI  /  AI Agent`}</code></pre>
             />
             <ScoreRow
               cells={["summary", "array", "Human-readable behavioral observations"]}
+            />
+            <ScoreRow
+              cells={["scoringVersion", "string", "Scoring model version (e.g. v1.0). Compare across time when scores shift."]}
+            />
+            <ScoreRow
+              cells={["limitations", "array", "Why the score is not in the next tier up. Omitted when no cap applies."]}
             />
           </tbody>
         </table>
@@ -460,10 +500,10 @@ def get_trust_score(address: str) -> dict:
         release conditions.
       </p>
       <p>
-        <strong>Stablecoin Risk Management.</strong> Check trust tier of
-        wallets interacting with stablecoin pools. Use confidence scores
-        to weight risk decisions — the same tier at low confidence is
-        treated differently than the same tier at high confidence.
+        <strong>Stablecoin Risk Management.</strong> Evaluate trust tier
+        and risk exposure independently for wallets interacting with
+        stablecoin pools. Use confidence to weight how much to rely on
+        the trust signal. High trust does not imply low risk.
       </p>
 
       <h2>8. Pricing and Limits</h2>
@@ -504,15 +544,25 @@ def get_trust_score(address: str) -> dict:
 
       <h2>9. Security and Philosophy</h2>
       <blockquote>
-        <p>TrustGate analyzes behavioral reputation, not identity.</p>
+        <p>
+          TrustGate doesn&apos;t decide who can interact. It gives every
+          application the information needed to make better trust decisions
+          based on observed behavior rather than identity or reputation
+          alone.
+        </p>
       </blockquote>
       <p>
-        TrustGate models behavioral reputation, not personal identity. It
+        TrustGate models behavioral trust, not personal identity. It
         cannot tell you who owns a wallet. It can tell you what that wallet
         has done, how its behavior has changed over time, and whether its
         patterns signal risk. This distinction matters legally and
-        operationally — behavioral reputation infrastructure is a
+        operationally — behavioral trust infrastructure is a
         fundamentally different category from identity systems.
+      </p>
+      <p>
+        Good infrastructure changes behavior. Integrators gate access;
+        participants improve their onchain conduct because persistent
+        negative patterns degrade trust over time.
       </p>
       <p>
         TrustGate scores reflect immutable onchain history.
@@ -522,7 +572,8 @@ def get_trust_score(address: str) -> dict:
       <p>
         Score hardening: exact formula weights, thresholds, and scoring
         mechanics are not published. Public responses return tier,
-        score, confidence, flags, and summary only. This prevents
+        score, confidence, flags, summary, scoringVersion, and
+        limitations only. This prevents
         adversaries from reverse-engineering an optimization path.
         Developers integrating TrustGate consume the signal — they do
         not need to reproduce the calculation.
@@ -554,6 +605,14 @@ def get_trust_score(address: str) -> dict:
         <li>
           Trust Graph — network analysis, Sybil resistance, coordinated
           cluster detection
+        </li>
+        <li>
+          Trust Intelligence — score stability, direction drivers, and
+          point-in-time trust snapshots for audit trails
+        </li>
+        <li>
+          Agent Identity — score agents across multiple wallets, chains,
+          and execution environments rather than a single address
         </li>
       </ul>
     </DocShell>

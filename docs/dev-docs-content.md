@@ -168,8 +168,7 @@ PAGE CONTENT:
 
 # TrustGate Developer Documentation
 
-> TrustGate is a behavioral trust oracle for wallets and contracts on Arc.
-> Query any address and receive a trust score, tier, confidence level, and behavioral flags.
+> TrustGate doesn't decide who can interact. It gives every application the information needed to make better trust decisions based on observed behavior rather than identity or reputation alone.
 
 ```bash
 curl https://api.trustgated.xyz/oracle/wallet/0xYourAddressHere
@@ -211,7 +210,15 @@ Token Shield queries for non-ERC-20 contracts are free.
 
 ## 2. Core Concepts
 
-**Wallet Score** — A 0 to 100 behavioral score derived from a wallet's full onchain history. Deployments, transaction history, contract interactions, wallet age, USDC activity, and behavioral anomaly detection.
+**Trust** — The real-time decision signal. Should you interact with this entity right now? Trust reacts immediately to recent behavior.
+
+**Reputation** — The long-term historical record. What has this entity done over months or years? Trust and reputation are related but not identical.
+
+**Risk** — Exposure to loss from a specific action or context. Risk is not the inverse of trust. Evaluate both signals independently.
+
+**Agent** — Any autonomous or semi-autonomous on-chain actor capable of initiating transactions, making decisions, or interacting with smart contracts on behalf of a user or protocol. Today scored via primary wallet; future versions score at agent-identity level.
+
+**Wallet Score** — A 0 to 100 behavioral trust score derived from a wallet's full onchain history. Deployments, transaction history, contract interactions, wallet age, USDC activity, and behavioral anomaly detection.
 
 **Contract Score** — A 0 to 100 score for smart contracts. Auto-detects ERC-20 or non-ERC-20 and applies the correct scoring model.
 
@@ -238,15 +245,20 @@ curl -H "X-Payment: <x402_payment_header>" \
 Response:
 ```json
 {
-  "score": 82,
-  "tier": "HIGH_ELITE",
+  "score": 72,
+  "tier": "HIGH",
   "confidence": 94,
-  "recommendation": "INSTANT_PRIORITY",
+  "recommendation": "INSTANT",
+  "scoringVersion": "v1.0",
   "flags": [],
   "summary": [
     "Consistent activity across 11 months",
     "12 verified contract deployments",
     "No coordinated behavior detected"
+  ],
+  "limitations": [
+    "Limited deployment history",
+    "Deployments lack independent usage"
   ]
 }
 ```
@@ -259,6 +271,8 @@ Response:
 | recommendation | string | BLOCKED / TIME_LOCKED / INSTANT / INSTANT_PRIORITY |
 | flags | array | Active behavioral flags, empty array if none |
 | summary | array | Human-readable behavioral observations |
+| scoringVersion | string | Scoring model version (e.g. v1.0) |
+| limitations | array | Why the score is not in the next tier up. Omitted when no cap applies. |
 
 ---
 
@@ -517,9 +531,11 @@ Payment standard: Circle x402 Nanopayment on Arc. Every paid query includes an X
 
 ## 9. Security and Philosophy
 
-> TrustGate analyzes behavioral reputation, not identity.
+> TrustGate doesn't decide who can interact. It gives every application the information needed to make better trust decisions based on observed behavior rather than identity or reputation alone.
 
-TrustGate makes no claim about who owns a wallet. It makes claims about what that wallet has done onchain.
+TrustGate models behavioral trust, not personal identity. It makes no claim about who owns a wallet. It makes claims about what that wallet has done onchain.
+
+Good infrastructure changes behavior. Integrators gate access; participants improve onchain conduct because persistent negative patterns degrade trust over time.
 
 - No KYC data collected or required
 - No biometric or social identity linked
@@ -531,7 +547,7 @@ This positioning matters for institutional integration, governed protocol deploy
 
 TrustGate scores reflect immutable onchain history. Rehabilitation mechanics are handled through longitudinal behavioral recovery rather than manual appeals.
 
-Score hardening: exact formula weights, thresholds, and scoring mechanics are not published. Public responses return tier, score, confidence, flags, and summary only. This prevents adversaries from reverse-engineering an optimization path. Developers integrating TrustGate consume the signal — they do not need to reproduce the calculation.
+Score hardening: exact formula weights, thresholds, and scoring mechanics are not published. Public responses return tier, score, confidence, flags, summary, scoringVersion, and limitations only. This prevents adversaries from reverse-engineering an optimization path. Developers integrating TrustGate consume the signal — they do not need to reproduce the calculation.
 
 ---
 
@@ -543,6 +559,8 @@ Score hardening: exact formula weights, thresholds, and scoring mechanics are no
 - Send Address Shield — trust scoring at point of send in wallet UIs (Rabby, MetaMask Snaps)
 - Multichain Expansion — Arc, Ethereum, Base, Arbitrum with cross-chain composite scoring
 - Trust Graph — EigenTrust-style network analysis, Sybil resistance, coordinated cluster detection
+- Trust Intelligence — score stability, direction drivers, and point-in-time trust snapshots for audit trails
+- Agent Identity — score agents across multiple wallets, chains, and execution environments
 ```
 
 ---

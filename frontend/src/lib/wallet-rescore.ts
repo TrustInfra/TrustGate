@@ -340,6 +340,8 @@ export interface RescoreResult {
   tier: WalletTier;
   recommendation: WalletRecommendation;
   confidence: Confidence;
+  /** Why the score is not in the next tier up. Empty when no cap applies. */
+  limitations: string[];
 }
 
 function computeConfidence(signals: Signals): Confidence {
@@ -355,6 +357,59 @@ function computeConfidence(signals: Signals): Confidence {
     return "LOW";
   }
   return "MEDIUM";
+}
+
+function computeLimitations(
+  signals: Signals,
+  opts: {
+    botHardCap: boolean;
+    isFresh: boolean;
+    highEliteOk: boolean;
+    perfectOk: boolean;
+    tier: WalletTier;
+    score: number;
+  }
+): string[] {
+  const { deployments, walletAgeDays, txCount, botFlags, activeMonths } =
+    signals;
+  const { botHardCap, isFresh, highEliteOk, perfectOk, tier, score } = opts;
+  const out: string[] = [];
+
+  if (tier === "HIGH_ELITE" && score >= 100) return out;
+
+  if (botHardCap || botFlags.length > 0) {
+    out.push("Behavioral anomaly detected");
+  }
+  if (isFresh) {
+    out.push("Young wallet");
+  }
+  if (!highEliteOk) {
+    if (deployments < HIGH_ELITE_MIN_DEPLOYMENTS) {
+      out.push("Limited deployment history");
+    }
+    if (txCount < HIGH_ELITE_MIN_TXS) {
+      out.push("Sparse onchain activity");
+    }
+    if (walletAgeDays < HIGH_ELITE_MIN_AGE_DAYS) {
+      out.push("Insufficient wallet age");
+    }
+    if (activeMonths < HIGH_ELITE_MIN_ACTIVE_MONTHS) {
+      out.push("Limited activity spread");
+    }
+    if (signals.categoryDiversity < HIGH_ELITE_MIN_CATEGORIES) {
+      out.push("Narrow protocol participation");
+    }
+    if (
+      signals.deploymentsWithQualityInteractors <
+      HIGH_ELITE_QUALITY_DEPLOYMENTS
+    ) {
+      out.push("Deployments lack independent usage");
+    }
+  } else if (!perfectOk && tier === "HIGH_ELITE") {
+    out.push("Elite tier reached; perfect score requires sustained top-tier history");
+  }
+
+  return [...new Set(out)].slice(0, 4);
 }
 
 function applyFormula(rawScore: number, signals: Signals): RescoreResult {
@@ -414,11 +469,21 @@ function applyFormula(rawScore: number, signals: Signals): RescoreResult {
   if (score > cap) score = cap;
   if (score < 0) score = 0;
 
+  const tier = tierFor(score);
+
   return {
     score,
-    tier: tierFor(score),
+    tier,
     recommendation: recommendationFor(score),
     confidence: computeConfidence(signals),
+    limitations: computeLimitations(signals, {
+      botHardCap,
+      isFresh,
+      highEliteOk,
+      perfectOk,
+      tier,
+      score,
+    }),
   };
 }
 

@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 import { ChevronDown, Menu, X } from "lucide-react";
 import { ConnectKitButton } from "connectkit";
 import { cn } from "@/lib/utils";
+import StatusDot from "@/components/ui/StatusDot";
 
 type NavLink = { href: string; label: string; external?: boolean };
 
@@ -33,8 +34,6 @@ function isActiveLink(href: string, pathname: string): boolean {
   if (href === "/") return pathname === "/";
   if (!pathname.startsWith(href)) return false;
   if (pathname !== href && pathname.charAt(href.length) !== "/") return false;
-  // Longest matching prefix wins so /docs/widget-integration highlights
-  // "Widget" instead of both "Widget" and "Docs".
   for (const other of ALL_HREFS) {
     if (other === href || other === "/") continue;
     if (other.length <= href.length) continue;
@@ -46,8 +45,8 @@ function isActiveLink(href: string, pathname: string): boolean {
 }
 
 export default function Navbar() {
-  const [menuOpen, setMenuOpen] = useState<boolean>(false);
-  const [moreOpen, setMoreOpen] = useState<boolean>(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const pathname = usePathname();
   const moreRef = useRef<HTMLDivElement | null>(null);
 
@@ -78,31 +77,34 @@ export default function Navbar() {
     setMoreOpen(false);
   }, [pathname]);
 
+  const linkBase =
+    "relative px-3 py-2 font-mono text-xs tracking-wide transition-colors duration-200";
+
   return (
     <nav className="nav-bar sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-14">
           <Link href="/" className="flex items-center gap-2.5 shrink-0 group">
             <Image
               src="/logo.png"
               alt="TrustGate logo"
-              width={36}
-              height={36}
+              width={32}
+              height={32}
               priority
-              className="h-9 w-9 rounded-xl object-contain transition-transform duration-200 group-hover:scale-105"
+              className="h-8 w-8 object-contain"
             />
-
             <div className="flex flex-col">
               <span className="text-sm font-display font-bold text-text leading-tight">
                 TrustGate
               </span>
-              <span className="text-[9px] text-text-muted leading-tight tracking-wider uppercase">
-                Arc Testnet
+              <span className="flex items-center gap-1.5 text-[9px] font-mono text-text-muted leading-tight uppercase tracking-wider">
+                <StatusDot status="active" />
+                Live
               </span>
             </div>
           </Link>
 
-          <div className="hidden md:flex items-center gap-1">
+          <div className="hidden md:flex items-center">
             {PRIMARY_LINKS.map((link) => {
               const isActive = isActiveLink(link.href, pathname);
               return (
@@ -110,16 +112,14 @@ export default function Navbar() {
                   key={link.href}
                   href={link.href}
                   className={cn(
-                    "relative px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200",
+                    linkBase,
+                    "border-l-2",
                     isActive
-                      ? "text-text"
-                      : "text-text-muted hover:text-text-secondary"
+                      ? "border-accent text-text pl-3"
+                      : "border-transparent text-text-muted hover:text-text-secondary"
                   )}
                 >
                   {link.label}
-                  {isActive && (
-                    <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-6 h-0.5 bg-accent rounded-full" />
-                  )}
                 </Link>
               );
             })}
@@ -131,38 +131,36 @@ export default function Navbar() {
                 aria-haspopup="menu"
                 aria-expanded={moreOpen}
                 className={cn(
-                  "relative inline-flex items-center gap-1 px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200",
+                  linkBase,
+                  "inline-flex items-center gap-1 border-l-2",
                   moreActive
-                    ? "text-text"
-                    : "text-text-muted hover:text-text-secondary"
+                    ? "border-accent text-text pl-3"
+                    : "border-transparent text-text-muted hover:text-text-secondary"
                 )}
               >
                 More
                 <ChevronDown
-                  size={14}
+                  size={12}
                   aria-hidden="true"
                   className={cn(
                     "transition-transform duration-200",
                     moreOpen && "rotate-180"
                   )}
                 />
-                {moreActive && (
-                  <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-6 h-0.5 bg-accent rounded-full" />
-                )}
               </button>
 
               {moreOpen && (
                 <div
                   role="menu"
-                  className="absolute right-0 mt-2 w-48 rounded-lg border border-border bg-bg-surface shadow-lg py-1 animate-slide-down"
+                  className="absolute right-0 mt-1 w-44 border border-border bg-bg-raised py-1 animate-slide-down"
                 >
                   {MORE_LINKS.map((link) => {
                     const isActive = isActiveLink(link.href, pathname);
                     const itemClass = cn(
-                      "block mx-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                      "block mx-1 px-3 py-2 font-mono text-xs transition-colors",
                       isActive
-                        ? "text-text bg-bg-hover"
-                        : "text-text-muted hover:text-text-secondary hover:bg-bg-hover"
+                        ? "text-text bg-bg-hover border-l-2 border-accent"
+                        : "text-text-muted hover:text-text-secondary hover:bg-bg-hover border-l-2 border-transparent"
                     );
                     if (link.external) {
                       return (
@@ -204,23 +202,23 @@ export default function Navbar() {
             <button
               type="button"
               onClick={() => setMenuOpen(!menuOpen)}
-              className="md:hidden p-2 rounded-lg text-text-muted hover:text-text-secondary hover:bg-bg-hover transition-colors"
+              className="md:hidden p-2 text-text-muted hover:text-text-secondary hover:bg-bg-hover transition-colors"
               aria-label="Toggle menu"
             >
-              {menuOpen ? <X size={22} /> : <Menu size={22} />}
+              {menuOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
           </div>
         </div>
 
         {menuOpen && (
-          <div className="md:hidden pb-4 border-t border-border mt-2 pt-4 space-y-1 animate-slide-down">
+          <div className="md:hidden pb-4 border-t border-border pt-3 space-y-0.5 animate-slide-down">
             {ALL_LINKS.map((link) => {
               const isActive = isActiveLink(link.href, pathname);
               const itemClass = cn(
-                "block px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
+                "block px-3 py-2.5 font-mono text-xs transition-colors border-l-2",
                 isActive
-                  ? "text-text bg-bg-surface"
-                  : "text-text-muted hover:text-text-secondary hover:bg-bg-hover"
+                  ? "text-text bg-bg-surface border-accent"
+                  : "text-text-muted hover:text-text-secondary hover:bg-bg-hover border-transparent"
               );
               if (link.external) {
                 return (
@@ -247,7 +245,7 @@ export default function Navbar() {
                 </Link>
               );
             })}
-            <div className="pt-3">
+            <div className="pt-3 px-1">
               <ConnectKitButton />
             </div>
           </div>
