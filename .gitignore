@@ -51,5 +51,10 @@ npm-debug.log*
 
 # Vercel env paste file, holds real scoring values, never commit
 /vercel-new-vars.txt
+# Grok/Cursor harness noise (never commit)
 mcps/
 terminals/
+
+# Local MCP probe scripts (dev only)
+frontend/scripts/test-*.mjs
+frontend/scripts/test-*.ts

@@ -19,6 +19,7 @@ import {
   relativeTime,
   saveHistory,
 } from "@/lib/recent-history";
+import TrustSourceShell from "@/components/trust-source/TrustSourceShell";
 
 const TOKEN_ORACLE_PROXY = "/api/oracle/token";
 const TOKEN_STATS_PROXY = "/api/oracle/oracle/token/stats";
@@ -517,7 +518,9 @@ export default function TokenShieldPage() {
         </section>
 
         {/* Result */}
-        {result && phase === "done" && <ResultCard result={result} />}
+        {result && phase === "done" && (
+          <ResultCard result={result} address={address} />
+        )}
 
         {/* Recent Checks (localStorage, last 5) */}
         {history.length > 0 && (
@@ -610,7 +613,13 @@ export default function TokenShieldPage() {
   );
 }
 
-function ResultCard({ result }: { result: TokenScoreResult }) {
+function ResultCard({
+  result,
+  address,
+}: {
+  result: TokenScoreResult;
+  address: string;
+}) {
   const isContract = result.contractType === "CONTRACT";
   // Official issuer tokens carry a VERIFIED attestation, not a numeric band, so
   // the score number is suppressed and only the tier badge is shown.
@@ -620,41 +629,45 @@ function ResultCard({ result }: { result: TokenScoreResult }) {
   const flags = Array.isArray(result.flags) ? result.flags : [];
   return (
     <section className="mb-12 rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6">
-      <p className="text-xs uppercase tracking-widest text-zinc-500">{label}</p>
-      <div className="mt-3 flex flex-wrap items-end gap-4">
-        {!isVerified && (
-          <div className="text-5xl font-bold tabular-nums">{result.score}</div>
-        )}
-        <span
-          className={`rounded border px-2.5 py-1 text-xs font-semibold tracking-wide ${tierClass(result.tier)}`}
-        >
-          {result.tier}
-        </span>
-        {result.confidence && (
-          <span
-            className={`rounded border px-2.5 py-1 text-xs font-semibold tracking-wide ${confidenceClass(result.confidence)}`}
-          >
-            {result.confidence} CONFIDENCE
-          </span>
-        )}
-      </div>
-      {flags.length > 0 && (
-        <div className="mt-4 flex flex-wrap gap-2">
-          {flags.map((flag) => (
+      <TrustSourceShell address={address}>
+        <div>
+          <p className="text-xs uppercase tracking-widest text-zinc-500">{label}</p>
+          <div className="mt-3 flex flex-wrap items-end gap-4">
+            {!isVerified && (
+              <div className="text-5xl font-bold tabular-nums">{result.score}</div>
+            )}
             <span
-              key={flag}
-              className="rounded border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-xs font-semibold tracking-wide text-amber-200"
+              className={`rounded border px-2.5 py-1 text-xs font-semibold tracking-wide ${tierClass(result.tier)}`}
             >
-              {flag}
+              {result.tier}
             </span>
-          ))}
+            {result.confidence && (
+              <span
+                className={`rounded border px-2.5 py-1 text-xs font-semibold tracking-wide ${confidenceClass(result.confidence)}`}
+              >
+                {result.confidence} CONFIDENCE
+              </span>
+            )}
+          </div>
+          {flags.length > 0 && (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {flags.map((flag) => (
+                <span
+                  key={flag}
+                  className="rounded border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-xs font-semibold tracking-wide text-amber-200"
+                >
+                  {flag}
+                </span>
+              ))}
+            </div>
+          )}
+          {typeof result.txCount === "number" && (
+            <p className="mt-3 text-sm text-zinc-400 tabular-nums">
+              {result.txCount.toLocaleString()} transactions recorded
+            </p>
+          )}
         </div>
-      )}
-      {typeof result.txCount === "number" && (
-        <p className="mt-3 text-sm text-zinc-400 tabular-nums">
-          {result.txCount.toLocaleString()} transactions recorded
-        </p>
-      )}
+      </TrustSourceShell>
     </section>
   );
 }

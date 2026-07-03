@@ -21,6 +21,7 @@ import {
   relativeTime,
   saveHistory,
 } from '@/lib/recent-history';
+import TrustSourceShell from '@/components/trust-source/TrustSourceShell';
 
 const HISTORY_KEY = 'trustgate_oracle_history';
 const FAILURE_COOLDOWN_MS = 3000;
@@ -517,7 +518,11 @@ response = requests.get(
           )}
 
           {result && phase === 'done' && (
-            <ScoreCard result={result} />
+            <div className="mt-6 rounded-xl border border-zinc-800 bg-zinc-950 p-6">
+              <TrustSourceShell address={address}>
+                <ScoreCard result={result} />
+              </TrustSourceShell>
+            </div>
           )}
         </section>
 
@@ -654,7 +659,7 @@ function StatCard({ label, value }: { label: string; value: string | number }) {
 
 function ScoreCard({ result }: { result: ScoreResult }) {
   return (
-    <div className="mt-6 rounded-xl border border-zinc-800 bg-zinc-950 p-6">
+    <div>
       <p className="text-4xl font-bold">{result.score}</p>
       <p className="mt-1 text-sm text-zinc-400">
         tier <span className="text-zinc-200">{result.tier}</span> · recommendation{' '}
