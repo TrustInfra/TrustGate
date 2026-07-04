@@ -13,6 +13,7 @@
 - [Documentation index -- protocol overview, integration guides, and API reference](https://www.trustgated.xyz/docs)
 - [How TrustGate works -- register, deposit, score, claim flow explained](https://www.trustgated.xyz/docs/how-it-works)
 - [Trust scoring model -- wallet and token scoring via formula-based analysis of direct on-chain behavioral signals](https://www.trustgated.xyz/docs/trust-scoring)
+- [Knowledge Graph trust -- Intuition attestation signals on Oracle and Token Shield, platform-only second lens](https://www.trustgated.xyz/docs/knowledge-graph)
 - [Trust tiers -- HIGH (75-100) instant, MEDIUM (40-74) 24h lock, LOW (0-39) escrow](https://www.trustgated.xyz/docs/trust-tiers)
 - [Payment flow -- USDC routing logic from deposit to agent claim by trust tier](https://www.trustgated.xyz/docs/payment-flow)
 - [Agent registration guide -- permissionlessly register an AI agent on AgentRegistry](https://www.trustgated.xyz/docs/agent-registration)
@@ -34,4 +35,4 @@
 ## Notes
 
 - Built by Ludarep
-- Last generated: 2026-07-03
+- Last generated: 2026-07-04

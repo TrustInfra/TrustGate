@@ -26,6 +26,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { path: "/docs/agent-loop", changeFrequency: "monthly", priority: 0.6 },
     { path: "/docs/payment-flow", changeFrequency: "monthly", priority: 0.6 },
     { path: "/docs/trust-scoring", changeFrequency: "monthly", priority: 0.6 },
+    { path: "/docs/knowledge-graph", changeFrequency: "monthly", priority: 0.6 },
     { path: "/docs/trust-tiers", changeFrequency: "monthly", priority: 0.6 },
     { path: "/docs/margin-analysis", changeFrequency: "monthly", priority: 0.6 },
     { path: "/docs/oracle", changeFrequency: "monthly", priority: 0.6 },

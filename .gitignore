@@ -58,3 +58,6 @@ terminals/
 # Local MCP probe scripts (dev only)
 frontend/scripts/test-*.mjs
 frontend/scripts/test-*.ts
+
+# Internal session notes (local only, never publish)
+tasks/

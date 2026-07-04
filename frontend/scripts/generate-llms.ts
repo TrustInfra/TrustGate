@@ -28,6 +28,7 @@ const config: Config = {
     { path: "/docs", description: "Documentation index -- protocol overview, integration guides, and API reference" },
     { path: "/docs/how-it-works", description: "How TrustGate works -- register, deposit, score, claim flow explained" },
     { path: "/docs/trust-scoring", description: "Trust scoring model -- wallet and token scoring via formula-based analysis of direct on-chain behavioral signals" },
+    { path: "/docs/knowledge-graph", description: "Knowledge Graph trust -- Intuition attestation signals on Oracle and Token Shield, platform-only second lens" },
     { path: "/docs/trust-tiers", description: "Trust tiers -- HIGH (75-100) instant, MEDIUM (40-74) 24h lock, LOW (0-39) escrow" },
     { path: "/docs/payment-flow", description: "Payment flow -- USDC routing logic from deposit to agent claim by trust tier" },
     { path: "/docs/agent-registration", description: "Agent registration guide -- permissionlessly register an AI agent on AgentRegistry" },

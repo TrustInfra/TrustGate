@@ -95,6 +95,11 @@ export default function DocsOverview() {
           description="The full scoring formula, tier mapping, and how scores are derived from Arc activity."
         />
         <QuickLink
+          href="/docs/knowledge-graph"
+          label="Knowledge Graph"
+          description="Intuition attestation trust on Oracle and Token Shield. Platform-only second lens alongside behavioral scoring."
+        />
+        <QuickLink
           href="/docs/contracts"
           label="Contracts"
           description="Deployed addresses on Arc Testnet and the role of each contract."
