@@ -73,6 +73,22 @@ below those. Your list, your choice.
 
 ---
 
+## Live batch endpoint
+
+```
+POST /api/batch
+Content-Type: application/json
+
+{ "addresses": ["0x…", "0x…"] }
+```
+
+Returns an array of batch score objects (open CORS). Free local scoring path —
+no x402 payment. Max 40 addresses per request.
+
+Optional helper: `rankGroupsByTrust` / `rankSameTickerTokens` in
+`@/lib/discovery/group-rank` ranks within the same ticker so rugs sink while
+staying visible.
+
 ## Option B: script tag
 
 For pages without a framework. Add the script once, then mark each badge slot
@@ -84,6 +100,34 @@ and fills them in.
 
 <!-- anywhere in your markup, placed by you -->
 <span data-trustgate-badge="0xTOKENADDRESS"></span>
+```
+
+Optional: `data-trustgate-mock="1"` for fixtures; `data-trustgate-batch-url` to
+override the batch endpoint; `data-trustgate-flags="on"` to show flags.
+
+### Search-results intercept (DEX layer)
+
+Mark each result row and load the widget once. TrustGate batch-scores and can
+reorder client-side. The DEX keeps full control of markup.
+
+```html
+<script
+  src="https://www.trustgated.xyz/widget-discovery.js"
+  data-trustgate-search="#token-results"
+  data-trustgate-reorder="on"
+  data-trustgate-flags="on"
+></script>
+
+<ul id="token-results">
+  <li data-trustgate-row data-address="0xaaa…">Yoshi</li>
+  <li data-trustgate-row data-address="0xbbb…">Yoshi</li>
+</ul>
+```
+
+Dynamic lists (SPA): after render call
+
+```js
+window.TrustGateDiscovery.reorderContainer("#token-results");
 ```
 
 The widget shows the compact badge alone by default. Flags are off so nothing

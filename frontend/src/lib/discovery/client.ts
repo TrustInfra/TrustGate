@@ -12,10 +12,9 @@ import { isVerifiedIssuer } from "./verified-issuers";
 // agreed shape. Nothing downstream changes.
 // ============================================================================
 
-const USE_MOCK = true;
-
-// Real path. A same-origin proxy keeps the oracle IP hidden, matching the
-// single-token pattern. Point this at whatever path Nald finalizes for batch.
+// Live batch via /api/batch (Phase 2b). Mock is fallback only if live fails
+// and NEXT_PUBLIC_DISCOVERY_MOCK=1, or when explicitly forced.
+const FORCE_MOCK = process.env.NEXT_PUBLIC_DISCOVERY_MOCK === "1";
 const BATCH_ENDPOINT = "/api/batch";
 
 async function fetchScoreBatch(addresses: string[]): Promise<BatchScore[]> {
@@ -30,9 +29,8 @@ async function fetchScoreBatch(addresses: string[]): Promise<BatchScore[]> {
   }
 
   const data = await res.json();
-  // Expecting a plain array of BatchScore. If Nald wraps it (for example
-  // { results: [...] }), unwrap it here, in this one place, and nothing
-  // else has to know.
+  // Expecting a plain array of BatchScore. If wrapped as { results: [...] },
+  // unwrap here once.
   return Array.isArray(data) ? data : data.results;
 }
 
@@ -48,8 +46,17 @@ function applyVerifiedOverlay(results: BatchScore[]): BatchScore[] {
 
 export async function scoreBatch(addresses: string[]): Promise<BatchScore[]> {
   if (addresses.length === 0) return [];
-  const results = USE_MOCK
-    ? await mockScoreBatch(addresses)
-    : await fetchScoreBatch(addresses);
-  return applyVerifiedOverlay(results);
+  if (FORCE_MOCK) {
+    return applyVerifiedOverlay(await mockScoreBatch(addresses));
+  }
+  try {
+    const results = await fetchScoreBatch(addresses);
+    return applyVerifiedOverlay(results);
+  } catch (err) {
+    console.warn(
+      "[discovery] live batch failed, falling back to mock:",
+      err instanceof Error ? err.message : err
+    );
+    return applyVerifiedOverlay(await mockScoreBatch(addresses));
+  }
 }

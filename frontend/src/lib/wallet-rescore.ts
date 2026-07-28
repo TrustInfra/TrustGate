@@ -331,15 +331,16 @@ export function recommendationFor(score: number): WalletRecommendation {
   return "INSTANT_PRIORITY";
 }
 
-// RescoreResult is the internal shape. `confidence` is computed and returned
-// here for internal use and frontend display, but MUST be stripped before the
-// public API response — the public oracle proxy only forwards score/tier/
-// recommendation (see api/oracle/[address]/route.ts).
+// RescoreResult is the internal shape. Public oracle merges score/tier/
+// recommendation/confidence/limitations plus Trust Intelligence fields.
 export interface RescoreResult {
   score: number;
   tier: WalletTier;
   recommendation: WalletRecommendation;
   confidence: Confidence;
+  /** 0–100 density score for public API */
+  confidenceScore: number;
+  flags: string[];
   /** Why the score is not in the next tier up. Empty when no cap applies. */
   limitations: string[];
 }
@@ -470,12 +471,32 @@ function applyFormula(rawScore: number, signals: Signals): RescoreResult {
   if (score < 0) score = 0;
 
   const tier = tierFor(score);
+  const confidence = computeConfidence(signals);
+  const confidenceScore =
+    confidence === "HIGH" ? 88 : confidence === "LOW" ? 32 : 62;
+
+  const flags: string[] = botFlags.map((f: BotFlag): string => {
+    switch (f) {
+      case "velocity":
+        return "INTERACTION_VELOCITY";
+      case "interval-pattern":
+        return "INTERVAL_PATTERN";
+      case "self-interaction":
+        return "SELF_INTERACTION";
+      case "clean-history":
+        return "CLEAN_HISTORY_ANOMALY";
+      default:
+        return String(f);
+    }
+  });
 
   return {
     score,
     tier,
     recommendation: recommendationFor(score),
-    confidence: computeConfidence(signals),
+    confidence,
+    confidenceScore,
+    flags,
     limitations: computeLimitations(signals, {
       botHardCap,
       isFresh,
@@ -549,5 +570,58 @@ export async function rescoreWallet(
   address: string
 ): Promise<RescoreResult> {
   const signals = await gatherSignals(address);
-  return applyFormula(rawScore, signals);
+  const base = applyFormula(rawScore, signals);
+
+  // Phase 3: coordinated-exit feedback marks
+  // Phase 3b: staking commitment boost / gaming
+  const { markScorePenalty, markFlags } = await import(
+    "@/lib/token-behavior/wallet-marks"
+  );
+  const { analyzeStaking } = await import("@/lib/staking/signals");
+
+  let score = base.score;
+  const flags = [...base.flags, ...markFlags(address)];
+  let penalty = markScorePenalty(address);
+
+  try {
+    const staking = await analyzeStaking(address);
+    // Long staking history softens a single flag penalty (appeal evidence)
+    if (
+      penalty > 0 &&
+      staking.totalPoints >= 40 &&
+      staking.gamingFlags.length === 0
+    ) {
+      penalty = Math.max(0, Math.floor(penalty * 0.5));
+    }
+    if (penalty > 0) {
+      score = Math.max(0, score - penalty);
+    }
+    if (staking.scoreBoost > 0) {
+      score = Math.min(100, score + staking.scoreBoost);
+      flags.push("STAKING_COMMITTED");
+    }
+    for (const g of staking.gamingFlags) {
+      flags.push(g);
+    }
+    if (staking.gamingFlags.length > 0) {
+      flags.push("STAKING_GAMING");
+    }
+  } catch (err) {
+    if (penalty > 0) {
+      score = Math.max(0, score - penalty);
+    }
+    console.warn(
+      "[wallet-rescore] staking analysis failed:",
+      err instanceof Error ? err.message : err
+    );
+  }
+
+  const tier = tierFor(score);
+  return {
+    ...base,
+    score,
+    tier,
+    recommendation: recommendationFor(score),
+    flags: [...new Set(flags)],
+  };
 }

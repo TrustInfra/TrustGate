@@ -54,6 +54,8 @@ interface IntegrationCard {
   icon: typeof Shield;
 }
 
+// Status labels follow docs/INTERNAL_ROADMAP.md (canonical). Do not mark a
+// phase Completed until its grant exit criteria are met in production.
 const COMPLETED_PHASES: Phase[] = [
   {
     id: "phase-1",
@@ -73,19 +75,19 @@ const IN_PROGRESS_PHASES: Phase[] = [
   {
     id: "phase-2b",
     title: "Phase 2b -- Trust-Ordered Token Discovery",
-    body: "When multiple tokens share the same name or ticker, DEX search results rank by trust score. The token with the most credible deployer, the most legitimate holder base, and the cleanest behavioral record surfaces first. Flags surface inline. Rugs go to the bottom automatically.",
+    body: "When multiple tokens share the same name or ticker, DEX search results rank by trust score. Flags surface inline. Rugs go to the bottom, marked not hidden. Batch endpoint, React kit, widget-discovery.js, and /discovery reference surface are in codebase. Exit: trust-ordered lists live on at least one Arc DEX search layer.",
     icon: TrendingUp,
   },
   {
     id: "phase-3",
-    title: "Phase 3 -- Trust Intelligence",
-    body: "Token Shield upgraded with temporal behavior tracking. Hold duration signals, exit ratio analysis, wash trading detection, honeypot flagging, and coordinated long-hold exit detection. Wallets that repeatedly participate in coordinated exits receive score reductions -- you cannot maintain HIGH status while repeatedly dumping on retail.\n\nConfidence Scoring added to every oracle response. The same tier at 40% confidence is treated differently than the same tier at 96% confidence. Protocols can set minimum confidence thresholds for high-stakes decisions like lending.\n\nTrust Intelligence layer added to every score: behavioral summaries, score stability, direction drivers, and point-in-time trust snapshots for audit trails -- without exposing internal formula details that would create gaming paths.",
+    title: "Phase 3 -- Token Behavior Intelligence",
+    body: "Temporal Token Shield: hold duration, exit ratio, wash trading, honeypot flagging, coordinated long-hold exit, wallet score feedback loop, confidence scoring, two-tier explainability (public vs protocol). Core detectors and confidence/summary/snapshot paths are scaffolding in-repo; production hardening and full explainability split still in progress.",
     icon: Brain,
   },
   {
     id: "phase-3b",
     title: "Phase 3b -- Staking Intelligence",
-    body: "Staking behavior added as a scoring dimension. Wallets that lock capital in credible tokens over time demonstrate economic commitment -- a signal that pure transaction history cannot capture. Deployers with long staking histories receive a credibility boost on any token they launch. Anti-gaming protections prevent self-staking, circular staking rings, and same-day manipulation. Public staking leaderboard surfaces the most committed ecosystem participants.",
+    body: "Staking as a scoring dimension with 7-day minimum, self-stake zero, duration x size x token-trust formula, circular-ring detection, gradual decay, and public leaderboard. Leaderboard page and heuristic staking signals exist; full formula and USD size multipliers still incomplete.",
     icon: Lock,
   },
 ];
@@ -94,7 +96,7 @@ const UPCOMING_PHASES: Phase[] = [
   {
     id: "phase-4",
     title: "Phase 4 -- Protocol Guard",
-    body: "Trust signals at the protocol level. Lending protocols receive alerts before low-trust wallets open borrowing positions. DAOs receive coordinated voting pattern detection before proposals close. Delivery via Discord webhook, Telegram, email, and onchain event. Subscription pricing -- protocols pay monthly USDC for continuous monitoring.",
+    body: "Contextual trust thresholds by action type. Lending and DAO governance monitoring. Trust Surface Area in alerts. Delivery via Discord, Telegram, email, onchain event. Free for protocols (no subscription fee). Exit: three protocol integrations using free Guard in production.",
     icon: Shield,
   },
   {
@@ -436,21 +438,23 @@ export default function RoadmapPage() {
       </section>
 
       {/* IN PROGRESS */}
-      <section className="px-4 sm:px-6 lg:px-8 py-12 border-t border-border">
-        <div className="max-w-5xl mx-auto">
-          <div className="mb-8 flex items-baseline gap-3">
-            <SectionEyebrow>In Progress</SectionEyebrow>
-            <span className="text-[11px] font-mono text-text-muted">
-              {IN_PROGRESS_PHASES.length} active
-            </span>
+      {IN_PROGRESS_PHASES.length > 0 && (
+        <section className="px-4 sm:px-6 lg:px-8 py-12 border-t border-border">
+          <div className="max-w-5xl mx-auto">
+            <div className="mb-8 flex items-baseline gap-3">
+              <SectionEyebrow>In Progress</SectionEyebrow>
+              <span className="text-[11px] font-mono text-text-muted">
+                {IN_PROGRESS_PHASES.length} active
+              </span>
+            </div>
+            <div className="grid gap-5">
+              {IN_PROGRESS_PHASES.map((phase) => (
+                <PhaseCard key={phase.id} phase={phase} status="in-progress" />
+              ))}
+            </div>
           </div>
-          <div className="grid gap-5">
-            {IN_PROGRESS_PHASES.map((phase) => (
-              <PhaseCard key={phase.id} phase={phase} status="in-progress" />
-            ))}
-          </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* UPCOMING */}
       <section className="px-4 sm:px-6 lg:px-8 py-12 border-t border-border">

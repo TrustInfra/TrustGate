@@ -65,7 +65,15 @@ interface ScoreResult {
   score: number;
   tier: string;
   recommendation: string;
-  breakdown: {
+  confidence?: number;
+  flags?: string[];
+  summary?: string[];
+  scoreStability?: string;
+  directionDrivers?: string[];
+  snapshotId?: string;
+  scoringVersion?: string;
+  limitations?: string[];
+  breakdown?: {
     txPoints: number;
     usdcPoints: number;
     contractPoints: number;
@@ -659,12 +667,116 @@ function StatCard({ label, value }: { label: string; value: string | number }) {
 
 function ScoreCard({ result }: { result: ScoreResult }) {
   return (
-    <div>
-      <p className="text-4xl font-bold">{result.score}</p>
-      <p className="mt-1 text-sm text-zinc-400">
-        tier <span className="text-zinc-200">{result.tier}</span> · recommendation{' '}
-        <span className="text-zinc-200">{result.recommendation}</span>
-      </p>
+    <div className="space-y-4">
+      <div>
+        <p className="text-4xl font-bold tabular-nums">{result.score}</p>
+        <p className="mt-1 text-sm text-zinc-400">
+          tier <span className="text-zinc-200">{result.tier}</span>
+          {result.recommendation ? (
+            <>
+              {' '}
+              · recommendation{' '}
+              <span className="text-zinc-200">{result.recommendation}</span>
+            </>
+          ) : null}
+        </p>
+      </div>
+
+      {(result.confidence != null || result.scoreStability) && (
+        <div className="grid gap-3 sm:grid-cols-3">
+          {result.confidence != null && (
+            <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-3">
+              <p className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">
+                Confidence
+              </p>
+              <p className="mt-1 text-lg font-semibold tabular-nums">
+                {result.confidence}%
+              </p>
+            </div>
+          )}
+          {result.scoreStability && (
+            <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-3">
+              <p className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">
+                Stability
+              </p>
+              <p className="mt-1 text-sm font-medium capitalize text-zinc-200">
+                {result.scoreStability.replace(/_/g, ' ')}
+              </p>
+            </div>
+          )}
+          {result.scoringVersion && (
+            <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-3">
+              <p className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">
+                Model
+              </p>
+              <p className="mt-1 font-mono text-sm text-zinc-200">
+                {result.scoringVersion}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {result.summary && result.summary.length > 0 && (
+        <div>
+          <p className="mb-2 text-[10px] font-mono uppercase tracking-wider text-zinc-500">
+            Behavioral summary
+          </p>
+          <ul className="space-y-1.5 text-sm text-zinc-300">
+            {result.summary.map((line) => (
+              <li key={line} className="flex gap-2">
+                <span className="text-accent">·</span>
+                <span>{line}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {result.directionDrivers && result.directionDrivers.length > 0 && (
+        <div>
+          <p className="mb-2 text-[10px] font-mono uppercase tracking-wider text-zinc-500">
+            Direction drivers
+          </p>
+          <ul className="space-y-1 text-sm text-zinc-400">
+            {result.directionDrivers.map((d) => (
+              <li key={d}>{d}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {result.flags && result.flags.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {result.flags.map((f) => (
+            <span
+              key={f}
+              className="rounded border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 font-mono text-[11px] text-amber-200"
+            >
+              {f}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {result.limitations && result.limitations.length > 0 && (
+        <div>
+          <p className="mb-2 text-[10px] font-mono uppercase tracking-wider text-zinc-500">
+            Limitations
+          </p>
+          <ul className="space-y-1 text-sm text-zinc-500">
+            {result.limitations.map((l) => (
+              <li key={l}>{l}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {result.snapshotId && (
+        <p className="font-mono text-[11px] text-zinc-600">
+          snapshot {result.snapshotId}
+        </p>
+      )}
     </div>
   );
 }

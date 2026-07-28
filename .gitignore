@@ -61,3 +61,6 @@ frontend/scripts/test-*.ts
 
 # Internal session notes (local only, never publish)
 tasks/
+
+# Internal product roadmap (private; never push to public GitHub)
+docs/INTERNAL_ROADMAP.md

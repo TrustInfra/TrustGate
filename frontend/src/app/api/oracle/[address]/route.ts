@@ -151,14 +151,59 @@ async function proxy(
       ) {
         const original = parsed as Record<string, unknown> & { score: number };
         const rescored = await rescoreWallet(original.score, address);
-        // Override the three score-derived fields. Preserve everything else
-        // upstream returned (breakdown, queriedAt, network, source, etc.).
+        const { recordIntelligence } = await import(
+          "@/lib/trust-intelligence/snapshots"
+        );
+        const intel = recordIntelligence({
+          subject: address,
+          subjectType: "wallet",
+          score: rescored.score,
+          tier: rescored.tier,
+          confidence: rescored.confidenceScore,
+          flags: rescored.flags,
+          limitations: rescored.limitations,
+          scoringVersion: SCORING_VERSION,
+        });
+        const { buildExplainability } = await import(
+          "@/lib/trust-intelligence/explainability"
+        );
+        const explain = buildExplainability({
+          score: rescored.score,
+          tier: rescored.tier,
+          confidence: intel.confidence,
+          flags: rescored.flags,
+          limitations: rescored.limitations,
+          scoreStability: intel.scoreStability,
+          directionDrivers: intel.directionDrivers,
+          subjectType: "wallet",
+        });
+        // Override score-derived fields. Preserve upstream extras (queriedAt, etc.).
+        // Do not forward raw formula breakdown when present — strip for public API.
+        const {
+          breakdown: _breakdown,
+          ...safeOriginal
+        } = original as Record<string, unknown> & {
+          score: number;
+          breakdown?: unknown;
+        };
+        void _breakdown;
         const merged: Record<string, unknown> = {
-          ...original,
+          ...safeOriginal,
           score: rescored.score,
           tier: rescored.tier,
           recommendation: rescored.recommendation,
+          confidence: intel.confidence,
+          flags: rescored.flags,
+          summary: intel.summary,
+          // Public layer (retail/DEX) — simple headline + lines
+          publicExplain: explain.public,
+          // Protocol layer — structured risk categories (no formula weights)
+          protocolExplain: explain.protocol,
+          scoreStability: intel.scoreStability,
+          directionDrivers: intel.directionDrivers,
+          snapshotId: intel.snapshotId,
           scoringVersion: SCORING_VERSION,
+          queriedAt: intel.queriedAt,
           ...(rescored.limitations.length > 0
             ? { limitations: rescored.limitations }
             : {}),

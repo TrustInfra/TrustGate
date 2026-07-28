@@ -28,6 +28,7 @@ export const DOC_SECTIONS = [
   { href: "/docs/dashboard-guide", label: "Dashboard Guide", icon: LayoutDashboard },
   { href: "/docs/integration", label: "Integration", icon: Boxes },
   { href: "/docs/widget-integration", label: "Widget", icon: Code2 },
+  { href: "/docs/gating", label: "Gating", icon: ShieldCheck },
   { href: "/docs/local-setup", label: "Local Setup", icon: Terminal },
 ] as const;
 

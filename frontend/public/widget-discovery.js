@@ -13,9 +13,24 @@
 (function () {
   "use strict";
 
-  // ===== THE ONE LINE to flip when Nald's batch endpoint is live =====
-  var USE_MOCK = true;
-  var BATCH_ENDPOINT = "https://www.trustgated.xyz/api/batch"; // needs open CORS
+  // Live batch by default (Phase 2b). Set data-trustgate-mock="1" on the script tag for fixtures.
+  var USE_MOCK = (function () {
+    var tag = document.currentScript;
+    if (!tag) return false;
+    return (tag.getAttribute("data-trustgate-mock") || "") === "1";
+  })();
+  var BATCH_ENDPOINT = (function () {
+    var tag = document.currentScript;
+    var custom = tag && tag.getAttribute("data-trustgate-batch-url");
+    if (custom) return custom;
+    // Same-origin when hosted on trustgated.xyz; absolute fallback otherwise
+    try {
+      if (typeof location !== "undefined" && location.origin) {
+        return location.origin + "/api/batch";
+      }
+    } catch (e) {}
+    return "https://www.trustgated.xyz/api/batch";
+  })();
 
   var SLOT_ATTR = "data-trustgate-badge";
 
@@ -164,7 +179,77 @@
     slot.appendChild(wrap);
   }
 
-  function init() {
+  // --- Phase 2b search intercept ---------------------------------------------
+  // Opt-in: <script data-trustgate-search="#results" data-trustgate-reorder="on">
+  // Rows: [data-trustgate-row] or children of the search root containing an
+  // address in [data-address] / [data-token] / data-trustgate-badge.
+  var TIER_RANK = { VERIFIED: 6, ELITE: 5, HIGH: 4, MEDIUM: 3, LOW: 2, BLOCKED: 1 };
+
+  function scriptAttr(name) {
+    var tag = document.currentScript;
+    return tag ? (tag.getAttribute(name) || "") : "";
+  }
+
+  function extractAddress(node) {
+    if (!node || !node.getAttribute) return "";
+    var a =
+      node.getAttribute(SLOT_ATTR) ||
+      node.getAttribute("data-address") ||
+      node.getAttribute("data-token") ||
+      node.getAttribute("data-token-address") ||
+      "";
+    if (a && /^0x[0-9a-fA-F]{40}$/.test(a)) return a;
+    var child = node.querySelector(
+      "[" + SLOT_ATTR + "], [data-address], [data-token], [data-token-address]"
+    );
+    if (child) return extractAddress(child);
+    return "";
+  }
+
+  function reorderRows(parent, rows, scoreMap) {
+    var decorated = rows.map(function (row, index) {
+      var addr = extractAddress(row).toLowerCase();
+      var s = scoreMap[addr];
+      return { row: row, index: index, score: s };
+    });
+    decorated.sort(function (a, b) {
+      var sa = a.score, sb = b.score;
+      if (!sa && !sb) return a.index - b.index;
+      if (!sa) return 1;
+      if (!sb) return -1;
+      var ta = TIER_RANK[sa.tier] || 0, tb = TIER_RANK[sb.tier] || 0;
+      if (tb !== ta) return tb - ta;
+      if ((sb.score || 0) !== (sa.score || 0)) return (sb.score || 0) - (sa.score || 0);
+      return a.index - b.index;
+    });
+    decorated.forEach(function (d) {
+      parent.appendChild(d.row);
+      if (d.score && (d.score.tier === "LOW" || d.score.tier === "BLOCKED")) {
+        d.row.style.opacity = d.row.style.opacity || "0.72";
+        d.row.setAttribute("data-trustgate-deprioritized", "1");
+      }
+    });
+  }
+
+  function fillBadges(scoreMap) {
+    var slots = document.querySelectorAll("[" + SLOT_ATTR + "]");
+    for (var j = 0; j < slots.length; j++) {
+      var addr = (slots[j].getAttribute(SLOT_ATTR) || "").toLowerCase();
+      if (scoreMap[addr]) renderSlot(slots[j], scoreMap[addr]);
+    }
+  }
+
+  function runBatch(addresses, thenFn) {
+    scoreBatch(addresses).then(function (results) {
+      var map = {};
+      results.forEach(function (r) { map[String(r.address).toLowerCase()] = r; });
+      thenFn(map);
+    }).catch(function (err) {
+      if (window && window.console) console.error("[trustgate] batch widget:", err);
+    });
+  }
+
+  function initSlots() {
     var slots = document.querySelectorAll("[" + SLOT_ATTR + "]");
     if (!slots.length) return;
     var addresses = [], seen = {};
@@ -172,17 +257,82 @@
       var a = slots[i].getAttribute(SLOT_ATTR);
       if (a && !seen[a.toLowerCase()]) { seen[a.toLowerCase()] = true; addresses.push(a); }
     }
-    scoreBatch(addresses).then(function (results) {
-      var map = {};
-      results.forEach(function (r) { map[String(r.address).toLowerCase()] = r; });
-      for (var j = 0; j < slots.length; j++) {
-        var addr = (slots[j].getAttribute(SLOT_ATTR) || "").toLowerCase();
-        if (map[addr]) renderSlot(slots[j], map[addr]);
+    runBatch(addresses, fillBadges);
+  }
+
+  function initSearch() {
+    var sel = scriptAttr("data-trustgate-search");
+    if (!sel) return;
+    var root = document.querySelector(sel);
+    if (!root) return;
+    var reorderOn = scriptAttr("data-trustgate-reorder").toLowerCase() === "on";
+    var rows = root.querySelectorAll("[data-trustgate-row]");
+    if (!rows.length) {
+      // Fallback: direct children that carry an address
+      rows = [];
+      for (var c = 0; c < root.children.length; c++) {
+        if (extractAddress(root.children[c])) rows.push(root.children[c]);
       }
-    }).catch(function (err) {
-      if (window && window.console) console.error("[trustgate] batch widget:", err);
+    } else {
+      rows = Array.prototype.slice.call(rows);
+    }
+    if (!rows.length) return;
+
+    var addresses = [], seen = {};
+    for (var i = 0; i < rows.length; i++) {
+      var a = extractAddress(rows[i]);
+      if (a && !seen[a.toLowerCase()]) {
+        seen[a.toLowerCase()] = true;
+        addresses.push(a);
+      }
+      // Auto-inject badge slot if missing
+      if (a && !rows[i].querySelector("[" + SLOT_ATTR + "]")) {
+        var span = document.createElement("span");
+        span.setAttribute(SLOT_ATTR, a);
+        span.setAttribute("data-trustgate-flags", GLOBAL_FLAGS_ON ? "on" : "off");
+        rows[i].appendChild(span);
+      }
+    }
+    runBatch(addresses, function (map) {
+      fillBadges(map);
+      if (reorderOn) reorderRows(root, rows, map);
     });
   }
+
+  function init() {
+    initSlots();
+    initSearch();
+  }
+
+  // Public API for DEX partners who render search results dynamically
+  window.TrustGateDiscovery = {
+    scoreAndRender: function (addresses) {
+      return scoreBatch(addresses || []).then(function (results) {
+        var map = {};
+        results.forEach(function (r) { map[String(r.address).toLowerCase()] = r; });
+        fillBadges(map);
+        return results;
+      });
+    },
+    reorderContainer: function (selector) {
+      var root = document.querySelector(selector);
+      if (!root) return Promise.resolve([]);
+      var rows = root.querySelectorAll("[data-trustgate-row]");
+      rows = rows.length ? Array.prototype.slice.call(rows) : Array.prototype.slice.call(root.children);
+      var addresses = [];
+      rows.forEach(function (row) {
+        var a = extractAddress(row);
+        if (a) addresses.push(a);
+      });
+      return scoreBatch(addresses).then(function (results) {
+        var map = {};
+        results.forEach(function (r) { map[String(r.address).toLowerCase()] = r; });
+        fillBadges(map);
+        reorderRows(root, rows, map);
+        return results;
+      });
+    }
+  };
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
   else init();

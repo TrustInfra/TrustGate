@@ -81,6 +81,111 @@ function pickResponseHeaders(upstream: Response): Headers {
   return out;
 }
 
+async function enrichTokenScore(
+  rawAddress: string,
+  payload: Record<string, unknown>
+): Promise<Record<string, unknown>> {
+  const { analyzeTokenTemporal } = await import(
+    "@/lib/token-behavior/temporal"
+  );
+  const { markCoordinatedExitParticipants } = await import(
+    "@/lib/token-behavior/wallet-marks"
+  );
+  const { deployerStakingBoost } = await import("@/lib/staking/signals");
+  const {
+    confidenceEnumToNumber,
+    recordIntelligence,
+  } = await import("@/lib/trust-intelligence/snapshots");
+  const { SCORING_VERSION } = await import("@/lib/scoring-version");
+  const { detectContractKind } = await import("@/lib/contract-scoring");
+
+  const temporal = await analyzeTokenTemporal(rawAddress);
+  let detectionCreator: string | null = null;
+  try {
+    const det = await detectContractKind(rawAddress);
+    detectionCreator = det.info?.creatorAddress ?? null;
+  } catch {
+    // ignore
+  }
+  const staking = await deployerStakingBoost(detectionCreator);
+
+  const baseScore =
+    typeof payload.score === "number" ? payload.score : 50;
+  let score = Math.max(
+    0,
+    Math.min(100, Math.round(baseScore + temporal.scoreDelta + staking.boost))
+  );
+
+  const upstreamFlags = Array.isArray(payload.flags)
+    ? (payload.flags as unknown[]).map(String)
+    : [];
+  const flags = [
+    ...new Set([...upstreamFlags, ...temporal.flags, ...staking.flags]),
+  ];
+
+  if (flags.includes("EXIT_SYNC") && temporal.exitParticipants.length > 0) {
+    markCoordinatedExitParticipants(rawAddress, temporal.exitParticipants);
+  }
+
+  const confidence = confidenceEnumToNumber(
+    (payload.confidence as string | number | undefined) ??
+      (temporal.metrics.transferSample >= 20 ? "HIGH" : "MEDIUM")
+  );
+
+  const tier =
+    typeof payload.tier === "string"
+      ? payload.tier
+      : score >= 80
+        ? "HIGH_ELITE"
+        : score >= 60
+          ? "HIGH"
+          : score >= 40
+            ? "MEDIUM"
+            : "LOW";
+
+  const observations = [...temporal.observations, ...staking.observations];
+  const intel = recordIntelligence({
+    subject: rawAddress,
+    subjectType: "token",
+    score,
+    tier,
+    confidence,
+    flags,
+    scoringVersion: SCORING_VERSION,
+    observations,
+  });
+  const { buildExplainability } = await import(
+    "@/lib/trust-intelligence/explainability"
+  );
+  const explain = buildExplainability({
+    score,
+    tier,
+    confidence: intel.confidence,
+    flags,
+    observations,
+    scoreStability: intel.scoreStability,
+    directionDrivers: intel.directionDrivers,
+    subjectType: "token",
+  });
+
+  return {
+    ...payload,
+    score,
+    tier,
+    confidence: intel.confidence,
+    flags,
+    summary: intel.summary,
+    publicExplain: explain.public,
+    protocolExplain: explain.protocol,
+    scoreStability: intel.scoreStability,
+    directionDrivers: intel.directionDrivers,
+    snapshotId: intel.snapshotId,
+    scoringVersion: SCORING_VERSION,
+    queriedAt: intel.queriedAt,
+    temporal: temporal.metrics,
+  };
+}
+
 async function forwardToTokenOracle(
   req: NextRequest,
   rawAddress: string
@@ -112,6 +217,44 @@ async function forwardToTokenOracle(
 
   const headers = pickResponseHeaders(upstream);
   const body = await upstream.arrayBuffer();
+
+  // Phase 3: enrich successful paid score responses with temporal intelligence
+  if (
+    upstream.status === 200 &&
+    req.method === "GET" &&
+    (headers.get("content-type") ?? "").toLowerCase().includes("application/json")
+  ) {
+    try {
+      const text = new TextDecoder().decode(body);
+      const parsed: unknown = JSON.parse(text);
+      if (
+        typeof parsed === "object" &&
+        parsed !== null &&
+        (typeof (parsed as { score?: unknown }).score === "number" ||
+          (parsed as { tier?: string }).tier === "VERIFIED")
+      ) {
+        const enriched = await enrichTokenScore(
+          rawAddress,
+          parsed as Record<string, unknown>
+        );
+        const newBody = JSON.stringify(enriched);
+        const newHeaders = new Headers(headers);
+        newHeaders.set("content-type", "application/json; charset=utf-8");
+        newHeaders.delete("etag");
+        newHeaders.delete("last-modified");
+        return new NextResponse(newBody, {
+          status: 200,
+          statusText: "OK",
+          headers: newHeaders,
+        });
+      }
+    } catch (err) {
+      console.error(
+        "[token-intel] enrich failed, passing upstream:",
+        err instanceof Error ? err.message : err
+      );
+    }
+  }
 
   return new NextResponse(body, {
     status: upstream.status,

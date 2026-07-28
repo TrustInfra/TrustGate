@@ -6,6 +6,7 @@ import { scoreBatch } from "@/lib/discovery/client";
 import { TrustBadge } from "@/lib/discovery/TrustBadge";
 import { TrustFlags } from "@/lib/discovery/TrustFlags";
 import { reorderByTrust } from "@/lib/discovery/reorder";
+import { rankGroupsByTrust } from "@/lib/discovery/group-rank";
 
 // ============================================================================
 // /discovery: our own reference surface for Phase 2b. It is NOT a partner UI.
@@ -48,6 +49,7 @@ export default function DiscoveryPage() {
   const [scores, setScores] = useState<ScoreMap | null>(null);
   const [loading, setLoading] = useState(true);
   const [orderByTrust, setOrderByTrust] = useState(false);
+  const [groupByTicker, setGroupByTicker] = useState(true);
 
   useEffect(() => {
     let live = true;
@@ -69,8 +71,16 @@ export default function DiscoveryPage() {
 
   const list = useMemo(() => {
     if (!orderByTrust || !scores) return MOCK_TOKENS;
+    if (groupByTicker) {
+      return rankGroupsByTrust(
+        MOCK_TOKENS,
+        (t) => t.address,
+        (t) => t.symbol,
+        scores
+      );
+    }
     return reorderByTrust(MOCK_TOKENS, (t) => t.address, scores);
-  }, [orderByTrust, scores]);
+  }, [orderByTrust, groupByTicker, scores]);
 
   return (
     <main style={styles.page}>
@@ -92,9 +102,20 @@ export default function DiscoveryPage() {
             />
             <span>Order by trust</span>
           </label>
+          <label style={styles.toggle}>
+            <input
+              type="checkbox"
+              checked={groupByTicker}
+              disabled={!orderByTrust}
+              onChange={(e) => setGroupByTicker(e.target.checked)}
+            />
+            <span>Group same ticker</span>
+          </label>
           <span style={styles.hint}>
             {orderByTrust
-              ? "Reordered by trust. Low and blocked sink to the bottom, marked not hidden."
+              ? groupByTicker
+                ? "Within each ticker, high trust rises; rugs sink, marked not hidden."
+                : "Global reorder by trust. Low and blocked sink to the bottom."
               : "Plain launch order. Nothing reordered."}
           </span>
         </div>

@@ -591,7 +591,7 @@ def get_trust_score(address: str) -> dict:
           dimension
         </li>
         <li>
-          DAO Risk Alerts — subscription alerts for lending protocols and
+          DAO Risk Alerts — free protocol guard alerts for lending protocols and
           DAOs
         </li>
         <li>

@@ -16,6 +16,10 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { path: "/dashboard", changeFrequency: "weekly", priority: 0.8 },
     { path: "/demo", changeFrequency: "monthly", priority: 0.7 },
     { path: "/roadmap", changeFrequency: "monthly", priority: 0.7 },
+    { path: "/discovery", changeFrequency: "weekly", priority: 0.7 },
+    { path: "/staking", changeFrequency: "weekly", priority: 0.7 },
+    { path: "/protocol-guard", changeFrequency: "weekly", priority: 0.8 },
+    { path: "/gating", changeFrequency: "weekly", priority: 0.8 },
     { path: "/agents/live", changeFrequency: "daily", priority: 0.7 },
     { path: "/docs", changeFrequency: "weekly", priority: 0.8 },
     { path: "/docs/how-it-works", changeFrequency: "monthly", priority: 0.7 },
@@ -34,6 +38,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { path: "/docs/dashboard-guide", changeFrequency: "monthly", priority: 0.6 },
     { path: "/docs/widget-integration", changeFrequency: "monthly", priority: 0.6 },
     { path: "/docs/api-reference", changeFrequency: "monthly", priority: 0.6 },
+    { path: "/docs/gating", changeFrequency: "monthly", priority: 0.7 },
   ];
 
   return routes.map((route) => ({
