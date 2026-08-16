@@ -1,5 +1,7 @@
 import "server-only";
 
+import { envNumber } from "@/lib/env-number";
+
 // Post-processing layer for the wallet oracle proxy. Mirrors the caps,
 // bot detectors, and tier bands defined in oracle/token-scoring.ts so the
 // public proxy is the final authority on wallet scores regardless of what
@@ -18,18 +20,18 @@ const ARC_RPC_URL = "https://rpc.testnet.arc.network";
 // unreachable. A missing-env deploy therefore degrades to obviously-neutered
 // scoring (no caps, no flags, elite gates closed) rather than leaking or
 // silently faking the real values.
-const BOT_FLAG_PENALTY = Number(process.env.SCORING_WALLET_BOT_FLAG_PENALTY ?? 0);
-const VELOCITY_TXS_PER_HOUR = Number(process.env.SCORING_WALLET_VELOCITY_TXS_PER_HOUR ?? 999999);
-const INTERVAL_PATTERN_MIN_SAMPLE = Number(process.env.SCORING_WALLET_INTERVAL_PATTERN_MIN_SAMPLE ?? 999999);
-const INTERVAL_PATTERN_TOLERANCE = Number(process.env.SCORING_WALLET_INTERVAL_PATTERN_TOLERANCE ?? 0);
-const INTERVAL_PATTERN_DOMINANCE = Number(process.env.SCORING_WALLET_INTERVAL_PATTERN_DOMINANCE ?? 999999);
-const SELF_INTERACTION_THRESHOLD = Number(process.env.SCORING_WALLET_SELF_INTERACTION_THRESHOLD ?? 999999);
+const BOT_FLAG_PENALTY = envNumber("SCORING_WALLET_BOT_FLAG_PENALTY", 0);
+const VELOCITY_TXS_PER_HOUR = envNumber("SCORING_WALLET_VELOCITY_TXS_PER_HOUR", 999999);
+const INTERVAL_PATTERN_MIN_SAMPLE = envNumber("SCORING_WALLET_INTERVAL_PATTERN_MIN_SAMPLE", 999999);
+const INTERVAL_PATTERN_TOLERANCE = envNumber("SCORING_WALLET_INTERVAL_PATTERN_TOLERANCE", 0);
+const INTERVAL_PATTERN_DOMINANCE = envNumber("SCORING_WALLET_INTERVAL_PATTERN_DOMINANCE", 999999);
+const SELF_INTERACTION_THRESHOLD = envNumber("SCORING_WALLET_SELF_INTERACTION_THRESHOLD", 999999);
 // Clean-history is a youth-of-wallet signal: a brand-new wallet with hundreds
 // of perfect txs is suspicious; a mature wallet with a clean record is just
 // careful. Only flag when all three hold: high volume, zero failures, fresh.
 // Neutral fallback closes the flag (min-txs unreachable, max-age 0).
-const CLEAN_HISTORY_MIN_TXS = Number(process.env.SCORING_WALLET_CLEAN_HISTORY_MIN_TXS ?? 999999);
-const CLEAN_HISTORY_MAX_AGE_DAYS = Number(process.env.SCORING_WALLET_CLEAN_HISTORY_MAX_AGE_DAYS ?? 0);
+const CLEAN_HISTORY_MIN_TXS = envNumber("SCORING_WALLET_CLEAN_HISTORY_MIN_TXS", 999999);
+const CLEAN_HISTORY_MAX_AGE_DAYS = envNumber("SCORING_WALLET_CLEAN_HISTORY_MAX_AGE_DAYS", 0);
 
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
@@ -40,41 +42,41 @@ const TX_PAGES = 5;
 // Hard caps and tier gates. Caps default to 100 (no cap); gate mins default to
 // 999999 (unreachable, so a missing-env deploy keeps every elite/perfect gate
 // closed rather than accidentally open).
-const HARD_CAP = Number(process.env.SCORING_WALLET_HARD_CAP ?? 100);
-const NON_ELITE_CAP = Number(process.env.SCORING_WALLET_NON_ELITE_CAP ?? 100);
-const NON_PERFECT_CAP = Number(process.env.SCORING_WALLET_NON_PERFECT_CAP ?? 100);
+const HARD_CAP = envNumber("SCORING_WALLET_HARD_CAP", 100);
+const NON_ELITE_CAP = envNumber("SCORING_WALLET_NON_ELITE_CAP", 100);
+const NON_PERFECT_CAP = envNumber("SCORING_WALLET_NON_PERFECT_CAP", 100);
 
 // Fresh-wallet gate. Neutral fallback of 0 means the gate never triggers
 // (walletAgeDays < 0 and txCount < 0 are both impossible).
-const FRESH_MAX_AGE_DAYS = Number(process.env.SCORING_WALLET_FRESH_MAX_AGE_DAYS ?? 0);
-const FRESH_MIN_TXS = Number(process.env.SCORING_WALLET_FRESH_MIN_TXS ?? 0);
+const FRESH_MAX_AGE_DAYS = envNumber("SCORING_WALLET_FRESH_MAX_AGE_DAYS", 0);
+const FRESH_MIN_TXS = envNumber("SCORING_WALLET_FRESH_MIN_TXS", 0);
 
 // Two-or-more bot flags hard-cap rule. Neutral fallback of 999999 makes the
 // count-based hard cap unreachable.
-const BOT_FLAG_HARDCAP_COUNT = Number(process.env.SCORING_WALLET_BOT_FLAG_HARDCAP_COUNT ?? 999999);
+const BOT_FLAG_HARDCAP_COUNT = envNumber("SCORING_WALLET_BOT_FLAG_HARDCAP_COUNT", 999999);
 
 // HIGH_ELITE gate thresholds (all must hold simultaneously).
-const HIGH_ELITE_MIN_DEPLOYMENTS = Number(process.env.SCORING_WALLET_HIGH_ELITE_MIN_DEPLOYMENTS ?? 999999);
-const HIGH_ELITE_QUALITY_DEPLOYMENTS = Number(process.env.SCORING_WALLET_HIGH_ELITE_QUALITY_DEPLOYMENTS ?? 999999); // deployments with 100+ independent interactors
-const HIGH_ELITE_MIN_ACTIVE_MONTHS = Number(process.env.SCORING_WALLET_HIGH_ELITE_MIN_ACTIVE_MONTHS ?? 999999);
-const HIGH_ELITE_MIN_CATEGORIES = Number(process.env.SCORING_WALLET_HIGH_ELITE_MIN_CATEGORIES ?? 999999);
-const HIGH_ELITE_MIN_AGE_DAYS = Number(process.env.SCORING_WALLET_HIGH_ELITE_MIN_AGE_DAYS ?? 999999);
-const HIGH_ELITE_MIN_TXS = Number(process.env.SCORING_WALLET_HIGH_ELITE_MIN_TXS ?? 999999);
+const HIGH_ELITE_MIN_DEPLOYMENTS = envNumber("SCORING_WALLET_HIGH_ELITE_MIN_DEPLOYMENTS", 999999);
+const HIGH_ELITE_QUALITY_DEPLOYMENTS = envNumber("SCORING_WALLET_HIGH_ELITE_QUALITY_DEPLOYMENTS", 999999); // deployments with 100+ independent interactors
+const HIGH_ELITE_MIN_ACTIVE_MONTHS = envNumber("SCORING_WALLET_HIGH_ELITE_MIN_ACTIVE_MONTHS", 999999);
+const HIGH_ELITE_MIN_CATEGORIES = envNumber("SCORING_WALLET_HIGH_ELITE_MIN_CATEGORIES", 999999);
+const HIGH_ELITE_MIN_AGE_DAYS = envNumber("SCORING_WALLET_HIGH_ELITE_MIN_AGE_DAYS", 999999);
+const HIGH_ELITE_MIN_TXS = envNumber("SCORING_WALLET_HIGH_ELITE_MIN_TXS", 999999);
 
 // Score-of-100 gate thresholds (all HIGH_ELITE conditions plus these).
-const PERFECT_MIN_DEPLOYMENTS = Number(process.env.SCORING_WALLET_PERFECT_MIN_DEPLOYMENTS ?? 999999);
-const PERFECT_QUALITY_DEPLOYMENTS = Number(process.env.SCORING_WALLET_PERFECT_QUALITY_DEPLOYMENTS ?? 999999); // deployments with 500+ independent interactors
-const PERFECT_MIN_TXS = Number(process.env.SCORING_WALLET_PERFECT_MIN_TXS ?? 999999);
-const PERFECT_MIN_AGE_DAYS = Number(process.env.SCORING_WALLET_PERFECT_MIN_AGE_DAYS ?? 999999);
+const PERFECT_MIN_DEPLOYMENTS = envNumber("SCORING_WALLET_PERFECT_MIN_DEPLOYMENTS", 999999);
+const PERFECT_QUALITY_DEPLOYMENTS = envNumber("SCORING_WALLET_PERFECT_QUALITY_DEPLOYMENTS", 999999); // deployments with 500+ independent interactors
+const PERFECT_MIN_TXS = envNumber("SCORING_WALLET_PERFECT_MIN_TXS", 999999);
+const PERFECT_MIN_AGE_DAYS = envNumber("SCORING_WALLET_PERFECT_MIN_AGE_DAYS", 999999);
 
 // Confidence thresholds. HIGH thresholds default to 999999 (HIGH unreachable)
 // and LOW thresholds to 0 (LOW never triggers), so a missing-env deploy reports
 // a neutral MEDIUM confidence everywhere.
-const CONFIDENCE_HIGH_AGE_DAYS = Number(process.env.SCORING_WALLET_CONFIDENCE_HIGH_AGE_DAYS ?? 999999);
-const CONFIDENCE_HIGH_TXS = Number(process.env.SCORING_WALLET_CONFIDENCE_HIGH_TXS ?? 999999);
-const CONFIDENCE_HIGH_QUALITY_DEPLOYMENTS = Number(process.env.SCORING_WALLET_CONFIDENCE_HIGH_QUALITY_DEPLOYMENTS ?? 999999);
-const CONFIDENCE_LOW_AGE_DAYS = Number(process.env.SCORING_WALLET_CONFIDENCE_LOW_AGE_DAYS ?? 0);
-const CONFIDENCE_LOW_TXS = Number(process.env.SCORING_WALLET_CONFIDENCE_LOW_TXS ?? 0);
+const CONFIDENCE_HIGH_AGE_DAYS = envNumber("SCORING_WALLET_CONFIDENCE_HIGH_AGE_DAYS", 999999);
+const CONFIDENCE_HIGH_TXS = envNumber("SCORING_WALLET_CONFIDENCE_HIGH_TXS", 999999);
+const CONFIDENCE_HIGH_QUALITY_DEPLOYMENTS = envNumber("SCORING_WALLET_CONFIDENCE_HIGH_QUALITY_DEPLOYMENTS", 999999);
+const CONFIDENCE_LOW_AGE_DAYS = envNumber("SCORING_WALLET_CONFIDENCE_LOW_AGE_DAYS", 0);
+const CONFIDENCE_LOW_TXS = envNumber("SCORING_WALLET_CONFIDENCE_LOW_TXS", 0);
 
 export type WalletTier = "LOW" | "MEDIUM" | "HIGH" | "HIGH_ELITE";
 export type WalletRecommendation =
@@ -343,6 +345,8 @@ export interface RescoreResult {
   flags: string[];
   /** Why the score is not in the next tier up. Empty when no cap applies. */
   limitations: string[];
+  /** Hard cap applied by the formula — marks/staking must not exceed it */
+  appliedCap: number;
 }
 
 function computeConfidence(signals: Signals): Confidence {
@@ -505,6 +509,7 @@ function applyFormula(rawScore: number, signals: Signals): RescoreResult {
       tier,
       score,
     }),
+    appliedCap: cap,
   };
 }
 
@@ -597,7 +602,7 @@ export async function rescoreWallet(
       score = Math.max(0, score - penalty);
     }
     if (staking.scoreBoost > 0) {
-      score = Math.min(100, score + staking.scoreBoost);
+      score = Math.min(base.appliedCap, score + staking.scoreBoost);
       flags.push("STAKING_COMMITTED");
     }
     for (const g of staking.gamingFlags) {
@@ -616,6 +621,7 @@ export async function rescoreWallet(
     );
   }
 
+  score = Math.min(base.appliedCap, Math.max(0, score));
   const tier = tierFor(score);
   return {
     ...base,

@@ -42,57 +42,56 @@ describe("AgentRegistry", function () {
 
   describe("Registration", function () {
     it("should register an agent", async function () {
-      await registry.connect(agentOwner1).registerAgent(agent1.address, "ipfs://agent1");
+      await registry.connect(agent1).registerAgent(agent1.address, "ipfs://agent1");
 
       const [agOwner, status, registeredAt, metadataURI] =
         await registry.getAgent(agent1.address);
 
-      expect(agOwner).to.equal(agentOwner1.address);
+      expect(agOwner).to.equal(agent1.address);
       expect(status).to.equal(1); // Active
       expect(registeredAt).to.be.gt(0);
       expect(metadataURI).to.equal("ipfs://agent1");
     });
 
     it("should increment totalActiveAgents", async function () {
-      await registry.connect(agentOwner1).registerAgent(agent1.address, "");
+      await registry.connect(agent1).registerAgent(agent1.address, "");
       expect(await registry.totalActiveAgents()).to.equal(1);
 
-      await registry.connect(agentOwner1).registerAgent(agent2.address, "");
+      await registry.connect(agent2).registerAgent(agent2.address, "");
       expect(await registry.totalActiveAgents()).to.equal(2);
     });
 
     it("should mark caller as agent owner", async function () {
-      expect(await registry.isAgentOwner(agentOwner1.address)).to.equal(false);
+      expect(await registry.isAgentOwner(agent1.address)).to.equal(false);
 
-      await registry.connect(agentOwner1).registerAgent(agent1.address, "");
-      expect(await registry.isAgentOwner(agentOwner1.address)).to.equal(true);
+      await registry.connect(agent1).registerAgent(agent1.address, "");
+      expect(await registry.isAgentOwner(agent1.address)).to.equal(true);
     });
 
     it("should track agents by owner", async function () {
-      await registry.connect(agentOwner1).registerAgent(agent1.address, "");
-      await registry.connect(agentOwner1).registerAgent(agent2.address, "");
+      await registry.connect(agent1).registerAgent(agent1.address, "");
+      await registry.connect(agent2).registerAgent(agent2.address, "");
 
-      const agents = await registry.getAgentsByOwner(agentOwner1.address);
-      expect(agents).to.have.lengthOf(2);
+      const agents = await registry.getAgentsByOwner(agent1.address);
+      expect(agents).to.have.lengthOf(1);
       expect(agents[0]).to.equal(agent1.address);
-      expect(agents[1]).to.equal(agent2.address);
     });
 
     it("should emit AgentRegistered event", async function () {
       await expect(
-        registry.connect(agentOwner1).registerAgent(agent1.address, "ipfs://meta")
+        registry.connect(agent1).registerAgent(agent1.address, "ipfs://meta")
       )
         .to.emit(registry, "AgentRegistered")
-        .withArgs(agent1.address, agentOwner1.address, "ipfs://meta");
+        .withArgs(agent1.address, agent1.address, "ipfs://meta");
     });
 
     it("should allow different owners to register different agents", async function () {
-      await registry.connect(agentOwner1).registerAgent(agent1.address, "");
-      await registry.connect(agentOwner2).registerAgent(agent2.address, "");
+      await registry.connect(agent1).registerAgent(agent1.address, "");
+      await registry.connect(agent2).registerAgent(agent2.address, "");
 
-      expect(await registry.isActiveAgent(agentOwner1.address, agent1.address)).to.equal(true);
-      expect(await registry.isActiveAgent(agentOwner2.address, agent2.address)).to.equal(true);
-      expect(await registry.isActiveAgent(agentOwner1.address, agent2.address)).to.equal(false);
+      expect(await registry.isActiveAgent(agent1.address, agent1.address)).to.equal(true);
+      expect(await registry.isActiveAgent(agent2.address, agent2.address)).to.equal(true);
+      expect(await registry.isActiveAgent(agent1.address, agent2.address)).to.equal(false);
     });
 
     it("should revert on zero address agent", async function () {
@@ -101,11 +100,17 @@ describe("AgentRegistry", function () {
       ).to.be.revertedWithCustomError(registry, "ZeroAddress");
     });
 
+    it("should revert when caller is not the agent address", async function () {
+      await expect(
+        registry.connect(agentOwner1).registerAgent(agent1.address, "")
+      ).to.be.revertedWithCustomError(registry, "CallerMustBeAgent");
+    });
+
     it("should revert on duplicate registration", async function () {
-      await registry.connect(agentOwner1).registerAgent(agent1.address, "");
+      await registry.connect(agent1).registerAgent(agent1.address, "");
 
       await expect(
-        registry.connect(agentOwner2).registerAgent(agent1.address, "")
+        registry.connect(agent1).registerAgent(agent1.address, "")
       ).to.be.revertedWithCustomError(registry, "AgentAlreadyRegistered");
     });
   });
@@ -116,11 +121,11 @@ describe("AgentRegistry", function () {
 
   describe("Deactivation", function () {
     beforeEach(async function () {
-      await registry.connect(agentOwner1).registerAgent(agent1.address, "");
+      await registry.connect(agent1).registerAgent(agent1.address, "");
     });
 
     it("should deactivate an agent", async function () {
-      await registry.connect(agentOwner1).deactivateAgent(agent1.address);
+      await registry.connect(agent1).deactivateAgent(agent1.address);
 
       const [, status] = await registry.getAgent(agent1.address);
       expect(status).to.equal(3); // Deactivated
@@ -129,21 +134,21 @@ describe("AgentRegistry", function () {
     it("should decrement totalActiveAgents", async function () {
       expect(await registry.totalActiveAgents()).to.equal(1);
 
-      await registry.connect(agentOwner1).deactivateAgent(agent1.address);
+      await registry.connect(agent1).deactivateAgent(agent1.address);
       expect(await registry.totalActiveAgents()).to.equal(0);
     });
 
     it("should report agent as not active after deactivation", async function () {
-      await registry.connect(agentOwner1).deactivateAgent(agent1.address);
-      expect(await registry.isActiveAgent(agentOwner1.address, agent1.address)).to.equal(false);
+      await registry.connect(agent1).deactivateAgent(agent1.address);
+      expect(await registry.isActiveAgent(agent1.address, agent1.address)).to.equal(false);
     });
 
     it("should emit AgentDeactivated event", async function () {
       await expect(
-        registry.connect(agentOwner1).deactivateAgent(agent1.address)
+        registry.connect(agent1).deactivateAgent(agent1.address)
       )
         .to.emit(registry, "AgentDeactivated")
-        .withArgs(agent1.address, agentOwner1.address);
+        .withArgs(agent1.address, agent1.address);
     });
 
     it("should revert deactivation from non-owner", async function () {
@@ -154,15 +159,15 @@ describe("AgentRegistry", function () {
 
     it("should revert deactivation for unregistered agent", async function () {
       await expect(
-        registry.connect(agentOwner1).deactivateAgent(agent2.address)
+        registry.connect(agent1).deactivateAgent(agent2.address)
       ).to.be.revertedWithCustomError(registry, "AgentNotFound");
     });
 
     it("should revert double deactivation", async function () {
-      await registry.connect(agentOwner1).deactivateAgent(agent1.address);
+      await registry.connect(agent1).deactivateAgent(agent1.address);
 
       await expect(
-        registry.connect(agentOwner1).deactivateAgent(agent1.address)
+        registry.connect(agent1).deactivateAgent(agent1.address)
       ).to.be.revertedWithCustomError(registry, "InvalidStatusTransition");
     });
   });
@@ -173,7 +178,7 @@ describe("AgentRegistry", function () {
 
   describe("Suspension & Reactivation", function () {
     beforeEach(async function () {
-      await registry.connect(agentOwner1).registerAgent(agent1.address, "");
+      await registry.connect(agent1).registerAgent(agent1.address, "");
     });
 
     it("should suspend an active agent (contract owner only)", async function () {
@@ -239,7 +244,7 @@ describe("AgentRegistry", function () {
       await registry.connect(owner).suspendAgent(agent1.address);
 
       // Agent owner should still be able to deactivate a suspended agent
-      await registry.connect(agentOwner1).deactivateAgent(agent1.address);
+      await registry.connect(agent1).deactivateAgent(agent1.address);
       const [, status] = await registry.getAgent(agent1.address);
       expect(status).to.equal(3); // Deactivated
     });
@@ -251,11 +256,11 @@ describe("AgentRegistry", function () {
 
   describe("Metadata", function () {
     beforeEach(async function () {
-      await registry.connect(agentOwner1).registerAgent(agent1.address, "ipfs://v1");
+      await registry.connect(agent1).registerAgent(agent1.address, "ipfs://v1");
     });
 
     it("should update metadata", async function () {
-      await registry.connect(agentOwner1).updateMetadata(agent1.address, "ipfs://v2");
+      await registry.connect(agent1).updateMetadata(agent1.address, "ipfs://v2");
 
       const [, , , metadataURI] = await registry.getAgent(agent1.address);
       expect(metadataURI).to.equal("ipfs://v2");
@@ -263,7 +268,7 @@ describe("AgentRegistry", function () {
 
     it("should emit AgentMetadataUpdated event", async function () {
       await expect(
-        registry.connect(agentOwner1).updateMetadata(agent1.address, "ipfs://v2")
+        registry.connect(agent1).updateMetadata(agent1.address, "ipfs://v2")
       )
         .to.emit(registry, "AgentMetadataUpdated")
         .withArgs(agent1.address, "ipfs://v2");
@@ -303,7 +308,7 @@ describe("AgentRegistry", function () {
     });
 
     it("should report isActiveAgent false for wrong owner", async function () {
-      await registry.connect(agentOwner1).registerAgent(agent1.address, "");
+      await registry.connect(agent1).registerAgent(agent1.address, "");
       expect(await registry.isActiveAgent(agentOwner2.address, agent1.address)).to.equal(false);
     });
 
@@ -326,7 +331,7 @@ describe("AgentRegistry", function () {
     });
 
     it("should allow new owner to suspend agents", async function () {
-      await registry.connect(agentOwner1).registerAgent(agent1.address, "");
+      await registry.connect(agent1).registerAgent(agent1.address, "");
 
       await registry.connect(owner).transferOwnership(agentOwner2.address);
       await registry.connect(agentOwner2).acceptOwnership();

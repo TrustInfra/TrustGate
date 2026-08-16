@@ -45,6 +45,8 @@ const REGISTRY_ERROR_MESSAGES: Record<string, string> = {
     "This address is already registered. Each agent can only be registered once.",
   AgentNotFound: "Agent not found in the registry.",
   NotAgentOwner: "Only the registering wallet can modify this agent.",
+  CallerMustBeAgent:
+    "You can only register the connected wallet. Agent address must equal the signer.",
   AgentNotActive: "Agent is not currently active.",
 };
 
@@ -750,6 +752,13 @@ export default function AgentPanel() {
       }
       return "This address is already registered by another wallet.";
     }
+    if (
+      address &&
+      agentAddrValid &&
+      agentAddr.toLowerCase() !== address.toLowerCase()
+    ) {
+      return "You can only register the connected wallet as the agent.";
+    }
     if (insufficientGas) {
       return "Insufficient USDC for gas on Arc — add at least 0.01 USDC to your wallet.";
     }
@@ -765,6 +774,7 @@ export default function AgentPanel() {
 
   const handleRegister = () => {
     if (!agentAddr || !agentAddrValid || alreadyRegistered) return;
+    if (!address || agentAddr.toLowerCase() !== address.toLowerCase()) return;
     setRegisterError(null);
     resetRegister();
     register(
@@ -789,6 +799,7 @@ export default function AgentPanel() {
   const canSubmit =
     !!address &&
     agentAddrValid &&
+    agentAddr.toLowerCase() === address.toLowerCase() &&
     !alreadyRegistered &&
     !insufficientGas &&
     !isRegistering &&
@@ -847,7 +858,7 @@ export default function AgentPanel() {
                 address &&
                 agentAddr.toLowerCase() === address.toLowerCase()
                   ? "Using your connected wallet"
-                  : "Defaults to your connected wallet — the caller becomes the agent owner"
+                  : "Must be the connected wallet — you can only register yourself"
               }
             />
             {address && agentAddr.toLowerCase() !== address.toLowerCase() && (

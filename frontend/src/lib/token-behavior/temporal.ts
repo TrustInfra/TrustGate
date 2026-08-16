@@ -1,5 +1,12 @@
 import "server-only";
 
+import { envNumber } from "@/lib/env-number";
+import {
+  classifyPostDistributionVolume,
+  countBidirectionalWashPairs,
+  isWashWallet,
+} from "./heuristics";
+
 /**
  * Temporal Token Shield signals (Phase 3 — INTERNAL_ROADMAP).
  * Hold duration, exit ratio (% sold back), wash trading, honeypot
@@ -11,17 +18,16 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const HOUR_MS = 60 * 60 * 1000;
 
 // Env-tunable (neutral defaults if missing — still functional heuristics)
-const SHORT_HOLD_HOURS = Number(process.env.SCORING_TEMPORAL_SHORT_HOLD_HOURS ?? 6);
-const EXIT_MAJORITY_PCT = Number(process.env.SCORING_TEMPORAL_EXIT_MAJORITY_PCT ?? 70);
-const EXIT_WINDOW_MS = Number(
-  process.env.SCORING_TEMPORAL_EXIT_WINDOW_MS ?? 3 * DAY_MS
+const SHORT_HOLD_HOURS = envNumber("SCORING_TEMPORAL_SHORT_HOLD_HOURS", 6);
+const EXIT_MAJORITY_PCT = envNumber("SCORING_TEMPORAL_EXIT_MAJORITY_PCT", 70);
+const EXIT_WINDOW_MS = envNumber("SCORING_TEMPORAL_EXIT_WINDOW_MS", 3 * DAY_MS);
+const HONEYPOT_SELL_BUY_RATIO = envNumber(
+  "SCORING_TEMPORAL_HONEYPOT_SELL_BUY_RATIO",
+  0.05
 );
-const HONEYPOT_SELL_BUY_RATIO = Number(
-  process.env.SCORING_TEMPORAL_HONEYPOT_SELL_BUY_RATIO ?? 0.05
-);
-const DIST_PERIOD_MS = Number(
-  process.env.SCORING_TEMPORAL_DIST_PERIOD_MS ?? 2 * DAY_MS
-);
+const DIST_PERIOD_MS = envNumber("SCORING_TEMPORAL_DIST_PERIOD_MS", 2 * DAY_MS);
+/** Min majority-exit wallets in EXIT_WINDOW for EXIT_SYNC (was 4; raised for thin testnet). */
+const EXIT_SYNC_MIN_PARTICIPANTS = 10;
 
 export interface TemporalTokenResult {
   flags: string[];
@@ -135,7 +141,7 @@ export async function analyzeTokenTemporal(
         ts: Number.isFinite(ts) ? ts : 0,
       };
     })
-    .filter((t) => t.from && t.to)
+    .filter((t) => t.from && t.to && t.ts > 0 && t.amount > 0)
     .sort((a, b) => a.ts - b.ts);
 
   const holderCount = Math.max(
@@ -181,10 +187,6 @@ export async function analyzeTokenTemporal(
     return f;
   };
 
-  let buyVolumeSample = 0;
-  let sellVolumeSample = 0;
-  const firstTransferTs = transfers.length > 0 ? transfers[0].ts : 0;
-
   for (const t of transfers) {
     const amt = t.amount > 0 ? t.amount : 1;
     const toF = ensure(t.to);
@@ -195,41 +197,10 @@ export async function analyzeTokenTemporal(
     fromF.sold += amt;
     fromF.sellCount += 1;
     if (fromF.lastOut === null || t.ts > fromF.lastOut) fromF.lastOut = t.ts;
-
-    // After initial distribution window, classify volume
-    if (firstTransferTs && t.ts >= firstTransferTs + DIST_PERIOD_MS) {
-      // Heuristic: transfers from dense early holders toward new wallets = sells
-      // We accumulate both legs; honeypot uses aggregate sell vs buy after dist
-      buyVolumeSample += amt;
-      sellVolumeSample += amt * 0.5; // refined below using unique patterns
-    }
   }
 
-  // Better buy/sell volume after distribution: first half of timeline ≈ dist,
-  // second half measure direction from early holders
-  const midTs =
-    firstTransferTs && transfers.length
-      ? firstTransferTs + DIST_PERIOD_MS
-      : 0;
-  let postDistBuy = 0;
-  let postDistSell = 0;
-  if (midTs) {
-    const earlyRecipients = new Set<string>();
-    for (const t of transfers) {
-      if (t.ts < midTs) earlyRecipients.add(t.to);
-    }
-    for (const t of transfers) {
-      if (t.ts < midTs) continue;
-      const amt = t.amount > 0 ? t.amount : 1;
-      if (earlyRecipients.has(t.from)) postDistSell += amt;
-      if (!earlyRecipients.has(t.to) || earlyRecipients.has(t.from) === false) {
-        postDistBuy += amt;
-      }
-      if (!earlyRecipients.has(t.to)) postDistBuy += amt * 0.25;
-    }
-  }
-  buyVolumeSample = postDistBuy || buyVolumeSample;
-  sellVolumeSample = postDistSell || sellVolumeSample;
+  const { buyVolume: buyVolumeSample, sellVolume: sellVolumeSample } =
+    classifyPostDistributionVolume(transfers, DIST_PERIOD_MS);
 
   // Exit ratio: sold / bought per wallet
   const exitRatios: number[] = [];
@@ -262,7 +233,7 @@ export async function analyzeTokenTemporal(
     scoreDelta -= 8;
   }
 
-  if (majorityExitWalletCount >= 4) {
+  if (majorityExitWalletCount >= EXIT_SYNC_MIN_PARTICIPANTS) {
     // Cluster majority exits in rolling window → pump/dump coordination
     majorityExitEvents.sort((a, b) => a.ts - b.ts);
     let best = 1;
@@ -281,7 +252,7 @@ export async function analyzeTokenTemporal(
         bestRange = [j, i];
       }
     }
-    if (best >= 4) {
+    if (best >= EXIT_SYNC_MIN_PARTICIPANTS) {
       flags.push("EXIT_SYNC");
       observations.push(
         "Multiple wallets sold majority positions in a synchronized window"
@@ -329,21 +300,11 @@ export async function analyzeTokenTemporal(
     scoreDelta += 3;
   }
 
-  // Wash trading: bilateral pairs + same wallet rapid buy/sell
-  const pairCounts = new Map<string, number>();
+  // Wash trading: bidirectional repeat pairs + balanced buy/sell wallets
+  const circularPairs = countBidirectionalWashPairs(transfers);
   let washWallets = 0;
-  for (const t of transfers) {
-    const a = t.from < t.to ? t.from : t.to;
-    const b = t.from < t.to ? t.to : t.from;
-    const key = `${a}|${b}`;
-    pairCounts.set(key, (pairCounts.get(key) ?? 0) + 1);
-  }
-  let circularPairs = 0;
-  for (const c of pairCounts.values()) {
-    if (c >= 4) circularPairs += 1;
-  }
   for (const f of flows.values()) {
-    if (f.buyCount >= 3 && f.sellCount >= 3) washWallets += 1;
+    if (isWashWallet(f)) washWallets += 1;
   }
   if (
     circularPairs >= 2 ||

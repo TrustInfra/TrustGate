@@ -15,6 +15,7 @@ interface ITrustScoring {
     function isScoreExpired(address account) external view returns (bool);
 
     /// @notice Returns the plaintext trust tier: 2 = HIGH, 1 = MEDIUM, 0 = LOW.
-    /// @dev    Only accurate when score was set via a plaintext setter.
+    /// @dev    Reverts if the score is missing, expired, or was last written
+    ///         via encrypted input (no fresh plaintext cache).
     function getTrustTierPlaintext(address account) external view returns (uint8);
 }

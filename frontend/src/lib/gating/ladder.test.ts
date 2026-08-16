@@ -3,7 +3,14 @@ import {
   EXAMPLE_LENDING_LADDER,
   evaluateLadder,
 } from "./ladder";
-import { hashFlags, defaultTtlSeconds } from "./eip712";
+import {
+  hashFlags,
+  defaultTtlSeconds,
+  clampAttestationTtl,
+  MAX_ATTESTATION_TTL_SECONDS,
+  MIN_ATTESTATION_TTL_SECONDS,
+} from "./eip712";
+import { computeGatingAllowed } from "./decide";
 
 describe("protocol ladder (illustrative)", () => {
   it("rejects amount above band for score 48", () => {
@@ -54,6 +61,15 @@ describe("protocol ladder (illustrative)", () => {
     });
     expect(r.allowed).toBe(false);
   });
+
+  it("fails closed when band maxAmount is 0 even if amount is omitted", () => {
+    const r = evaluateLadder(10, EXAMPLE_LENDING_LADDER, {
+      capability: "borrow",
+      confidence: 80,
+    });
+    expect(r.allowed).toBe(false);
+    expect(r.matchedBand?.maxAmount).toBe(0);
+  });
 });
 
 describe("attestation helpers", () => {
@@ -67,5 +83,53 @@ describe("attestation helpers", () => {
     expect(defaultTtlSeconds("financial_high")).toBeLessThan(
       defaultTtlSeconds("allowlist")
     );
+  });
+
+  it("clamps attacker-controlled ttlSeconds", () => {
+    expect(clampAttestationTtl(10 ** 12, "financial_high")).toBe(
+      MAX_ATTESTATION_TTL_SECONDS
+    );
+    expect(clampAttestationTtl(1, "financial_high")).toBe(
+      MIN_ATTESTATION_TTL_SECONDS
+    );
+    expect(clampAttestationTtl(undefined, "financial_high")).toBe(
+      defaultTtlSeconds("financial_high")
+    );
+    expect(clampAttestationTtl(Number.NaN, "allowlist")).toBe(
+      defaultTtlSeconds("allowlist")
+    );
+  });
+});
+
+describe("gating allow decision", () => {
+  it("fails closed when attestation is invalid even if ladder allows", () => {
+    expect(
+      computeGatingAllowed({
+        walletAllowed: true,
+        attestationValid: false,
+        scoringVersionAllowed: true,
+      })
+    ).toBe(false);
+  });
+
+  it("fails closed when token ladder rejects", () => {
+    expect(
+      computeGatingAllowed({
+        walletAllowed: true,
+        tokenAllowed: false,
+        attestationValid: true,
+        scoringVersionAllowed: true,
+      })
+    ).toBe(false);
+  });
+
+  it("allows only when every explicit gate passes", () => {
+    expect(
+      computeGatingAllowed({
+        walletAllowed: true,
+        attestationValid: true,
+        scoringVersionAllowed: true,
+      })
+    ).toBe(true);
   });
 });

@@ -115,6 +115,7 @@ function isStakeLike(tx: ArcscanTx): "stake" | "unstake" | null {
 
   if (
     method.includes("unstake") ||
+    method.includes("unlock") ||
     method.includes("withdraw") ||
     method.includes("redeem")
   ) {
@@ -123,7 +124,7 @@ function isStakeLike(tx: ArcscanTx): "stake" | "unstake" | null {
   if (
     method.includes("stake") ||
     method.includes("delegate") ||
-    method.includes("lock") ||
+    (method.includes("lock") && !method.includes("unlock")) ||
     STAKE_SELECTORS.has(sel)
   ) {
     return "stake";
@@ -136,15 +137,15 @@ function isStakeLike(tx: ArcscanTx): "stake" | "unstake" | null {
 /** Parse tx value as USD proxy (native units — Arc testnet; scale conservatively). */
 function valueUsdProxy(tx: ArcscanTx): number {
   const raw = tx.value;
-  if (!raw) return 50; // unknown size → mid-low band default for heuristic
+  if (!raw) return 0;
   try {
     const wei = BigInt(raw);
     // Assume 18 decimals; treat 1 unit ≈ $1 on testnet for sizing bands only
     const units = Number(wei) / 1e18;
-    if (!Number.isFinite(units) || units <= 0) return 50;
+    if (!Number.isFinite(units) || units <= 0) return 0;
     return Math.max(10, Math.min(50_000, units));
   } catch {
-    return 50;
+    return 0;
   }
 }
 

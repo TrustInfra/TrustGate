@@ -78,6 +78,18 @@ export function evaluateLadder(
     matched = capBand;
   }
 
+  if (matched.maxAmount != null && matched.maxAmount <= 0) {
+    reasons.push(
+      `Protocol band max is ${matched.maxAmount} for score ${score} — fail-closed`
+    );
+    return {
+      allowed: false,
+      matchedBand: matched,
+      reasons,
+      policyOwner: "protocol",
+    };
+  }
+
   if (
     opts?.requestedAmount != null &&
     matched.maxAmount != null &&

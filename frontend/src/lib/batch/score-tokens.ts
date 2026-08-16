@@ -8,6 +8,10 @@ import {
 import { assembleAndScoreNft } from "@/lib/nft-contract";
 import { analyzeTokenTemporal } from "@/lib/token-behavior/temporal";
 import {
+  applyTemporalScoreDelta,
+  readTemporalScoreWeight,
+} from "@/lib/token-behavior/heuristics";
+import {
   markCoordinatedExitParticipants,
 } from "@/lib/token-behavior/wallet-marks";
 import { deployerStakingBoost } from "@/lib/staking/signals";
@@ -200,7 +204,11 @@ export async function scoreTokenForBatch(address: string): Promise<BatchScore> {
     else if (holders >= 20) score += 10;
     else if (holders >= 5) score += 4;
 
-    score += temporal.scoreDelta;
+    // scoreDelta still fully computed on temporal; weight 0 suppresses published impact until calibrated
+    score += applyTemporalScoreDelta(
+      temporal.scoreDelta,
+      readTemporalScoreWeight()
+    );
     score += deployerBoost.boost;
     score = Math.max(0, Math.min(100, Math.round(score)));
 

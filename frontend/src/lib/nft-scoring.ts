@@ -1,5 +1,7 @@
 import "server-only";
 
+import { envNumber } from "@/lib/env-number";
+
 // frontend/src/lib/nft-scoring.ts
 // NFT contract scoring — ERC-721 and ERC-1155
 // Free query, scored locally, no oracle required
@@ -12,22 +14,22 @@ import "server-only";
 // to values so extreme the band or flag effectively never fires. A missing-env
 // deploy therefore degrades to obviously-neutered scoring rather than leaking
 // values.
-const WASH_TRADING_CAP = Number(process.env.SCORING_NFT_WASH_TRADING_CAP ?? 100);
-const CREATOR_DUMPING_CAP = Number(process.env.SCORING_NFT_CREATOR_DUMPING_CAP ?? 100);
-const HOLDER_CONCENTRATION_PCT = Number(process.env.SCORING_NFT_HOLDER_CONCENTRATION_PCT ?? 999);
-const HOLDER_CONCENTRATION_PENALTY = Number(process.env.SCORING_NFT_HOLDER_CONCENTRATION_PENALTY ?? 0);
+const WASH_TRADING_CAP = envNumber("SCORING_NFT_WASH_TRADING_CAP", 100);
+const CREATOR_DUMPING_CAP = envNumber("SCORING_NFT_CREATOR_DUMPING_CAP", 100);
+const HOLDER_CONCENTRATION_PCT = envNumber("SCORING_NFT_HOLDER_CONCENTRATION_PCT", 999);
+const HOLDER_CONCENTRATION_PENALTY = envNumber("SCORING_NFT_HOLDER_CONCENTRATION_PENALTY", 0);
 
 // Unique-holder-ratio band edges (uniqueHolders / totalSupply). Higher ratio is
 // better, so a missing edge defaults extreme-high and the band never matches,
 // awarding zero rather than inflating the score.
-const HOLDER_RATIO_HIGH = Number(process.env.SCORING_NFT_HOLDER_RATIO_HIGH ?? 999);
-const HOLDER_RATIO_MEDIUM = Number(process.env.SCORING_NFT_HOLDER_RATIO_MEDIUM ?? 999);
-const HOLDER_RATIO_LOW = Number(process.env.SCORING_NFT_HOLDER_RATIO_LOW ?? 999);
+const HOLDER_RATIO_HIGH = envNumber("SCORING_NFT_HOLDER_RATIO_HIGH", 999);
+const HOLDER_RATIO_MEDIUM = envNumber("SCORING_NFT_HOLDER_RATIO_MEDIUM", 999);
+const HOLDER_RATIO_LOW = envNumber("SCORING_NFT_HOLDER_RATIO_LOW", 999);
 
 // Confidence unique-holder thresholds. Missing values default extreme-high so
 // the HIGH and MEDIUM gates never fire and confidence degrades to LOW.
-const CONFIDENCE_HIGH_INTERACTORS = Number(process.env.SCORING_NFT_CONFIDENCE_HIGH_INTERACTORS ?? 99999);
-const CONFIDENCE_LOW_INTERACTORS = Number(process.env.SCORING_NFT_CONFIDENCE_LOW_INTERACTORS ?? 99999);
+const CONFIDENCE_HIGH_INTERACTORS = envNumber("SCORING_NFT_CONFIDENCE_HIGH_INTERACTORS", 99999);
+const CONFIDENCE_LOW_INTERACTORS = envNumber("SCORING_NFT_CONFIDENCE_LOW_INTERACTORS", 99999);
 
 export type NftScoreInput = {
   contractAddress: string;

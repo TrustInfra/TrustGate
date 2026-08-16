@@ -35,10 +35,24 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "invalid_wallet" }, { status: 400 });
   }
 
+  const isMainnet =
+    (process.env.SCORING_ENVIRONMENT ?? "testnet").toLowerCase() === "mainnet";
+
+  if (isMainnet && b.ladderPreset) {
+    return NextResponse.json(
+      {
+        error: "ladder_preset_forbidden",
+        detail:
+          "Example ladder presets are demo-only. On mainnet supply your own ladder.bands.",
+      },
+      { status: 400 }
+    );
+  }
+
   let ladder: LadderConfig | undefined = b.ladder as LadderConfig | undefined;
-  if (!ladder && b.ladderPreset === "example_lending") {
+  if (!ladder && !isMainnet && b.ladderPreset === "example_lending") {
     ladder = EXAMPLE_LENDING_LADDER;
-  } else if (!ladder && b.ladderPreset === "example_governance") {
+  } else if (!ladder && !isMainnet && b.ladderPreset === "example_governance") {
     ladder = EXAMPLE_GOVERNANCE_LADDER;
   }
 
@@ -48,6 +62,16 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         error: "ladder_required",
         detail:
           "Provide ladder.bands (protocol-owned) or ladderPreset example_lending|example_governance for demos only",
+      },
+      { status: 400 }
+    );
+  }
+
+  if (isMainnet && !ladder.protocolId) {
+    return NextResponse.json(
+      {
+        error: "protocol_id_required",
+        detail: "Mainnet checks require ladder.protocolId so the caller owns the policy.",
       },
       { status: 400 }
     );
@@ -66,7 +90,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     tokenLadder: b.tokenLadder,
     useClass: b.useClass,
     chainId: typeof b.chainId === "number" ? b.chainId : arcTestnet.id,
-    requireMultiFactorAck: b.requireMultiFactorAck === true,
+    requireMultiFactorAck: isMainnet || b.requireMultiFactorAck === true,
   };
 
   try {
@@ -77,7 +101,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         pricing: "free",
         disclaimer: GATING_DISCLAIMER,
         guidance:
-          "Free for protocols. TrustGate is one risk input. Combine with collateral, protocol history, and staking. Do not sole-gate on score.",
+          "allowed / allowedByCallerLadder is YOUR ladder evaluation, not TrustGate authorization. Trust attestation.score and attestation.signature only. Combine with collateral and protocol history.",
       },
       { headers: { "Cache-Control": "no-store" } }
     );

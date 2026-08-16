@@ -28,11 +28,13 @@ export default function HowItWorks() {
 
       <h3>3. Agent registers via AgentRegistry</h3>
       <p>
-        The agent (or anyone acting on its behalf) calls{" "}
-        <code>AgentRegistry.registerAgent(agentAddress, metadataURI)</code>.
-        Registration is permissionless. The msg.sender becomes the agent owner
-        and gains the right to deactivate or update metadata. A new agent
-        starts at score 0 and tier LOW until scoring runs.
+        The agent calls{" "}
+        <code>AgentRegistry.registerAgent(itsOwnAddress, metadataURI)</code>.
+        Registration is permissionless but self-only —{" "}
+        <code>agent</code> must equal <code>msg.sender</code>. The caller
+        becomes the agent owner and can deactivate or update metadata. A new
+        agent starts at score 0 and tier LOW until an authorized oracle scores
+        it.
       </p>
 
       <h3>4. Agent claims payment</h3>

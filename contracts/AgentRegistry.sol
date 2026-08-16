@@ -6,10 +6,10 @@ import {IAgentRegistry} from "./IAgentRegistry.sol";
 
 /**
  * @title AgentRegistry
- * @notice Permissionless registry for AI agents. Any address can register an
- *         agent it controls. Trust scores (managed by TrustScoring) handle
- *         quality filtering — low-trust agents receive escrowed payments via
- *         TrustGate rather than being blocked at registration.
+ * @notice Permissionless registry for AI agents. An address may only register
+ *         itself (msg.sender == agent). Trust scores (managed by TrustScoring)
+ *         handle quality filtering — low-trust agents receive escrowed payments
+ *         via TrustGate rather than being blocked at registration.
  *
  * @dev Agent lifecycle:
  *      None → Active  (registerAgent)
@@ -73,6 +73,7 @@ contract AgentRegistry is IAgentRegistry, Ownable2Step {
     error AgentNotActive();
     error AgentNotSuspended();
     error InvalidStatusTransition();
+    error CallerMustBeAgent();
 
     // ──────────────────────────────────────────────────────────────────
     //  Constructor
@@ -88,13 +89,14 @@ contract AgentRegistry is IAgentRegistry, Ownable2Step {
     // ──────────────────────────────────────────────────────────────────
 
     /**
-     * @notice Registers an AI agent. Permissionless — any address can register
-     *         an agent it controls. The caller becomes the agent's owner.
+     * @notice Registers the caller as an AI agent. `agent` must equal msg.sender
+     *         so a third party cannot claim someone else's address.
      * @param agent       Address of the agent wallet.
      * @param metadataURI Off-chain pointer to agent metadata (capabilities, model, etc.).
      */
     function registerAgent(address agent, string calldata metadataURI) external {
         if (agent == address(0)) revert ZeroAddress();
+        if (agent != msg.sender) revert CallerMustBeAgent();
         if (_agents[agent].status != AgentStatus.None) revert AgentAlreadyRegistered();
 
         _agents[agent] = Agent({

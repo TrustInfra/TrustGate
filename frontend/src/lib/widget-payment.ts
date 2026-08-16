@@ -25,6 +25,7 @@
 // the current target.
 
 import { randomUUID } from "node:crypto";
+import { assertWidgetPaymentBudget } from "@/lib/widget-limit";
 import {
   createPublicClient,
   createWalletClient,
@@ -226,6 +227,7 @@ export async function scoreErc20ViaUpstream(
 
   const task: Promise<WidgetScore> = (async () => {
     try {
+      assertWidgetPaymentBudget();
       const { header, txHash } = await payAndBuildHeader();
       const result = await fetchUpstream(address, header, txHash);
       setCacheEntry(key, result);

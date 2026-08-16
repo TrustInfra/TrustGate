@@ -4,7 +4,6 @@ pragma solidity ^0.8.27;
 import {FHE, euint64, externalEuint64, ebool} from "@fhevm/solidity/lib/FHE.sol";
 import {ZamaEthereumConfig} from "@fhevm/solidity/config/ZamaConfig.sol";
 import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
-import {IAgentRegistry} from "./IAgentRegistry.sol";
 
 /**
  * @title TrustScoring
@@ -54,6 +53,10 @@ contract TrustScoring is ZamaEthereumConfig, Ownable2Step {
     ///      Only populated by plaintext setters (setTrustScorePlaintext, batchSetScores).
     mapping(address => uint8) private _tierCache;
 
+    /// @dev True only after a plaintext setter. Encrypted writes clear this so
+    ///      TrustGate.claim cannot use a stale HIGH cache.
+    mapping(address => bool) private _tierCacheFresh;
+
     /// @notice AgentRegistry contract reference for owner-scoped score setting.
     address public agentRegistry;
 
@@ -78,6 +81,7 @@ contract TrustScoring is ZamaEthereumConfig, Ownable2Step {
     error BatchLengthMismatch();
     error ZeroAddress();
     error NotAuthorizedScorer();
+    error TierUncached();
 
     // ──────────────────────────────────────────────────────────────────
     //  Modifiers
@@ -85,22 +89,6 @@ contract TrustScoring is ZamaEthereumConfig, Ownable2Step {
 
     modifier onlyOracle() {
         if (!authorizedOracles[msg.sender]) revert UnauthorizedOracle();
-        _;
-    }
-
-    /// @dev Allows oracles or agent owners scoring their own active agents.
-    modifier onlyScorer(address account) {
-        if (authorizedOracles[msg.sender]) {
-            // Oracle -- always authorized
-        } else if (
-            agentRegistry != address(0) &&
-            IAgentRegistry(agentRegistry).isAgentOwner(msg.sender) &&
-            IAgentRegistry(agentRegistry).isActiveAgent(msg.sender, account)
-        ) {
-            // Agent owner scoring their own active agent
-        } else {
-            revert NotAuthorizedScorer();
-        }
         _;
     }
 
@@ -188,7 +176,7 @@ contract TrustScoring is ZamaEthereumConfig, Ownable2Step {
      * @param account Address whose score to set.
      * @param score   Plaintext score value (0-100).
      */
-    function setTrustScorePlaintext(address account, uint64 score) external onlyScorer(account) {
+    function setTrustScorePlaintext(address account, uint64 score) external onlyOracle {
         if (account == address(0)) revert ZeroAddress();
 
         uint64 clamped = score > MAX_SCORE ? uint64(MAX_SCORE) : score;
@@ -196,6 +184,7 @@ contract TrustScoring is ZamaEthereumConfig, Ownable2Step {
 
         _setScore(account, encrypted);
         _tierCache[account] = _computeTier(clamped);
+        _tierCacheFresh[account] = true;
     }
 
     // ──────────────────────────────────────────────────────────────────
@@ -211,30 +200,17 @@ contract TrustScoring is ZamaEthereumConfig, Ownable2Step {
     function batchSetScores(
         address[] calldata accounts,
         uint64[] calldata scores
-    ) external {
+    ) external onlyOracle {
         if (accounts.length != scores.length) revert BatchLengthMismatch();
-
-        bool isOracle = authorizedOracles[msg.sender];
-        bool isOwner = !isOracle &&
-            agentRegistry != address(0) &&
-            IAgentRegistry(agentRegistry).isAgentOwner(msg.sender);
 
         for (uint256 i = 0; i < accounts.length; i++) {
             if (accounts[i] == address(0)) revert ZeroAddress();
-
-            // Authorization check per account
-            if (isOracle) {
-                // Oracle -- always authorized
-            } else if (isOwner && IAgentRegistry(agentRegistry).isActiveAgent(msg.sender, accounts[i])) {
-                // Agent owner scoring own active agent
-            } else {
-                revert NotAuthorizedScorer();
-            }
 
             uint64 clamped = scores[i] > MAX_SCORE ? uint64(MAX_SCORE) : scores[i];
             euint64 encrypted = FHE.asEuint64(clamped);
             _setScore(accounts[i], encrypted);
             _tierCache[accounts[i]] = _computeTier(clamped);
+            _tierCacheFresh[accounts[i]] = true;
         }
     }
 
@@ -344,7 +320,8 @@ contract TrustScoring is ZamaEthereumConfig, Ownable2Step {
      */
     function getTrustTierPlaintext(
         address account
-    ) external view scored(account) returns (uint8) {
+    ) external view scored(account) notExpired(account) returns (uint8) {
+        if (!_tierCacheFresh[account]) revert TierUncached();
         return _tierCache[account];
     }
 
@@ -384,6 +361,7 @@ contract TrustScoring is ZamaEthereumConfig, Ownable2Step {
         _trustScores[account] = euint64.wrap(0);
         _hasScore[account] = false;
         _tierCache[account] = 0;
+        _tierCacheFresh[account] = false;
         lastScoreUpdate[account] = 0;
         totalScoredAddresses--;
 
@@ -407,6 +385,10 @@ contract TrustScoring is ZamaEthereumConfig, Ownable2Step {
         _trustScores[account] = score;
         _hasScore[account] = true;
         lastScoreUpdate[account] = block.timestamp;
+        // Encrypted path cannot refresh plaintext tier. Plaintext setters
+        // overwrite these immediately after _setScore.
+        _tierCache[account] = 0;
+        _tierCacheFresh[account] = false;
 
         if (isNewScore) {
             totalScoredAddresses++;

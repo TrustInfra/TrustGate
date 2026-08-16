@@ -1,5 +1,6 @@
 import "server-only";
 import { NextRequest, NextResponse } from "next/server";
+import { envNumber } from "@/lib/env-number";
 
 const ARC_RPC = "https://rpc.testnet.arc.network";
 const ARCSCAN_API = "https://testnet.arcscan.app/api/v2";
@@ -24,32 +25,32 @@ const MAX_PAGES = 10;
 // COUPLING: INTERACTOR_CAP_SCORE must stay exactly one below the hardcoded
 // HIGH_ELITE tier edge (98 in tierFor). The cap exists to keep gamed wallets out
 // of HIGH_ELITE, so if that elite edge ever moves, this cap must move with it.
-const INTERACTOR_CAP_MIN_INTERACTIONS = Number(process.env.SCORING_ARC_INTERACTOR_CAP_MIN_INTERACTIONS ?? 0);
-const INTERACTOR_CAP_SCORE = Number(process.env.SCORING_ARC_INTERACTOR_CAP_SCORE ?? 100);
+const INTERACTOR_CAP_MIN_INTERACTIONS = envNumber("SCORING_ARC_INTERACTOR_CAP_MIN_INTERACTIONS", 0);
+const INTERACTOR_CAP_SCORE = envNumber("SCORING_ARC_INTERACTOR_CAP_SCORE", 100);
 
 // scoreTxCount band edges (upper bound of each tx-count band, ascending). The
 // cascade awards MORE points as the count rises, so an extreme-LOW edge would
 // let a low-activity wallet escape into a higher-point band (inflation). The
 // neutral fallback is therefore extreme-HIGH: every active wallet stays trapped
 // in the lowest non-zero band (20 pts) rather than being over-rewarded.
-const TX_BAND_1 = Number(process.env.SCORING_ARC_TX_BAND_1 ?? 999999); // count <= edge -> 20 pts
-const TX_BAND_2 = Number(process.env.SCORING_ARC_TX_BAND_2 ?? 999999); // count <= edge -> 40 pts
-const TX_BAND_3 = Number(process.env.SCORING_ARC_TX_BAND_3 ?? 999999); // count <= edge -> 60 pts
-const TX_BAND_4 = Number(process.env.SCORING_ARC_TX_BAND_4 ?? 999999); // count <= edge -> 75 pts
+const TX_BAND_1 = envNumber("SCORING_ARC_TX_BAND_1", 999999); // count <= edge -> 20 pts
+const TX_BAND_2 = envNumber("SCORING_ARC_TX_BAND_2", 999999); // count <= edge -> 40 pts
+const TX_BAND_3 = envNumber("SCORING_ARC_TX_BAND_3", 999999); // count <= edge -> 60 pts
+const TX_BAND_4 = envNumber("SCORING_ARC_TX_BAND_4", 999999); // count <= edge -> 75 pts
 
 // scoreContracts band edges. CONTRACT_MIN is the floor: below it the wallet
 // earns zero contract points, so defaulting it extreme-HIGH denies the points
 // (safe). BAND_1 / BAND_2 are the upper bounds of the 5 / 7 point bands; like
 // the tx bands the top award (15) goes to the highest counts, so extreme-HIGH
 // fallbacks trap a wallet in the lower-point band rather than inflating it.
-const CONTRACT_MIN = Number(process.env.SCORING_ARC_CONTRACT_MIN ?? 999999); // count < min -> 0 pts
-const CONTRACT_BAND_1 = Number(process.env.SCORING_ARC_CONTRACT_BAND_1 ?? 999999); // count <= edge -> 5 pts
-const CONTRACT_BAND_2 = Number(process.env.SCORING_ARC_CONTRACT_BAND_2 ?? 999999); // count <= edge -> 7 pts
+const CONTRACT_MIN = envNumber("SCORING_ARC_CONTRACT_MIN", 999999); // count < min -> 0 pts
+const CONTRACT_BAND_1 = envNumber("SCORING_ARC_CONTRACT_BAND_1", 999999); // count <= edge -> 5 pts
+const CONTRACT_BAND_2 = envNumber("SCORING_ARC_CONTRACT_BAND_2", 999999); // count <= edge -> 7 pts
 
 // scoreUsdc bonus gate: +5 only when the balance clears this many whole USDC.
 // Neutral fallback is extreme-HIGH so the bonus is never wrongly awarded when
 // the real threshold is missing.
-const USDC_BONUS_MIN = Number(process.env.SCORING_ARC_USDC_BONUS_MIN ?? 999999999);
+const USDC_BONUS_MIN = envNumber("SCORING_ARC_USDC_BONUS_MIN", 999999999);
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";

@@ -131,11 +131,29 @@ async function fetchWithRetry(
   }
 }
 
+function isAllowedCatchAll(segments: string[]): boolean {
+  // Only stats may bypass the specialized wallet/token routes.
+  // /oracle/:address and /oracle/token/:address must not skip rescore/enrich.
+  return (
+    segments.length === 2 &&
+    segments[0] === "oracle" &&
+    segments[1] === "stats"
+  );
+}
+
 async function proxy(
   req: NextRequest,
   context: { params: { path?: string[] } }
 ): Promise<NextResponse> {
   const segments = context.params.path ?? [];
+  if (!isAllowedCatchAll(segments)) {
+    return NextResponse.json(
+      {
+        error: "Use /api/oracle/:address or /api/oracle/token/:address",
+      },
+      { status: 404, headers: CORS_HEADERS }
+    );
+  }
   const url = buildUpstreamUrl(segments, req.nextUrl.search);
   const isIdempotent = req.method === "GET" || req.method === "HEAD";
   const cacheable =
@@ -168,7 +186,7 @@ async function proxy(
   } catch (err) {
     const message = err instanceof Error ? err.message : "unknown error";
     return NextResponse.json(
-      { error: "Oracle proxy failed", detail: message, upstream: url },
+      { error: "Oracle proxy failed", detail: message },
       { status: 502, headers: CORS_HEADERS }
     );
   }

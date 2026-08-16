@@ -1,4 +1,9 @@
 export const agentRegistryAbi = [
+  { type: "error", name: "CallerMustBeAgent", inputs: [] },
+  { type: "error", name: "ZeroAddress", inputs: [] },
+  { type: "error", name: "AgentAlreadyRegistered", inputs: [] },
+  { type: "error", name: "AgentNotFound", inputs: [] },
+  { type: "error", name: "NotAgentOwner", inputs: [] },
   {
     inputs: [{ name: "agent", type: "address" }, { name: "metadataURI", type: "string" }],
     name: "registerAgent",

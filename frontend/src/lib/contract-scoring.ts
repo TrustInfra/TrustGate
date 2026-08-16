@@ -1,5 +1,7 @@
 import "server-only";
 
+import { envNumber } from "@/lib/env-number";
+
 // Trust scoring for non-ERC-20 contracts on Arc Testnet.
 // Used by /api/oracle/token/[address] when the address is a contract but not
 // a recognised token. Tier bands match the wallet oracle (LOW/MEDIUM/HIGH/
@@ -24,40 +26,40 @@ const ERC1155_BALANCEOF_SELECTOR = "00fdd58e";
 // default to no-cap, penalties/volume tiers to zero effect, and detection gates
 // to values so extreme the flag effectively never fires. A missing-env deploy
 // therefore degrades to obviously-neutered scoring rather than leaking values.
-const VELOCITY_THRESHOLD = Number(process.env.SCORING_VELOCITY_THRESHOLD ?? 999);
+const VELOCITY_THRESHOLD = envNumber("SCORING_VELOCITY_THRESHOLD", 999);
 const VELOCITY_WINDOW_MS = DAY_MS;
-const VELOCITY_CAP = Number(process.env.SCORING_VELOCITY_CAP ?? 100);
-const UNVERIFIED_CAP = Number(process.env.SCORING_UNVERIFIED_CAP ?? 100);
-const DOMINANCE_CAP = Number(process.env.SCORING_DOMINANCE_CAP ?? 100);
-const UPGRADE_CAP = Number(process.env.SCORING_UPGRADE_CAP ?? 100);
+const VELOCITY_CAP = envNumber("SCORING_VELOCITY_CAP", 100);
+const UNVERIFIED_CAP = envNumber("SCORING_UNVERIFIED_CAP", 100);
+const DOMINANCE_CAP = envNumber("SCORING_DOMINANCE_CAP", 100);
+const UPGRADE_CAP = envNumber("SCORING_UPGRADE_CAP", 100);
 
 // Recency-weighted volume scale (0-20). Recent activity is weighted more
 // heavily than all-time, so a contract with strong recent flow outranks one
 // living off old volume.
-const VOLUME_VERY_HIGH = Number(process.env.SCORING_VOLUME_VERY_HIGH ?? 0);
-const VOLUME_HIGH = Number(process.env.SCORING_VOLUME_HIGH ?? 0);
-const VOLUME_MODERATE = Number(process.env.SCORING_VOLUME_MODERATE ?? 0);
-const VOLUME_LOW = Number(process.env.SCORING_VOLUME_LOW ?? 0);
+const VOLUME_VERY_HIGH = envNumber("SCORING_VOLUME_VERY_HIGH", 0);
+const VOLUME_HIGH = envNumber("SCORING_VOLUME_HIGH", 0);
+const VOLUME_MODERATE = envNumber("SCORING_VOLUME_MODERATE", 0);
+const VOLUME_LOW = envNumber("SCORING_VOLUME_LOW", 0);
 
 // USDC value throughput scale (0-10).
-const THROUGHPUT_HIGH = Number(process.env.SCORING_THROUGHPUT_HIGH ?? 0); // USDC
-const THROUGHPUT_MODERATE = Number(process.env.SCORING_THROUGHPUT_MODERATE ?? 0); // USDC
+const THROUGHPUT_HIGH = envNumber("SCORING_THROUGHPUT_HIGH", 0); // USDC
+const THROUGHPUT_MODERATE = envNumber("SCORING_THROUGHPUT_MODERATE", 0); // USDC
 
 // Deployer-abandonment penalty thresholds (days since deployer last active).
-const ABANDONMENT_SEVERE_DAYS = Number(process.env.SCORING_ABANDONMENT_SEVERE_DAYS ?? 99999);
-const ABANDONMENT_SEVERE_PENALTY = Number(process.env.SCORING_ABANDONMENT_SEVERE_PENALTY ?? 0);
-const ABANDONMENT_MODERATE_DAYS = Number(process.env.SCORING_ABANDONMENT_MODERATE_DAYS ?? 99999);
-const ABANDONMENT_MODERATE_PENALTY = Number(process.env.SCORING_ABANDONMENT_MODERATE_PENALTY ?? 0);
+const ABANDONMENT_SEVERE_DAYS = envNumber("SCORING_ABANDONMENT_SEVERE_DAYS", 99999);
+const ABANDONMENT_SEVERE_PENALTY = envNumber("SCORING_ABANDONMENT_SEVERE_PENALTY", 0);
+const ABANDONMENT_MODERATE_DAYS = envNumber("SCORING_ABANDONMENT_MODERATE_DAYS", 99999);
+const ABANDONMENT_MODERATE_PENALTY = envNumber("SCORING_ABANDONMENT_MODERATE_PENALTY", 0);
 
 // Single-wallet dominance and upgrade-churn flag thresholds.
-const DOMINANCE_PCT = Number(process.env.SCORING_DOMINANCE_PCT ?? 999);
-const UPGRADE_COUNT = Number(process.env.SCORING_UPGRADE_COUNT ?? 999);
+const DOMINANCE_PCT = envNumber("SCORING_DOMINANCE_PCT", 999);
+const UPGRADE_COUNT = envNumber("SCORING_UPGRADE_COUNT", 999);
 
 // Confidence thresholds.
-const CONFIDENCE_HIGH_AGE_DAYS = Number(process.env.SCORING_CONFIDENCE_HIGH_AGE_DAYS ?? 99999);
-const CONFIDENCE_HIGH_INTERACTORS = Number(process.env.SCORING_CONFIDENCE_HIGH_INTERACTORS ?? 99999);
-const CONFIDENCE_LOW_AGE_DAYS = Number(process.env.SCORING_CONFIDENCE_LOW_AGE_DAYS ?? 0);
-const CONFIDENCE_LOW_INTERACTORS = Number(process.env.SCORING_CONFIDENCE_LOW_INTERACTORS ?? 0);
+const CONFIDENCE_HIGH_AGE_DAYS = envNumber("SCORING_CONFIDENCE_HIGH_AGE_DAYS", 99999);
+const CONFIDENCE_HIGH_INTERACTORS = envNumber("SCORING_CONFIDENCE_HIGH_INTERACTORS", 99999);
+const CONFIDENCE_LOW_AGE_DAYS = envNumber("SCORING_CONFIDENCE_LOW_AGE_DAYS", 0);
+const CONFIDENCE_LOW_INTERACTORS = envNumber("SCORING_CONFIDENCE_LOW_INTERACTORS", 0);
 
 // Known Arc ecosystem addresses (lowercase). Full address for USDC; prefix
 // matches for the others since the spec only provided abbreviated values.

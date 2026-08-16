@@ -99,6 +99,11 @@ async function enrichTokenScore(
   const { SCORING_VERSION } = await import("@/lib/scoring-version");
   const { detectContractKind } = await import("@/lib/contract-scoring");
 
+  const {
+    applyTemporalScoreDelta,
+    readTemporalScoreWeight,
+  } = await import("@/lib/token-behavior/heuristics");
+
   const temporal = await analyzeTokenTemporal(rawAddress);
   let detectionCreator: string | null = null;
   try {
@@ -109,12 +114,25 @@ async function enrichTokenScore(
   }
   const staking = await deployerStakingBoost(detectionCreator);
 
+  const verifiedIssuer =
+    typeof payload.tier === "string" &&
+    payload.tier.toUpperCase() === "VERIFIED" &&
+    typeof payload.score !== "number";
+
   const baseScore =
     typeof payload.score === "number" ? payload.score : 50;
-  let score = Math.max(
-    0,
-    Math.min(100, Math.round(baseScore + temporal.scoreDelta + staking.boost))
+  // scoreDelta still fully computed on temporal; weight 0 suppresses published impact until calibrated
+  const temporalContribution = applyTemporalScoreDelta(
+    temporal.scoreDelta,
+    readTemporalScoreWeight()
   );
+  // VERIFIED issuer payloads have no numeric score — do not invent 50
+  const score = verifiedIssuer
+    ? 100
+    : Math.max(
+        0,
+        Math.min(100, Math.round(baseScore + temporalContribution + staking.boost))
+      );
 
   const upstreamFlags = Array.isArray(payload.flags)
     ? (payload.flags as unknown[]).map(String)
@@ -170,7 +188,7 @@ async function enrichTokenScore(
 
   return {
     ...payload,
-    score,
+    score: verifiedIssuer ? (payload.score ?? null) : score,
     tier,
     confidence: intel.confidence,
     flags,
@@ -210,7 +228,7 @@ async function forwardToTokenOracle(
   } catch (err) {
     const message = err instanceof Error ? err.message : "unknown error";
     return NextResponse.json(
-      { error: "Oracle proxy failed", detail: message, upstream: url },
+      { error: "Oracle proxy failed", detail: message },
       { status: 502, headers: CORS_HEADERS }
     );
   }
@@ -281,17 +299,8 @@ async function handleNonTokenContract(
   address: string,
   info: ContractInfo
 ): Promise<NextResponse> {
-  const hasPayment = req.headers.has("x-payment");
-
-  // No payment yet — forward to upstream so the client receives Nald's normal
-  // 402 challenge body. We intentionally don't synthesise our own challenge:
-  // keeping the upstream shape avoids drift between ERC-20 and contract paths.
-  if (!hasPayment) {
-    return forwardToTokenOracle(req, address);
-  }
-
-  // Payment header present — score locally without hitting Nald, per spec
-  // ("run the CONTRACT SCORING flow ... instead of forwarding to Nald").
+  // Non-ERC-20 contract scoring is free and local — same as NFT.
+  // Do not 402 or treat header presence as payment proof.
   try {
     const result = await scoreContract(address, info, req.nextUrl.origin);
     return jsonResponse(result, 200);

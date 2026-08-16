@@ -31,7 +31,7 @@ const ORACLE_BASE = (
 async function scoreWalletLight(
   wallet: string
 ): Promise<{ score: number; tier: string; confidence: number; flags: string[] }> {
-  let raw = 50;
+  let raw: number | null = null;
   if (ORACLE_BASE) {
     try {
       const res = await fetch(`${ORACLE_BASE}/oracle/${wallet}`, {
@@ -45,6 +45,13 @@ async function scoreWalletLight(
     } catch {
       // default raw
     }
+  }
+  if (raw == null) {
+    const env = (process.env.SCORING_ENVIRONMENT ?? "testnet").toLowerCase();
+    if (env === "mainnet") {
+      throw new Error("upstream wallet score unavailable — fail-closed");
+    }
+    raw = 50;
   }
 
   const rescored = await rescoreWallet(raw, wallet);
@@ -259,6 +266,20 @@ export async function evaluateCheck(
       const minScore = rule.minScore ?? 25;
       if (scored.score < minScore) {
         reasons.push(`Below score floor ${minScore}`);
+        if (!alerts.some((a) => a.ruleType === "wallet_score_floor")) {
+          alerts.push(
+            await emitAlert(sub, {
+              ruleType: "wallet_score_floor",
+              severity: "warning",
+              title: "Wallet below protocol score floor",
+              body: `${wallet} scored ${scored.score} below floor ${minScore}.`,
+              subject: wallet,
+              score: scored.score,
+              tier: scored.tier,
+              payload: { minScore, score: scored.score },
+            })
+          );
+        }
       }
     }
   }

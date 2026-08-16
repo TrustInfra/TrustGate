@@ -57,6 +57,22 @@ export function defaultTtlSeconds(useClass: AttestationUseClass): number {
   }
 }
 
+/** Hard ceiling — clients cannot request a near-permanent signed attestation. */
+export const MAX_ATTESTATION_TTL_SECONDS = 7 * 24 * 60 * 60;
+export const MIN_ATTESTATION_TTL_SECONDS = 60;
+
+export function clampAttestationTtl(
+  requested: number | undefined,
+  useClass: AttestationUseClass
+): number {
+  const fallback = defaultTtlSeconds(useClass);
+  if (requested == null || !Number.isFinite(requested)) return fallback;
+  return Math.min(
+    MAX_ATTESTATION_TTL_SECONDS,
+    Math.max(MIN_ATTESTATION_TTL_SECONDS, Math.floor(requested))
+  );
+}
+
 export function hashFlags(flags: string[]): `0x${string}` {
   const sorted = [...flags].map((f) => f.toUpperCase()).sort();
   return keccak256(stringToHex(sorted.join("|")));
@@ -83,10 +99,17 @@ export function getIssuerAccount(): {
   };
 }
 
+function scoringEnvironment(): string {
+  return (process.env.SCORING_ENVIRONMENT ?? "testnet").toLowerCase();
+}
+
 export function getAuthorizedIssuers(): Set<string> {
   const set = new Set<string>();
-  const { account } = getIssuerAccount();
-  set.add(account.address.toLowerCase());
+  const { account, isDemo } = getIssuerAccount();
+  // Public Hardhat demo key must not be an authorized issuer on mainnet
+  if (!(isDemo && scoringEnvironment() === "mainnet")) {
+    set.add(account.address.toLowerCase());
+  }
   const extra = (process.env.ATTESTATION_AUTHORIZED_ISSUERS ?? "")
     .split(",")
     .map((s) => s.trim().toLowerCase())
@@ -109,10 +132,16 @@ export async function signAttestation(input: {
   ttlSeconds?: number;
 }): Promise<TrustAttestation & { isDemoSigner: boolean }> {
   const { account, isDemo } = getIssuerAccount();
+  if (isDemo && input.environment === "mainnet") {
+    throw new Error(
+      "ATTESTATION_SIGNER_PRIVATE_KEY is required when environment=mainnet"
+    );
+  }
   const now = Math.floor(Date.now() / 1000);
-  const ttl =
-    input.ttlSeconds ??
-    defaultTtlSeconds(input.useClass ?? "financial_high");
+  const ttl = clampAttestationTtl(
+    input.ttlSeconds,
+    input.useClass ?? "financial_high"
+  );
   const attestationId = `att_${now.toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
   const flagsHash = hashFlags(input.flags);
 

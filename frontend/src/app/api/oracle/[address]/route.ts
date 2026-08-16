@@ -125,7 +125,7 @@ async function proxy(
   } catch (err) {
     const message = err instanceof Error ? err.message : "unknown error";
     return NextResponse.json(
-      { error: "Oracle proxy failed", detail: message, upstream: url },
+      { error: "Oracle proxy failed", detail: message },
       { status: 502, headers: CORS_HEADERS }
     );
   }
@@ -221,8 +221,12 @@ async function proxy(
       }
     } catch (err) {
       console.error(
-        "[wallet-rescore] post-processing failed, passing upstream through:",
+        "[wallet-rescore] post-processing failed:",
         err instanceof Error ? err.message : err
+      );
+      return NextResponse.json(
+        { error: "Score post-processing failed" },
+        { status: 502, headers: CORS_HEADERS }
       );
     }
   }

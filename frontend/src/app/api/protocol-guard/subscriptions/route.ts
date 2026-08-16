@@ -10,6 +10,31 @@ import {
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
+function publicSubscription(
+  sub: NonNullable<ReturnType<typeof getSubscription>>,
+  includeManageToken = false
+) {
+  const { manageToken, ...rest } = sub;
+  return {
+    ...rest,
+    channels: {
+      hasDiscord: Boolean(sub.channels.discordWebhookUrl),
+      hasTelegram: Boolean(sub.channels.telegramBotToken),
+      hasEmail: Boolean(sub.channels.emailTo),
+      onchainEvent: Boolean(sub.channels.onchainEvent),
+    },
+    ...(includeManageToken ? { manageToken } : {}),
+  };
+}
+
+function readManageToken(req: NextRequest, bodyToken?: string): string {
+  const header = req.headers.get("authorization") ?? "";
+  const bearer = header.toLowerCase().startsWith("bearer ")
+    ? header.slice(7).trim()
+    : "";
+  return (bodyToken || bearer || req.nextUrl.searchParams.get("token") || "").trim();
+}
+
 /** GET /api/protocol-guard/subscriptions?id=sub_... */
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const id = req.nextUrl.searchParams.get("id");
@@ -18,9 +43,13 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     if (!sub) {
       return NextResponse.json({ error: "not_found" }, { status: 404 });
     }
+    const token = readManageToken(req);
+    if (!sub.manageToken || token !== sub.manageToken) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
     return NextResponse.json(
       {
-        subscription: sub,
+        subscription: publicSubscription(sub),
         recentAlerts: listAlerts(id, 20),
         onchainEvents: listOnchainEvents(id, 20),
       },
@@ -60,6 +89,7 @@ export async function PATCH(req: NextRequest): Promise<NextResponse> {
   }
   const b = body as {
     id?: string;
+    manageToken?: string;
     protocolName?: string;
     contactEmail?: string;
     status?: "active" | "cancelled";
@@ -68,6 +98,14 @@ export async function PATCH(req: NextRequest): Promise<NextResponse> {
   };
   if (!b.id) {
     return NextResponse.json({ error: "id_required" }, { status: 400 });
+  }
+  const existing = getSubscription(b.id);
+  if (!existing) {
+    return NextResponse.json({ error: "not_found" }, { status: 404 });
+  }
+  const token = readManageToken(req, b.manageToken);
+  if (!existing.manageToken || token !== existing.manageToken) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
   const updated = updateSubscription(b.id, {
     protocolName: b.protocolName,
@@ -80,7 +118,7 @@ export async function PATCH(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
   return NextResponse.json(
-    { subscription: updated },
+    { subscription: publicSubscription(updated) },
     { headers: { "Cache-Control": "no-store" } }
   );
 }

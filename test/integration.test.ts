@@ -54,9 +54,9 @@ describe("TrustGate — Integration", function () {
     );
 
     // Register three agents with different trust tiers
-    await registry.connect(agentOwnerSigner).registerAgent(highAgent.address, "ipfs://high");
-    await registry.connect(agentOwnerSigner).registerAgent(medAgent.address, "ipfs://med");
-    await registry.connect(agentOwnerSigner).registerAgent(lowAgent.address, "ipfs://low");
+    await registry.connect(highAgent).registerAgent(highAgent.address, "ipfs://high");
+    await registry.connect(medAgent).registerAgent(medAgent.address, "ipfs://med");
+    await registry.connect(lowAgent).registerAgent(lowAgent.address, "ipfs://low");
 
     await mockScoring.setScore(highAgent.address, 2); // HIGH
     await mockScoring.setScore(medAgent.address, 1);  // MEDIUM

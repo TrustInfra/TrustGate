@@ -5,6 +5,7 @@ import "server-only";
 // pure, dependency-free function. Used by both the standalone NFT route and
 // the server-side token router.
 
+import { envNumber } from "@/lib/env-number";
 import { scoreNft, NftScoreInput, NftScoreResult } from "./nft-scoring";
 
 const ARCSCAN_API = "https://testnet.arcscan.app";
@@ -14,7 +15,7 @@ const ARCSCAN_API = "https://testnet.arcscan.app";
 // topThreeHolderPct. Unlike a cap or gate, an extreme fallback would corrupt
 // the calculation (0 disables the signal, a huge value sums every holder and
 // over-fires concentration), so the fallback preserves current behavior at 3.
-const TOP_HOLDER_WINDOW = Number(process.env.SCORING_NFT_TOP_HOLDER_WINDOW ?? 3);
+const TOP_HOLDER_WINDOW = envNumber("SCORING_NFT_TOP_HOLDER_WINDOW", 3);
 
 interface ArcscanTokenInfo {
   holders?: string | number | null;

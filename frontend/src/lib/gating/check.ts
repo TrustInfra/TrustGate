@@ -1,6 +1,7 @@
 import "server-only";
 
 import { evaluateLadder } from "./ladder";
+import { computeGatingAllowed } from "./decide";
 import { issueWalletAttestation, rawWalletScore, rawTokenScore } from "./issue";
 import { verifyAttestationSignature } from "./eip712";
 import type {
@@ -25,6 +26,9 @@ export async function runGatingCheck(
   if (req.requireMultiFactorAck && !req.ladder.multiFactorAcknowledged) {
     return {
       allowed: false,
+      allowedByCallerLadder: false,
+      policySource: "caller_ladder",
+      scoreIsAuthoritative: true,
       walletEvaluation: {
         allowed: false,
         matchedBand: null,
@@ -42,9 +46,11 @@ export async function runGatingCheck(
 
   const walletScore = await rawWalletScore(req.wallet);
 
+  let scoringVersionAllowed = true;
   if (req.ladder.allowedScoringVersions?.length) {
     const ver = `${process.env.SCORING_ENVIRONMENT === "mainnet" ? "mainnet" : "testnet"}-wallet-${SCORING_VERSION}`;
     if (!req.ladder.allowedScoringVersions.includes(ver)) {
+      scoringVersionAllowed = false;
       reasons.push(
         `scoringVersion ${ver} not in protocol allowlist — fail-closed`
       );
@@ -70,6 +76,7 @@ export async function runGatingCheck(
   }
 
   let attestation: (TrustAttestation & { isDemoSigner?: boolean }) | undefined;
+  let attestationValid = false;
   try {
     attestation = await issueWalletAttestation({
       wallet: req.wallet,
@@ -79,18 +86,14 @@ export async function runGatingCheck(
     const v = await verifyAttestationSignature(attestation);
     if (!v.valid) {
       reasons.push(...v.reasons.map((r) => `attestation: ${r}`));
-    }
-    if (
-      req.ladder.maxAttestationAgeSeconds != null &&
-      attestation.expiresAt - attestation.issuedAt >
-        req.ladder.maxAttestationAgeSeconds
-    ) {
-      // protocol wants shorter than issued TTL — treat as soft warn; still can reject by age from now
+    } else {
+      attestationValid = true;
     }
     if (req.ladder.maxAttestationAgeSeconds != null) {
       const age =
         Math.floor(Date.now() / 1000) - attestation.issuedAt;
       if (age > req.ladder.maxAttestationAgeSeconds) {
+        attestationValid = false;
         reasons.push("Attestation older than protocol max age — fail-closed");
       }
     }
@@ -100,17 +103,18 @@ export async function runGatingCheck(
     );
   }
 
-  const allowed =
-    walletEvaluation.allowed &&
-    (tokenEvaluation ? tokenEvaluation.allowed : true) &&
-    !reasons.some((r) =>
-      /fail-closed|exceeds|does not|below protocol|no protocol|not in protocol/i.test(
-        r
-      )
-    );
+  const allowed = computeGatingAllowed({
+    walletAllowed: walletEvaluation.allowed,
+    tokenAllowed: tokenEvaluation ? tokenEvaluation.allowed : undefined,
+    attestationValid,
+    scoringVersionAllowed,
+  });
 
   return {
     allowed,
+    allowedByCallerLadder: allowed,
+    policySource: "caller_ladder",
+    scoreIsAuthoritative: true,
     walletEvaluation,
     tokenEvaluation,
     attestation,

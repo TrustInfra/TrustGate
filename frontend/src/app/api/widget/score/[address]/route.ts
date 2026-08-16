@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { detectContractKind, isVerifiedIssuer } from "@/lib/contract-scoring";
 import { scoreErc20ViaUpstream } from "@/lib/widget-payment";
+import {
+  resolveClientIp,
+  takeWidgetIpSlot,
+  WidgetSpendLimitError,
+} from "@/lib/widget-limit";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
-
-const RATE_LIMIT_MAX = 60;
-const RATE_LIMIT_WINDOW_MS = 60_000;
 
 const CORS_HEADERS: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -16,41 +18,6 @@ const CORS_HEADERS: Record<string, string> = {
   "Access-Control-Allow-Headers": "Content-Type, Accept",
   "Access-Control-Max-Age": "86400",
 };
-
-interface RateBucket {
-  count: number;
-  resetAt: number;
-}
-
-const rateBuckets: Map<string, RateBucket> = new Map();
-
-function takeRateSlot(ip: string): { ok: boolean; retryAfter: number } {
-  const now = Date.now();
-  const bucket = rateBuckets.get(ip);
-  if (!bucket || bucket.resetAt <= now) {
-    rateBuckets.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
-    return { ok: true, retryAfter: 0 };
-  }
-  if (bucket.count >= RATE_LIMIT_MAX) {
-    return {
-      ok: false,
-      retryAfter: Math.max(1, Math.ceil((bucket.resetAt - now) / 1000)),
-    };
-  }
-  bucket.count += 1;
-  return { ok: true, retryAfter: 0 };
-}
-
-function clientIp(req: NextRequest): string {
-  const xff = req.headers.get("x-forwarded-for");
-  if (xff) {
-    const first = xff.split(",")[0]?.trim();
-    if (first) return first;
-  }
-  const real = req.headers.get("x-real-ip");
-  if (real) return real;
-  return "unknown";
-}
 
 function jsonResponse(
   payload: unknown,
@@ -69,8 +36,8 @@ export async function GET(
   req: NextRequest,
   context: { params: { address: string } }
 ): Promise<NextResponse> {
-  const ip = clientIp(req);
-  const slot = takeRateSlot(ip);
+  const ip = resolveClientIp(req.headers);
+  const slot = takeWidgetIpSlot(ip);
   if (!slot.ok) {
     return jsonResponse({ error: "rate_limited" }, 429, {
       "Retry-After": String(slot.retryAfter),
@@ -110,6 +77,11 @@ export async function GET(
       const result = await scoreErc20ViaUpstream(address);
       return jsonResponse(result, 200);
     } catch (err) {
+      if (err instanceof WidgetSpendLimitError) {
+        return jsonResponse({ error: "rate_limited" }, 429, {
+          "Retry-After": String(err.retryAfter),
+        });
+      }
       const message = err instanceof Error ? err.message : "unknown";
       console.error(
         `[widget-score] erc20 upstream failed for ${address}:`,

@@ -9,6 +9,10 @@ import {
 import { markFlags } from "@/lib/token-behavior/wallet-marks";
 import { analyzeTokenTemporal } from "@/lib/token-behavior/temporal";
 import {
+  applyTemporalScoreDelta,
+  readTemporalScoreWeight,
+} from "@/lib/token-behavior/heuristics";
+import {
   detectContractKind,
   isVerifiedIssuer,
 } from "@/lib/contract-scoring";
@@ -48,7 +52,7 @@ async function rawWalletScore(address: string): Promise<{
   confidence: number;
   flags: string[];
 }> {
-  let raw = 50;
+  let raw: number | null = null;
   if (ORACLE_BASE) {
     try {
       const res = await fetch(`${ORACLE_BASE}/oracle/${address}`, {
@@ -62,6 +66,12 @@ async function rawWalletScore(address: string): Promise<{
     } catch {
       // fall through
     }
+  }
+  if (raw == null) {
+    if (environment() === "mainnet") {
+      throw new Error("upstream wallet score unavailable — fail-closed");
+    }
+    raw = 50;
   }
   const rescored = await rescoreWallet(raw, address);
   const flags = [...new Set([...rescored.flags, ...markFlags(address)])];
@@ -94,8 +104,17 @@ async function rawTokenScore(address: string): Promise<{
     return { score: 100, tier: "VERIFIED", confidence: 100, flags: [] };
   }
   const det = await detectContractKind(address);
+  if (det.kind === "not-contract" || det.kind === "fetch-failed") {
+    return {
+      score: 0,
+      tier: "BLOCKED",
+      confidence: 0,
+      flags: ["UNSCORED"],
+    };
+  }
   const temporal = await analyzeTokenTemporal(address);
-  let score = 45 + temporal.scoreDelta;
+  let score =
+    45 + applyTemporalScoreDelta(temporal.scoreDelta, readTemporalScoreWeight());
   if (det.info?.isVerified) score += 10;
   score = Math.max(0, Math.min(100, Math.round(score)));
   const tier =

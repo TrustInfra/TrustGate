@@ -48,6 +48,8 @@ export interface ProtocolSubscription {
   updatedAt: string;
   lastAlertAt?: string;
   alertsSent: number;
+  /** Shown once at create. Required to GET-by-id or PATCH. */
+  manageToken: string;
 }
 
 export interface GuardAlert {

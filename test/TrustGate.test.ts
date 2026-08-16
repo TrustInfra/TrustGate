@@ -57,7 +57,7 @@ describe("TrustGate", function () {
     await trustGate.waitForDeployment();
 
     // Setup: register agent, set score, mint and approve USDC
-    await registry.connect(agentOwnerSigner).registerAgent(agent.address, "ipfs://agent");
+    await registry.connect(agent).registerAgent(agent.address, "ipfs://agent");
     await mockScoring.setScore(agent.address, 2); // HIGH tier
 
     await mockUsdc.mint(depositor.address, usdc(10_000));
@@ -508,7 +508,7 @@ describe("TrustGate", function () {
     });
 
     it("should revert claim from agent without score", async function () {
-      await registry.connect(agentOwnerSigner).registerAgent(agent2.address, "");
+      await registry.connect(agent2).registerAgent(agent2.address, "");
 
       await trustGate.connect(depositor).setAllowance(agent2.address, usdc(1000));
 

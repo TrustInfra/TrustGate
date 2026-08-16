@@ -59,6 +59,7 @@ export function createSubscription(input: {
     createdAt: now,
     updatedAt: now,
     alertsSent: 0,
+    manageToken: randomBytes(16).toString("hex"),
   };
   getStore<ProtocolSubscription>(SUB_NS).set(sub.id, sub);
   return sub;
@@ -77,6 +78,7 @@ export function freeAnonymousConfig(protocolName = "anonymous-protocol"): Protoc
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     alertsSent: 0,
+    manageToken: "",
   };
 }
 

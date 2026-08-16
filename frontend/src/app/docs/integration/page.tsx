@@ -103,9 +103,11 @@ contract MyProtocol {
 
       <h3>Registering agents programmatically</h3>
       <p>
-        Any wallet or contract can register agents by calling{" "}
-        <code>AgentRegistry.registerAgent(agent, metadataURI)</code>. The
-        msg.sender becomes the agent owner and gains lifecycle control:
+        An address can only register itself. Call{" "}
+        <code>AgentRegistry.registerAgent(msg.sender, metadataURI)</code>.
+        Third-party registration of someone else&apos;s address reverts with{" "}
+        <code>CallerMustBeAgent</code>. The caller is the agent owner and
+        gains lifecycle control:
       </p>
 
       <pre><code>{`import { writeContract } from "@wagmi/core";
@@ -115,7 +117,7 @@ await writeContract({
   address: "0x73d3cf7f2734C334927f991fe87D06d595d398b4",
   abi: agentRegistryAbi,
   functionName: "registerAgent",
-  args: [agentAddress, "ipfs://Qm..."],
+  args: [connectedWallet, "ipfs://Qm..."], // must equal msg.sender
 });`}</code></pre>
 
       <p>

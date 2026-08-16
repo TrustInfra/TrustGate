@@ -11,16 +11,18 @@ export default function AgentRegistration() {
     >
       <h2>The registration call</h2>
       <p>
-        An agent is any EOA or contract address. To register, call:
+        An agent must register itself. <code>agent</code> must equal{" "}
+        <code>msg.sender</code> or the call reverts{" "}
+        <code>CallerMustBeAgent</code>.
       </p>
       <pre><code>{`AgentRegistry.registerAgent(
-  string calldata name,
-  string calldata metadata
+  address agent,          // must be msg.sender
+  string calldata metadataURI
 )`}</code></pre>
       <p>
-        <code>name</code> is a display string, <code>metadata</code> is a free-form
-        pointer — typically an IPFS CID or URL describing the agent&apos;s
-        purpose, owner, and attestations. Neither field is validated on chain.
+        <code>metadataURI</code> is a free-form pointer — typically an IPFS CID
+        or URL describing the agent&apos;s purpose and attestations. It is not
+        validated on chain.
       </p>
 
       <h2>Lifecycle states</h2>

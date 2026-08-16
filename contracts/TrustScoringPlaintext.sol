@@ -2,7 +2,6 @@
 pragma solidity ^0.8.27;
 
 import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
-import {IAgentRegistry} from "./IAgentRegistry.sol";
 import {ITrustScoring} from "./ITrustScoring.sol";
 
 /**
@@ -71,6 +70,7 @@ contract TrustScoringPlaintext is ITrustScoring, Ownable2Step {
     error BatchLengthMismatch();
     error ZeroAddress();
     error NotAuthorizedScorer();
+    error TierUncached();
 
     // ──────────────────────────────────────────────────────────────────
     //  Modifiers
@@ -78,22 +78,6 @@ contract TrustScoringPlaintext is ITrustScoring, Ownable2Step {
 
     modifier onlyOracle() {
         if (!authorizedOracles[msg.sender]) revert UnauthorizedOracle();
-        _;
-    }
-
-    /// @dev Allows oracles or agent owners scoring their own active agents.
-    modifier onlyScorer(address account) {
-        if (authorizedOracles[msg.sender]) {
-            // Oracle -- always authorized
-        } else if (
-            agentRegistry != address(0) &&
-            IAgentRegistry(agentRegistry).isAgentOwner(msg.sender) &&
-            IAgentRegistry(agentRegistry).isActiveAgent(msg.sender, account)
-        ) {
-            // Agent owner scoring their own active agent
-        } else {
-            revert NotAuthorizedScorer();
-        }
         _;
     }
 
@@ -138,7 +122,7 @@ contract TrustScoringPlaintext is ITrustScoring, Ownable2Step {
      * @param account Address whose score to set.
      * @param score   Plaintext score value (0-100). Clamped if above MAX_SCORE.
      */
-    function setTrustScore(address account, uint64 score) external onlyScorer(account) {
+    function setTrustScore(address account, uint64 score) external onlyOracle {
         if (account == address(0)) revert ZeroAddress();
 
         uint64 clamped = score > MAX_SCORE ? uint64(MAX_SCORE) : score;
@@ -166,24 +150,11 @@ contract TrustScoringPlaintext is ITrustScoring, Ownable2Step {
     function batchSetScores(
         address[] calldata accounts,
         uint64[] calldata scores
-    ) external {
+    ) external onlyOracle {
         if (accounts.length != scores.length) revert BatchLengthMismatch();
-
-        bool isOracle = authorizedOracles[msg.sender];
-        bool isOwner = !isOracle &&
-            agentRegistry != address(0) &&
-            IAgentRegistry(agentRegistry).isAgentOwner(msg.sender);
 
         for (uint256 i = 0; i < accounts.length; i++) {
             if (accounts[i] == address(0)) revert ZeroAddress();
-
-            if (isOracle) {
-                // Oracle -- always authorized
-            } else if (isOwner && IAgentRegistry(agentRegistry).isActiveAgent(msg.sender, accounts[i])) {
-                // Agent owner scoring own active agent
-            } else {
-                revert NotAuthorizedScorer();
-            }
 
             uint64 clamped = scores[i] > MAX_SCORE ? uint64(MAX_SCORE) : scores[i];
             uint8 tier = _computeTier(clamped);
@@ -233,7 +204,14 @@ contract TrustScoringPlaintext is ITrustScoring, Ownable2Step {
     }
 
     /// @inheritdoc ITrustScoring
-    function getTrustTierPlaintext(address account) external view override scored(account) returns (uint8) {
+    function getTrustTierPlaintext(address account)
+        external
+        view
+        override
+        scored(account)
+        notExpired(account)
+        returns (uint8)
+    {
         return _tierCache[account];
     }
 

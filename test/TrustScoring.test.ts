@@ -201,7 +201,7 @@ describe("TrustScoring", function () {
     it("should reject score setting from unauthorized address", async function () {
       await expect(
         trustScoring.connect(unauthorized).setTrustScorePlaintext(user1.address, 50)
-      ).to.be.revertedWithCustomError(trustScoring, "NotAuthorizedScorer");
+      ).to.be.revertedWithCustomError(trustScoring, "UnauthorizedOracle");
     });
 
     it("should reject score setting for the zero address", async function () {
@@ -289,7 +289,7 @@ describe("TrustScoring", function () {
         trustScoring
           .connect(unauthorized)
           .batchSetScores([user1.address], [85])
-      ).to.be.revertedWithCustomError(trustScoring, "NotAuthorizedScorer");
+      ).to.be.revertedWithCustomError(trustScoring, "UnauthorizedOracle");
     });
 
     it("should clamp each score in the batch to MAX_SCORE", async function () {
@@ -720,7 +720,7 @@ describe("TrustScoring", function () {
 
       await expect(
         trustScoring.connect(oracle2).setTrustScorePlaintext(user1.address, 50)
-      ).to.be.revertedWithCustomError(trustScoring, "NotAuthorizedScorer");
+      ).to.be.revertedWithCustomError(trustScoring, "UnauthorizedOracle");
     });
   });
 
@@ -740,11 +740,27 @@ describe("TrustScoring", function () {
       return { registry };
     }
 
-    it("should allow agent owner to set score for own active agent", async function () {
+    it("should reject agent self-registering then setting their own score", async function () {
       const { registry } = await setupAgentScoring();
+      await registry.connect(user1).registerAgent(user1.address, "ipfs://meta");
 
-      // oracle registers user1 as an agent (oracle becomes agent owner)
-      await registry.connect(oracle).registerAgent(user1.address, "ipfs://meta");
+      await expect(
+        trustScoring.connect(user1).setTrustScorePlaintext(user1.address, 85)
+      ).to.be.revertedWithCustomError(trustScoring, "UnauthorizedOracle");
+    });
+
+    it("should reject non-oracle scoring even after the subject self-registers", async function () {
+      const { registry } = await setupAgentScoring();
+      await registry.connect(user1).registerAgent(user1.address, "ipfs://meta");
+
+      await expect(
+        trustScoring.connect(unauthorized).setTrustScorePlaintext(user1.address, 50)
+      ).to.be.revertedWithCustomError(trustScoring, "UnauthorizedOracle");
+    });
+
+    it("should still allow an authorized oracle to score a registered agent", async function () {
+      const { registry } = await setupAgentScoring();
+      await registry.connect(user1).registerAgent(user1.address, "ipfs://meta");
 
       try {
         await trustScoring.connect(oracle).setTrustScorePlaintext(user1.address, 85);
@@ -752,30 +768,6 @@ describe("TrustScoring", function () {
       } catch {
         this.skip();
       }
-    });
-
-    it("should reject non-owner scoring an agent they do not own", async function () {
-      const { registry } = await setupAgentScoring();
-
-      // oracle registers user1 as agent
-      await registry.connect(oracle).registerAgent(user1.address, "ipfs://meta");
-
-      // unauthorized is not an oracle and does not own user1
-      await expect(
-        trustScoring.connect(unauthorized).setTrustScorePlaintext(user1.address, 50)
-      ).to.be.revertedWithCustomError(trustScoring, "NotAuthorizedScorer");
-    });
-
-    it("should reject agent owner scoring a deactivated agent", async function () {
-      const { registry } = await setupAgentScoring();
-
-      // Use user2 (non-oracle) as agent owner so the modifier tests the registry path
-      await registry.connect(user2).registerAgent(user1.address, "ipfs://meta");
-      await registry.connect(user2).deactivateAgent(user1.address);
-
-      await expect(
-        trustScoring.connect(user2).setTrustScorePlaintext(user1.address, 50)
-      ).to.be.revertedWithCustomError(trustScoring, "NotAuthorizedScorer");
     });
 
     it("should allow setAgentRegistry by owner", async function () {

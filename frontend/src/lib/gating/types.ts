@@ -85,7 +85,13 @@ export interface GatingCheckRequest {
 }
 
 export interface GatingCheckResult {
+  /** Caller-ladder evaluation only — not TrustGate authorization. */
   allowed: boolean;
+  /** Same bit as `allowed`. Named so clients do not treat it as an attest. */
+  allowedByCallerLadder: boolean;
+  /** TrustGate attests score/signature; the caller owns the allow bit. */
+  policySource: "caller_ladder";
+  scoreIsAuthoritative: true;
   walletEvaluation: LadderEvaluation;
   tokenEvaluation?: LadderEvaluation;
   attestation?: TrustAttestation;
