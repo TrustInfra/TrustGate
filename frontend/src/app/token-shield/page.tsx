@@ -203,6 +203,13 @@ export default function TokenShieldPage() {
     setHistory(loadHistory(HISTORY_KEY));
   }, []);
 
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search).get("address");
+    if (q && /^0x[0-9a-fA-F]{40}$/.test(q)) {
+      setAddress(q);
+    }
+  }, []);
+
   const recordHistory = (entry: HistoryEntry): void => {
     setHistory((prev) => {
       const next = prependEntry(prev, entry);

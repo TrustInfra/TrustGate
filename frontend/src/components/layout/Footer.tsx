@@ -26,6 +26,7 @@ const COLUMNS: FooterColumn[] = [
     links: [
       { label: "Oracle", href: "/oracle" },
       { label: "Token Shield", href: "/token-shield" },
+      { label: "Live on Swaparc", href: "/swaparc" },
       { label: "Dashboard", href: "/dashboard" },
       { label: "Docs", href: "https://docs.trustgated.xyz", external: true },
     ],

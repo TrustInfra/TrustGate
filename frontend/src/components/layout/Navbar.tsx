@@ -21,6 +21,7 @@ const MORE_LINKS: NavLink[] = [
   { href: "https://docs.trustgated.xyz", label: "Docs", external: true },
   { href: "/dashboard", label: "Dashboard" },
   { href: "/demo", label: "Demo" },
+  { href: "/swaparc", label: "Live on Swaparc" },
   { href: "/discovery", label: "Discovery" },
   { href: "/staking", label: "Staking" },
   { href: "/protocol-guard", label: "Protocol Guard" },
@@ -155,7 +156,7 @@ export default function Navbar() {
               {moreOpen && (
                 <div
                   role="menu"
-                  className="absolute right-0 mt-1 w-44 border border-border bg-bg-raised py-1 animate-slide-down"
+                  className="absolute right-0 mt-1 w-52 border border-border bg-bg-raised py-1 animate-slide-down"
                 >
                   {MORE_LINKS.map((link) => {
                     const isActive = isActiveLink(link.href, pathname);

@@ -75,7 +75,7 @@ const IN_PROGRESS_PHASES: Phase[] = [
   {
     id: "phase-2b",
     title: "Phase 2b -- Trust-Ordered Token Discovery",
-    body: "When multiple tokens share the same name or ticker, DEX search results rank by trust score. Flags surface inline. Rugs go to the bottom, marked not hidden. Batch endpoint, React kit, widget-discovery.js, and /discovery reference surface are in codebase. Exit: trust-ordered lists live on at least one Arc DEX search layer.",
+    body: "When multiple tokens share the same name or ticker, DEX search results carry a TrustGate mark. Circle issuers show VERIFIED. Other tokens show score and tier. Badges are live in the Swaparc token picker -- confirm at /swaparc. Batch endpoint, React kit, widget-discovery.js, and /discovery remain in-repo. Exit: trust-ordered ranking live on at least one Arc DEX search layer, not badges alone.",
     icon: TrendingUp,
   },
   {
@@ -165,9 +165,9 @@ const INTEGRATIONS: IntegrationCard[] = [
     audience: "For DEXs",
     product: "widget.js",
     description:
-      "One script tag. Trust badges on any token input. Free to integrate.",
-    href: "/docs/widget-integration",
-    linkLabel: "Integration docs",
+      "One script tag. Trust badges on any token input. Live on Swaparc search.",
+    href: "/swaparc",
+    linkLabel: "Confirm on Swaparc",
     icon: Coins,
   },
   {

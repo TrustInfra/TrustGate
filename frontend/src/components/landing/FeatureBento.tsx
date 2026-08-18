@@ -91,9 +91,9 @@ export default function FeatureBento() {
       <BentoCard
         icon={Code2}
         title="DEX Widget"
-        body="One script tag. Trust badges on every token input. Free on Arc testnet."
-        href="/docs/widget-integration"
-        linkLabel="View integration"
+        body="One script tag. Trust badges on every token input. Live now on Swaparc token search."
+        href="/swaparc"
+        linkLabel="See it live"
       />
     </div>
   );

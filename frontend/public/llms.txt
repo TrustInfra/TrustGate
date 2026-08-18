@@ -10,6 +10,7 @@
 - [Interactive demo -- walk through a trust-gated payment flow end to end](https://www.trustgated.xyz/demo)
 - [Trust oracle -- query behavioral trust scores for any wallet or agent address](https://www.trustgated.xyz/oracle)
 - [Token Shield -- score any token or contract for deployer credibility and holder authenticity](https://www.trustgated.xyz/token-shield)
+- [Live on Swaparc -- confirm TrustGate VERIFIED and scored-token badges on the Arc testnet DEX token search](https://www.trustgated.xyz/swaparc)
 - [Documentation index -- protocol overview, integration guides, and API reference](https://www.trustgated.xyz/docs)
 - [How TrustGate works -- register, deposit, score, claim flow explained](https://www.trustgated.xyz/docs/how-it-works)
 - [Trust scoring model -- wallet and token scoring via formula-based analysis of direct on-chain behavioral signals](https://www.trustgated.xyz/docs/trust-scoring)
@@ -35,4 +36,4 @@
 ## Notes
 
 - Built by Ludarep
-- Last generated: 2026-07-04
+- Last generated: 2026-08-18

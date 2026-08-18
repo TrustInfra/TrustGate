@@ -25,6 +25,7 @@ const config: Config = {
     { path: "/demo", description: "Interactive demo -- walk through a trust-gated payment flow end to end" },
     { path: "/oracle", description: "Trust oracle -- query behavioral trust scores for any wallet or agent address" },
     { path: "/token-shield", description: "Token Shield -- score any token or contract for deployer credibility and holder authenticity" },
+    { path: "/swaparc", description: "Live on Swaparc -- confirm TrustGate VERIFIED and scored-token badges on the Arc testnet DEX token search" },
     { path: "/docs", description: "Documentation index -- protocol overview, integration guides, and API reference" },
     { path: "/docs/how-it-works", description: "How TrustGate works -- register, deposit, score, claim flow explained" },
     { path: "/docs/trust-scoring", description: "Trust scoring model -- wallet and token scoring via formula-based analysis of direct on-chain behavioral signals" },

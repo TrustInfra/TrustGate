@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 import StatusDot from "@/components/ui/StatusDot";
 import SectionHeader from "@/components/landing/SectionHeader";
@@ -11,6 +11,8 @@ import TierMatrix from "@/components/landing/TierMatrix";
 import StepTimeline from "@/components/landing/StepTimeline";
 import LiveTicker from "@/components/landing/LiveTicker";
 import HeroVisual from "@/components/landing/HeroVisual";
+import SwaparcSwapMock from "@/components/landing/SwaparcSwapMock";
+import { SWAPARC_URL } from "@/lib/swaparc";
 import { useOracleStats, useTxStats } from "@/hooks/useHomeStats";
 
 export default function HomePage() {
@@ -120,6 +122,61 @@ export default function HomePage() {
             lede="Three products, one behavioral scoring engine. Query wallets, audit tokens, or embed trust signals directly into your DEX."
           />
           <FeatureBento />
+        </div>
+      </section>
+
+      {/* Live on Swaparc */}
+      <section className="py-20 lg:py-28 px-4 sm:px-6 lg:px-8 border-t border-border">
+        <div className="max-w-6xl mx-auto grid lg:grid-cols-2 gap-12 lg:gap-16 items-start">
+          <div>
+            <SectionHeader
+              eyebrow="Live integration"
+              title="Confirm the badge on Swaparc"
+              lede="Swaparc is an Arc testnet DEX. Open the Buy token list. Circle issuers show VERIFIED. Other tokens show a score and tier. TrustGate supplies the signal. Swaparc owns the swap."
+              className="lg:mb-8"
+            />
+            <ol className="space-y-4 mb-8">
+              <li className="flex gap-3 text-sm text-text-secondary">
+                <span className="font-mono text-[11px] text-accent pt-0.5">01</span>
+                Open swaparc.app. No swap required.
+              </li>
+              <li className="flex gap-3 text-sm text-text-secondary">
+                <span className="font-mono text-[11px] text-accent pt-0.5">02</span>
+                Click the Buy token. Search the list.
+              </li>
+              <li className="flex gap-3 text-sm text-text-secondary">
+                <span className="font-mono text-[11px] text-accent pt-0.5">03</span>
+                USDC / EURC / CircBTC read VERIFIED. SWPRC reads as a scored token.
+              </li>
+            </ol>
+            <div className="flex flex-wrap items-center gap-3">
+              <a
+                href={SWAPARC_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={cn(
+                  "inline-flex items-center gap-2 px-6 py-3 text-sm font-medium",
+                  "border border-accent text-accent bg-transparent",
+                  "hover:bg-accent-muted transition-colors duration-200"
+                )}
+              >
+                Open Swaparc
+                <ExternalLink size={14} />
+              </a>
+              <Link
+                href="/swaparc"
+                className={cn(
+                  "inline-flex items-center gap-2 px-6 py-3 text-sm font-medium",
+                  "border border-border text-text-secondary bg-transparent",
+                  "hover:border-border-hover hover:bg-bg-raised transition-colors duration-200"
+                )}
+              >
+                How to read the marks
+                <ArrowRight size={14} />
+              </Link>
+            </div>
+          </div>
+          <SwaparcSwapMock />
         </div>
       </section>
 

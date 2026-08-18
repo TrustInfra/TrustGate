@@ -67,6 +67,22 @@ export default function WidgetIntegrationPage() {
       title="Embed TrustGate in your DEX"
       lede="One script tag, one data attribute. Any token-address input field becomes a live trust signal — no API key, no SDK, no React adapter required."
     >
+      <h2>See it live</h2>
+      <p>
+        Swaparc, an Arc testnet DEX, already renders TrustGate marks in its
+        token search. Circle issuers show VERIFIED. Other tokens show a score
+        and tier. Open the picker on{" "}
+        <a
+          href="https://swaparc.app"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          swaparc.app
+        </a>{" "}
+        or read the confirmation walkthrough on{" "}
+        <a href="/swaparc">/swaparc</a>.
+      </p>
+
       <h2>One-line install</h2>
       <p>
         Drop this once at the bottom of your <code>&lt;body&gt;</code> or in

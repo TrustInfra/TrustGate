@@ -109,6 +109,11 @@ export default function DocsOverview() {
           label="API Reference"
           description="Public oracle endpoints and the x402 payment standard."
         />
+        <QuickLink
+          href="/swaparc"
+          label="Live on Swaparc"
+          description="Confirm TrustGate badges on the Arc DEX token search."
+        />
       </div>
     </DocShell>
   );
