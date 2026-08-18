@@ -138,7 +138,7 @@ export default function HomePage() {
             <ol className="space-y-4 mb-8">
               <li className="flex gap-3 text-sm text-text-secondary">
                 <span className="font-mono text-[11px] text-accent pt-0.5">01</span>
-                Open swaparc.app. No swap required.
+                Open www.swaparc.app. No swap required.
               </li>
               <li className="flex gap-3 text-sm text-text-secondary">
                 <span className="font-mono text-[11px] text-accent pt-0.5">02</span>

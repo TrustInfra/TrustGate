@@ -73,11 +73,11 @@ export default function WidgetIntegrationPage() {
         token search. Circle issuers show VERIFIED. Other tokens show a score
         and tier. Open the picker on{" "}
         <a
-          href="https://swaparc.app"
+          href="https://www.swaparc.app"
           target="_blank"
           rel="noopener noreferrer"
         >
-          swaparc.app
+          www.swaparc.app
         </a>{" "}
         or read the confirmation walkthrough on{" "}
         <a href="/swaparc">/swaparc</a>.

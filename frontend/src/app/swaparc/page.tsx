@@ -45,7 +45,7 @@ const STEPS = [
   {
     n: "01",
     title: "Open Swaparc",
-    body: "Go to swaparc.app. You do not need to swap. The badge is on the token picker.",
+    body: "Go to www.swaparc.app. You do not need to swap. The badge is on the token picker.",
   },
   {
     n: "02",

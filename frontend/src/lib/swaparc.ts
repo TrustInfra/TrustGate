@@ -1,1 +1,1 @@
-export const SWAPARC_URL = "https://swaparc.app";
+export const SWAPARC_URL = "https://www.swaparc.app";
