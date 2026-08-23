@@ -116,22 +116,11 @@ export async function GET(req: NextRequest) {
     const symbol = chain.nativeCurrency.symbol;
     const balance = roundTo(Number(formatUnits(balanceRaw, decimals)), 6);
     const summaryBalance = roundTo(balance, 4).toFixed(4);
+    const sentence = `${checksummed} holds ${summaryBalance} ${symbol} on ${chainRaw}.`;
 
-    return NextResponse.json({
-      intent: "WALLET_BALANCE_CHECK",
-      address: checksummed,
-      ens: ensInput,
-      chain: chainRaw,
-      chain_id: chain.id,
-      token: null,
-      symbol,
-      balance,
-      balance_raw: balanceRaw.toString(),
-      decimals,
-      summary: `${checksummed} holds ${summaryBalance} ${symbol} on ${chainRaw}.`,
-      confidence: 0.98,
-      source: "eth_getBalance over public RPC",
-      as_of: new Date().toISOString(),
+    return new NextResponse(sentence, {
+      status: 200,
+      headers: { "content-type": "text/plain; charset=utf-8" },
     });
   } catch (err) {
     return NextResponse.json(
