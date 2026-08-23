@@ -8,7 +8,29 @@ import {
   type Chain,
   type Hex,
 } from "viem";
-import { arbitrum, base, mainnet, optimism, polygon } from "viem/chains";
+import {
+  arbitrum,
+  arbitrumSepolia,
+  avalanche,
+  avalancheFuji,
+  base,
+  baseSepolia,
+  blast,
+  bsc,
+  celo,
+  gnosis,
+  linea,
+  mainnet,
+  mantle,
+  optimism,
+  optimismSepolia,
+  polygon,
+  polygonAmoy,
+  scroll,
+  sepolia,
+  zksync,
+  zora,
+} from "viem/chains";
 import { normalize } from "viem/ens";
 
 export const dynamic = "force-dynamic";
@@ -21,6 +43,22 @@ const SUPPORTED_CHAINS = [
   "arbitrum",
   "optimism",
   "polygon",
+  "avalanche",
+  "bsc",
+  "gnosis",
+  "celo",
+  "linea",
+  "scroll",
+  "zksync",
+  "mantle",
+  "blast",
+  "zora",
+  "sepolia",
+  "base-sepolia",
+  "arbitrum-sepolia",
+  "optimism-sepolia",
+  "polygon-amoy",
+  "avalanche-fuji",
 ] as const;
 
 type ChainName = (typeof SUPPORTED_CHAINS)[number];
@@ -31,10 +69,44 @@ const CHAIN_BY_NAME: Record<ChainName, Chain> = {
   arbitrum,
   optimism,
   polygon,
+  avalanche,
+  bsc,
+  gnosis,
+  celo,
+  linea,
+  scroll,
+  zksync,
+  mantle,
+  blast,
+  zora,
+  sepolia,
+  "base-sepolia": baseSepolia,
+  "arbitrum-sepolia": arbitrumSepolia,
+  "optimism-sepolia": optimismSepolia,
+  "polygon-amoy": polygonAmoy,
+  "avalanche-fuji": avalancheFuji,
+};
+
+const CHAIN_ALIASES: Record<string, ChainName> = {
+  eth: "ethereum",
+  mainnet: "ethereum",
+  matic: "polygon",
+  arb: "arbitrum",
+  op: "optimism",
+  avax: "avalanche",
+  bnb: "bsc",
+  binance: "bsc",
+  "eth-sepolia": "sepolia",
 };
 
 function isChainName(value: string): value is ChainName {
   return (SUPPORTED_CHAINS as readonly string[]).includes(value);
+}
+
+function resolveChainName(value: string): ChainName | null {
+  const key = value.toLowerCase();
+  if (isChainName(key)) return key;
+  return CHAIN_ALIASES[key] ?? null;
 }
 
 function isHexAddress(value: string): value is Hex {
@@ -79,7 +151,8 @@ function sanitizeDetail(err: unknown): string {
 
 export async function GET(req: NextRequest) {
   const chainRaw = req.nextUrl.searchParams.get("chain")?.trim() ?? "";
-  if (!isChainName(chainRaw)) {
+  const chainName = resolveChainName(chainRaw);
+  if (chainName === null) {
     return NextResponse.json(
       { error: "unsupported_chain", supported: [...SUPPORTED_CHAINS] },
       { status: 400 }
@@ -92,7 +165,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "invalid_address" }, { status: 400 });
   }
 
-  const chain = CHAIN_BY_NAME[chainRaw];
+  const chain = CHAIN_BY_NAME[chainName];
 
   try {
     let resolved: Hex;
@@ -110,13 +183,13 @@ export async function GET(req: NextRequest) {
     }
 
     const checksummed = getAddress(resolved);
-    const client = publicClient(chainRaw);
+    const client = publicClient(chainName);
     const balanceRaw = await client.getBalance({ address: checksummed });
     const decimals = chain.nativeCurrency.decimals;
     const symbol = chain.nativeCurrency.symbol;
     const balance = roundTo(Number(formatUnits(balanceRaw, decimals)), 6);
     const summaryBalance = roundTo(balance, 4).toFixed(4);
-    const sentence = `${checksummed} holds ${summaryBalance} ${symbol} on ${chainRaw}.`;
+    const sentence = `${checksummed} holds ${summaryBalance} ${symbol} on ${chainName}.`;
 
     return new NextResponse(sentence, {
       status: 200,
