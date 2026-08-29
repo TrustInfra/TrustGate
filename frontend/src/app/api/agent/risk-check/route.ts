@@ -170,7 +170,7 @@ function mapVerdict(
 }
 
 /**
- * GET /api/miner/fraud-detection
+ * GET /api/agent/risk-check
  * Query: address (required), chain (optional, default arc; non-arc still scored on Arc).
  * Free in-process TrustGate scoring. Never calls x402-gated oracle routes.
  */
