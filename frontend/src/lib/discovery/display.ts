@@ -25,9 +25,9 @@ export const TIER_DISPLAY: Record<Tier, TierDisplay> = {
   VERIFIED: {
     label: "Verified",
     short: "VERIFIED",
-    color: "#2563EB",
-    bg: "#2563EB1A",
-    border: "#2563EB33",
+    color: "#10d9a0",
+    bg: "#10d9a01A",
+    border: "#10d9a033",
     showScore: false,
     deprioritized: false,
   },
@@ -126,7 +126,7 @@ export function getSeverityColor(severity: FlagSeverity) {
 }
 
 // Resolve any flag code to a display. Known flags map directly. An unknown
-// flag (one Nald adds later before we give it a label) degrades gracefully:
+// flag (a code we have not labeled yet) degrades gracefully:
 // the raw code gets humanized so it still renders something sensible.
 export function getFlagDisplay(code: FlagCode): FlagDisplay {
   if (code in FLAG_DISPLAY) {

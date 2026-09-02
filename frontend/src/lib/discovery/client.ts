@@ -6,14 +6,11 @@ import { isVerifiedIssuer } from "./verified-issuers";
 // scoreBatch is the ONLY thing the rest of the frontend calls. Badges, flags,
 // the reorder helper, the demo surface: all of them go through here.
 //
-// THE ONE LINE TO CHANGE when Nald's batch endpoint goes live:
-//   set USE_MOCK = false
-// The real request lives in fetchScoreBatch below, already wired to the
-// agreed shape. Nothing downstream changes.
+// Live batch via /api/batch. Mock is used only when
+// NEXT_PUBLIC_DISCOVERY_MOCK=1. Live failures are not replaced with fixture
+// scores — that would paint fake tiers onto real contracts.
 // ============================================================================
 
-// Live batch via /api/batch (Phase 2b). Mock is fallback only if live fails
-// and NEXT_PUBLIC_DISCOVERY_MOCK=1, or when explicitly forced.
 const FORCE_MOCK = process.env.NEXT_PUBLIC_DISCOVERY_MOCK === "1";
 const BATCH_ENDPOINT = "/api/batch";
 
@@ -49,14 +46,6 @@ export async function scoreBatch(addresses: string[]): Promise<BatchScore[]> {
   if (FORCE_MOCK) {
     return applyVerifiedOverlay(await mockScoreBatch(addresses));
   }
-  try {
-    const results = await fetchScoreBatch(addresses);
-    return applyVerifiedOverlay(results);
-  } catch (err) {
-    console.warn(
-      "[discovery] live batch failed, falling back to mock:",
-      err instanceof Error ? err.message : err
-    );
-    return applyVerifiedOverlay(await mockScoreBatch(addresses));
-  }
+  const results = await fetchScoreBatch(addresses);
+  return applyVerifiedOverlay(results);
 }

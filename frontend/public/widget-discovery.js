@@ -44,7 +44,7 @@
 
   // --- display config, KEEP IN SYNC with src/lib/discovery/display.ts --------
   var TIER = {
-    VERIFIED: { short: "VERIFIED", color: "#2563EB", bg: "#2563EB1A", showScore: false, deprioritized: false },
+    VERIFIED: { short: "VERIFIED", color: "#10d9a0", bg: "#10d9a01A", showScore: false, deprioritized: false },
     ELITE: { short: "ELITE", color: "#059669", bg: "#0596691A", showScore: false, deprioritized: false },
     HIGH: { short: "HIGH", color: "#22C55E", bg: "#22C55E1A", showScore: true, deprioritized: false },
     MEDIUM: { short: "MID", color: "#F59E0B", bg: "#F59E0B1A", showScore: true, deprioritized: false },

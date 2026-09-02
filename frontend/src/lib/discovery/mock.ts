@@ -1,9 +1,8 @@
 import type { BatchScore } from "./types";
 
-// Mock of the batch oracle. Returns one BatchScore per requested address.
-// Used until Nald's /batch endpoint is live. The swap to the real endpoint
-// happens in client.ts, never here, so this file can stay as a realistic
-// fixture for local dev and the demo surface.
+// Fixture BatchScore results for local dev when NEXT_PUBLIC_DISCOVERY_MOCK=1.
+// Live scoring goes through client.ts to POST /api/batch. This file is never
+// the production path.
 
 // Fixed profiles we map addresses onto. Deterministic: the same address
 // always gets the same mock result within a session, so the demo is stable.
