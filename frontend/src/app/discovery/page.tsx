@@ -133,6 +133,10 @@ export default function DiscoveryPage() {
                 <div className="flex items-center gap-2 flex-wrap justify-end shrink-0">
                   {loading || !score ? (
                     <span className="inline-block w-24 h-5 bg-bg-surface" />
+                  ) : score.error ? (
+                    <span className="font-mono text-[10px] uppercase tracking-wider text-text-muted">
+                      Unavailable
+                    </span>
                   ) : (
                     <>
                       <TrustBadge score={score} />

@@ -61,6 +61,7 @@ export interface WidgetScore {
   score: number;
   tier: string;
   contractType: string;
+  flags: string[];
 }
 
 interface CachedScore {
@@ -172,11 +173,18 @@ async function fetchUpstream(
   ) {
     throw new Error("upstream returned unexpected response shape");
   }
-  const d = data as { score: number; tier: string; contractType?: string };
+  const d = data as {
+    score: number;
+    tier: string;
+    contractType?: string;
+    flags?: unknown;
+  };
+  const flags = Array.isArray(d.flags) ? d.flags.map(String) : [];
   return {
     score: d.score,
     tier: d.tier,
     contractType: d.contractType ?? "ERC-20",
+    flags,
   };
 }
 

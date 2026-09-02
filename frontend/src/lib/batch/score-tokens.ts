@@ -8,19 +8,16 @@ import {
 import { assembleAndScoreNft } from "@/lib/nft-contract";
 import { analyzeTokenTemporal } from "@/lib/token-behavior/temporal";
 import {
-  applyTemporalScoreDelta,
-  readTemporalScoreWeight,
-} from "@/lib/token-behavior/heuristics";
-import {
   markCoordinatedExitParticipants,
 } from "@/lib/token-behavior/wallet-marks";
-import { deployerStakingBoost } from "@/lib/staking/signals";
 import {
   confidenceEnumToNumber,
   recordIntelligence,
 } from "@/lib/trust-intelligence/snapshots";
 import { SCORING_VERSION } from "@/lib/scoring-version";
 import type { BatchScore, Tier } from "@/lib/discovery/types";
+import { scoreErc20ViaUpstream } from "@/lib/widget-payment";
+import { WidgetSpendLimitError } from "@/lib/widget-limit";
 
 const ARCSCAN_API = "https://testnet.arcscan.app";
 
@@ -185,76 +182,75 @@ export async function scoreTokenForBatch(address: string): Promise<BatchScore> {
       };
     }
 
-    // ERC-20 path: local temporal + meta + deployer staking
-    const [meta, temporal, deployerBoost] = await Promise.all([
-      fetchTokenMeta(address),
-      analyzeTokenTemporal(address),
-      deployerStakingBoost(detection.info?.creatorAddress),
-    ]);
-
-    const holders = Number(meta?.holders ?? meta?.holders_count ?? 0) || 0;
-    // Mining = no meaningful holder market yet
-    const state = holders < 3 ? "mining" : "graduated";
-
-    // Base score from holders / verification / temporal
-    let score = 40;
-    if (detection.info?.isVerified) score += 12;
-    if (holders >= 1000) score += 25;
-    else if (holders >= 100) score += 18;
-    else if (holders >= 20) score += 10;
-    else if (holders >= 5) score += 4;
-
-    // scoreDelta still fully computed on temporal; weight 0 suppresses published impact until calibrated
-    score += applyTemporalScoreDelta(
-      temporal.scoreDelta,
-      readTemporalScoreWeight()
-    );
-    score += deployerBoost.boost;
-    score = Math.max(0, Math.min(100, Math.round(score)));
-
-    const flags = [
-      ...temporal.flags,
-      ...deployerBoost.flags,
-    ];
-
-    if (flags.includes("EXIT_SYNC") && temporal.exitParticipants.length > 0) {
-      markCoordinatedExitParticipants(lower, temporal.exitParticipants);
+    // ERC-20 scores come from the same paid oracle as Token Shield and the
+    // widget. Do not invent a second local number for the same address.
+    if (detection.kind === "erc20") {
+      try {
+        const upstream = await scoreErc20ViaUpstream(address);
+        const [meta, temporal] = await Promise.all([
+          fetchTokenMeta(address),
+          analyzeTokenTemporal(address),
+        ]);
+        const holders = Number(meta?.holders ?? meta?.holders_count ?? 0) || 0;
+        const state = holders < 3 ? "mining" : "graduated";
+        const flags = [
+          ...new Set([...(upstream.flags ?? []), ...temporal.flags]),
+        ];
+        if (flags.includes("EXIT_SYNC") && temporal.exitParticipants.length > 0) {
+          markCoordinatedExitParticipants(lower, temporal.exitParticipants);
+        }
+        const score = Math.max(0, Math.min(100, Math.round(upstream.score)));
+        const tier = mapTier(upstream.tier, score);
+        let confidence = 35;
+        if (temporal.metrics.transferSample >= 40 && holders >= 20) {
+          confidence = 85;
+        } else if (temporal.metrics.transferSample >= 15 || holders >= 10) {
+          confidence = 60;
+        } else if (holders >= 3) {
+          confidence = 45;
+        }
+        const intel = recordIntelligence({
+          subject: lower,
+          subjectType: "token",
+          score,
+          tier,
+          confidence,
+          flags,
+          scoringVersion: SCORING_VERSION,
+          observations: temporal.observations,
+        });
+        return {
+          address: lower,
+          score,
+          tier,
+          confidence: intel.confidence,
+          flags,
+          state,
+        };
+      } catch (err) {
+        if (err instanceof WidgetSpendLimitError) {
+          return {
+            address: lower,
+            score: 0,
+            tier: "BLOCKED",
+            confidence: 0,
+            flags: [],
+            state: "graduated",
+            error: "rate_limited",
+          };
+        }
+        throw err;
+      }
     }
-
-    // Confidence from sample density
-    let confidence = 35;
-    if (temporal.metrics.transferSample >= 40 && holders >= 20) confidence = 85;
-    else if (temporal.metrics.transferSample >= 15 || holders >= 10) confidence = 60;
-    else if (holders >= 3) confidence = 45;
-
-    if (state === "mining") {
-      // Deployer-proxy standing: use a conservative band
-      score = Math.min(score, 70);
-      confidence = Math.min(confidence, 50);
-    }
-
-    const tier = mapTier("", score);
-    const intel = recordIntelligence({
-      subject: lower,
-      subjectType: "token",
-      score,
-      tier,
-      confidence,
-      flags,
-      scoringVersion: SCORING_VERSION,
-      observations: [
-        ...temporal.observations,
-        ...deployerBoost.observations,
-      ],
-    });
 
     return {
       address: lower,
-      score,
-      tier,
-      confidence: intel.confidence,
-      flags: [...new Set(flags)],
-      state,
+      score: 0,
+      tier: "BLOCKED",
+      confidence: 0,
+      flags: [],
+      state: "graduated",
+      error: "not_a_token",
     };
   } catch (err) {
     console.error("[batch] score failed", address, err);
