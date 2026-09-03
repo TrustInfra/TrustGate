@@ -71,7 +71,7 @@ export default function DiscoveryPage() {
           batch call. Ordering by that score is a choice, not a default.
         </p>
 
-        <div className="mt-8 flex flex-wrap items-center gap-4 px-4 py-3 border border-border bg-bg-raised">
+        <div className="mt-8 flex flex-col gap-3 px-4 py-3 border border-border bg-bg-raised sm:flex-row sm:flex-wrap sm:items-center sm:gap-4">
           <label className="inline-flex items-center gap-2 font-mono text-xs text-text cursor-pointer">
             <input
               type="checkbox"
@@ -93,7 +93,7 @@ export default function DiscoveryPage() {
             />
             Group same ticker
           </label>
-          <span className="font-mono text-[11px] text-text-muted">
+          <span className="font-mono text-[11px] text-text-muted sm:flex-1">
             {orderByTrust
               ? groupByTicker
                 ? "Within each ticker, high trust rises. Low and blocked stay visible at the bottom."
@@ -114,10 +114,10 @@ export default function DiscoveryPage() {
             return (
               <li
                 key={token.address}
-                className="flex items-center justify-between gap-4 px-4 py-3 border border-border bg-bg-raised"
+                className="flex flex-col gap-3 px-4 py-4 border border-border bg-bg-raised sm:flex-row sm:items-center sm:justify-between sm:gap-6"
               >
-                <div className="min-w-0">
-                  <p className="font-display font-bold text-sm text-text">
+                <div className="min-w-0 sm:flex-1">
+                  <p className="font-display font-bold text-sm text-text leading-tight">
                     {token.name}{" "}
                     <span className="font-mono text-[11px] font-medium text-text-muted">
                       {token.symbol}
@@ -125,12 +125,12 @@ export default function DiscoveryPage() {
                   </p>
                   <Link
                     href={`/token-shield?address=${token.address}`}
-                    className="font-mono text-[11px] text-text-muted hover:text-accent break-all"
+                    className="mt-1 inline-block font-mono text-[11px] text-text-muted hover:text-accent whitespace-nowrap"
                   >
                     {shorten(token.address)}
                   </Link>
                 </div>
-                <div className="flex items-center gap-2 flex-wrap justify-end shrink-0">
+                <div className="flex flex-wrap items-center gap-2 sm:justify-end sm:max-w-[18rem]">
                   {loading || !score ? (
                     <span className="inline-block w-24 h-5 bg-bg-surface" />
                   ) : score.error ? (
