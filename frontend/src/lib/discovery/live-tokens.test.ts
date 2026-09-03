@@ -11,17 +11,15 @@ describe("LIVE_TOKENS", () => {
     expect(new Set(addrs).size).toBe(LIVE_TOKENS.length);
   });
 
-  it("includes the four Circle issuers and SWPRC", () => {
-    const bySymbol = Object.fromEntries(
-      LIVE_TOKENS.map((t) => [t.address.toLowerCase(), t.symbol])
-    );
-    expect(bySymbol["0x3600000000000000000000000000000000000000"]).toBe("USDC");
-    expect(bySymbol["0x89b50855aa3be2f677cd6303cec089b5f319d72a"]).toBe("EURC");
-    expect(bySymbol["0xe9185f0c5f296ed1797aae4238d26ccabeadb86c"]).toBe("USYC");
-    expect(bySymbol["0xf0c4a4ce82a5746abaad9425360ab04fbba432bf"]).toBe(
-      "CircBTC"
-    );
-    expect(bySymbol["0xbe7477bf91526fc9988c8f33e91b6db687119d45"]).toBe("SWPRC");
+  it("includes official USDC, two USDC clones, and SWPRC", () => {
+    const addrs = LIVE_TOKENS.map((t) => t.address.toLowerCase());
+    expect(addrs).toContain("0x3600000000000000000000000000000000000000");
+    expect(addrs).toContain("0xd5413b391b3790cbef25d9655d82a2ad99cd8b31");
+    expect(addrs).toContain("0x634b984958e56a5a57db2ccfb11c48404b86f507");
+    expect(addrs).toContain("0xbe7477bf91526fc9988c8f33e91b6db687119d45");
+    expect(addrs).not.toContain("0x89b50855aa3be2f677cd6303cec089b5f319d72a");
+    expect(addrs).not.toContain("0xe9185f0c5f296ed1797aae4238d26ccabeadb86c");
+    expect(addrs).not.toContain("0xf0c4a4ce82a5746abaad9425360ab04fbba432bf");
   });
 
   it("has three USDC tickers so same-name ranking has something to group", () => {

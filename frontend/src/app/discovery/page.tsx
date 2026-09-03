@@ -66,9 +66,9 @@ export default function DiscoveryPage() {
           Trust-ordered discovery
         </h1>
         <p className="mt-4 text-sm text-text-secondary leading-relaxed max-w-xl">
-          Live Arc Testnet tokens. Three of these share the ticker USDC.
-          TrustGate scores the list in one batch call. Ordering by that score
-          is a choice, not a default.
+          Live Arc Testnet tokens. Three contracts share the ticker USDC —
+          one Circle issuer and two others. TrustGate scores the list in one
+          batch call. Ordering by that score is a choice, not a default.
         </p>
 
         <div className="mt-8 flex flex-wrap items-center gap-4 px-4 py-3 border border-border bg-bg-raised">
