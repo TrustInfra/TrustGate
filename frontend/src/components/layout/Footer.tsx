@@ -16,9 +16,8 @@ const COLUMNS: FooterColumn[] = [
   {
     title: "Network",
     links: [
-      { label: "Arcscan", href: EXPLORER_URL, external: true },
-      { label: "USDC Faucet", href: "https://faucet.circle.com", external: true },
-      { label: "Chain ID 5042002", href: null },
+      { label: "Explorer", href: EXPLORER_URL, external: true },
+      { label: "Chain ID 5042", href: null },
     ],
   },
   {

@@ -2,13 +2,13 @@
 
 import { createConfig, http } from "wagmi";
 import { getDefaultConfig } from "connectkit";
-import { arcTestnet } from "./constants";
+import { arc, RPC_URL } from "./chain";
 
 export const config = createConfig(
   getDefaultConfig({
-    chains: [arcTestnet],
+    chains: [arc],
     transports: {
-      [arcTestnet.id]: http("https://rpc.testnet.arc.network"),
+      [arc.id]: http(RPC_URL),
     },
     walletConnectProjectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || "",
     appName: "TrustGate",

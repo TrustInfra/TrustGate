@@ -1,15 +1,16 @@
 import "server-only";
 
 import { envNumber } from "@/lib/env-number";
+import { RPC_URL, VERIFIED_ISSUER_ADDRESSES } from "./chain";
+import { indexerGet } from "./indexer";
 
-// Trust scoring for non-ERC-20 contracts on Arc Testnet.
+// Trust scoring for non-ERC-20 contracts on Arc Mainnet.
 // Used by /api/oracle/token/[address] when the address is a contract but not
 // a recognised token. Tier bands match the wallet oracle (LOW/MEDIUM/HIGH/
 // HIGH_ELITE) so the public surface uses one tier vocabulary across wallets,
 // tokens, and generic contracts.
 
-const ARCSCAN_API = "https://testnet.arcscan.app";
-const ARC_RPC_URL = "https://rpc.testnet.arc.network";
+const ARC_RPC_URL = RPC_URL;
 const TX_SAMPLE_LIMIT = 50;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -68,19 +69,14 @@ const ARC_ECOSYSTEM_FULL = new Set<string>([
 ]);
 const ARC_ECOSYSTEM_PREFIXES: string[] = [
   "0x3df3", // XyloStablePool
-  "0x89b5", // FiatTokenProxy
+  "0xbef5", // EURC FiatTokenProxy (mainnet)
 ];
 
-// Official Circle-issued token contracts on Arc Testnet, stored lowercased.
+// Official Circle-issued token contracts on Arc Mainnet, stored lowercased.
 // These receive a dedicated VERIFIED tier instead of a numeric score: bot and
 // concentration heuristics are meaningless for canonical issuer tokens. Matched
 // by exact full address only — unlike ARC_ECOSYSTEM_PREFIXES, no prefix logic.
-const VERIFIED_ISSUERS = new Set<string>([
-  "0x3600000000000000000000000000000000000000", // USDC
-  "0x89b50855aa3be2f677cd6303cec089b5f319d72a", // EURC
-  "0xe9185f0c5f296ed1797aae4238d26ccabeadb86c", // USYC
-  "0xf0c4a4ce82a5746abaad9425360ab04fbba432bf", // cirBTC
-]);
+const VERIFIED_ISSUERS = new Set<string>(VERIFIED_ISSUER_ADDRESSES);
 
 interface ArcscanTokenInfo {
   type?: string | null;
@@ -169,16 +165,7 @@ export interface ContractScoreOutput {
 }
 
 async function arcscanGet<T>(path: string): Promise<T | null> {
-  try {
-    const res = await fetch(`${ARCSCAN_API}${path}`, {
-      headers: { accept: "application/json" },
-      cache: "no-store",
-    });
-    if (!res.ok) return null;
-    return (await res.json()) as T;
-  } catch {
-    return null;
-  }
+  return indexerGet<T>(path);
 }
 
 async function rpcCall(

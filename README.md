@@ -2,7 +2,7 @@
 
 Behavioral trust infrastructure for onchain systems. TrustGate scores wallets, tokens, and contracts from observed onchain behavior and exposes those signals for routing, gating, and integration.
 
-Live: [trustgated.xyz](https://www.trustgated.xyz) · Docs: [docs.trustgated.xyz](https://docs.trustgated.xyz) · Chain: Arc Testnet (`5042002`)
+Live: [trustgated.xyz](https://www.trustgated.xyz) · Docs: [docs.trustgated.xyz](https://docs.trustgated.xyz) · Chain: Arc (`5042`)
 
 ---
 
@@ -46,10 +46,11 @@ flowchart TB
     INTUITION[Intuition attestation graph]
   end
 
-  subgraph chain [Arc Testnet]
+  subgraph chain [Arc Mainnet]
     TG[TrustGate.sol]
     AR[AgentRegistry.sol]
     TS[TrustScoringPlaintext.sol]
+    SS[SubjectStake.sol]
   end
 
   DEX --> WIDGET
@@ -196,15 +197,16 @@ Guide: [Widget integration docs](https://docs.trustgated.xyz/docs/widget-integra
 
 ---
 
-## Contracts (Arc Testnet)
+## Contracts (Arc Mainnet)
 
-Explorer: [testnet.arcscan.app](https://testnet.arcscan.app)
+Explorer: [explorer.arc.io](https://explorer.arc.io) · Chain ID `5042`
 
 | Contract | Address |
 | --- | --- |
-| TrustScoringPlaintext | `0xEb979Dc25396ba4be6cEA41EAfEa894C55772246` |
-| AgentRegistry | `0x73d3cf7f2734C334927f991fe87D06d595d398b4` |
-| TrustGate | `0x52E17bC482d00776d73811680CbA9914e83E33CC` |
+| TrustScoringPlaintext | `0x1c0fDF6Bcf927824113271FccECb007fC43B41ee` |
+| AgentRegistry | `0xF27f123D4b3148811d65E4b8AF02bf0767e944e5` |
+| TrustGate | `0xD7f66981364be30D42D7cA5373d690FEa1045628` |
+| SubjectStake | `0xF3713C3434B712C947bb849b4c4d81Ea539189aE` |
 
 Sources and ABIs: `contracts/` · Reference: [Contract docs](https://docs.trustgated.xyz/docs/contracts)
 

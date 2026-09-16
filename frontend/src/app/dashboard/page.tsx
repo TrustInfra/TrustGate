@@ -32,7 +32,7 @@ export default function DashboardPage() {
           </h1>
           <p className="text-sm text-text-muted mb-8">
             Connect your wallet to access the TrustGate dashboard.
-            Make sure you are on Arc Testnet.
+            Make sure you are on Arc (chain ID 5042).
           </p>
           <ConnectKitButton />
         </div>

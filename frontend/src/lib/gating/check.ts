@@ -10,7 +10,7 @@ import type {
   TrustAttestation,
 } from "./types";
 import { GATING_DISCLAIMER } from "./types";
-import { arcTestnet } from "@/lib/constants";
+import { arc } from "@/lib/chain";
 import { SCORING_VERSION } from "@/lib/scoring-version";
 
 /**
@@ -21,7 +21,7 @@ export async function runGatingCheck(
   req: GatingCheckRequest
 ): Promise<GatingCheckResult> {
   const reasons: string[] = [];
-  const chainId = req.chainId ?? arcTestnet.id;
+  const chainId = req.chainId ?? arc.id;
 
   if (req.requireMultiFactorAck && !req.ladder.multiFactorAcknowledged) {
     return {

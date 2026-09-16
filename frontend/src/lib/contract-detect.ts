@@ -3,7 +3,9 @@
 // (oracle page pre-check), so the wallet-vs-contract rule lives in one place.
 // The Oracle scores wallets (EOAs); contracts belong on Token Shield.
 
-const ARC_RPC_URL = "https://rpc.testnet.arc.network";
+import { RPC_URL } from "./chain";
+
+const ARC_RPC_URL = RPC_URL;
 
 // EIP-7702 sets an EOA's code to the delegation designator 0xef0100 || address.
 // Such an address is still a wallet, so it must NOT be treated as a contract.

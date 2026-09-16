@@ -5,7 +5,7 @@ import {
 } from "@/lib/gating/issue";
 import type { AttestationUseClass } from "@/lib/gating/types";
 import { GATING_DISCLAIMER } from "@/lib/gating/types";
-import { arcTestnet } from "@/lib/constants";
+import { arc } from "@/lib/chain";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -50,13 +50,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       subjectType === "token"
         ? await issueTokenAttestation({
             token: subject as `0x${string}`,
-            chainId: b.chainId ?? arcTestnet.id,
+            chainId: b.chainId ?? arc.id,
             useClass: b.useClass,
             ttlSeconds: b.ttlSeconds,
           })
         : await issueWalletAttestation({
             wallet: subject as `0x${string}`,
-            chainId: b.chainId ?? arcTestnet.id,
+            chainId: b.chainId ?? arc.id,
             useClass: b.useClass,
             ttlSeconds: b.ttlSeconds,
           });

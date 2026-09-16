@@ -60,14 +60,13 @@ export default function DiscoveryPage() {
     <div className="px-4 sm:px-6 lg:px-8 py-16 lg:py-24">
       <div className="max-w-3xl mx-auto">
         <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-accent mb-4">
-          Arc Testnet
+          Arc Mainnet
         </p>
         <h1 className="font-display font-extrabold text-3xl sm:text-4xl text-text tracking-tight">
           Trust-ordered discovery
         </h1>
         <p className="mt-4 text-sm text-text-secondary leading-relaxed max-w-xl">
-          Live Arc Testnet tokens. Three contracts share the ticker USDC —
-          one Circle issuer and two others. TrustGate scores the list in one
+          Live Arc Mainnet issuer tokens. TrustGate scores the list in one
           batch call. Ordering by that score is a choice, not a default.
         </p>
 

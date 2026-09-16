@@ -1,0 +1,14 @@
+{
+  "network": "arcMainnet",
+  "chainId": 5042,
+  "deployer": "0x0c2154aC0b4fEc3432B8cb8673041dB79AeEf6e4",
+  "contracts": {
+    "TrustScoringPlaintext": "0x1c0fDF6Bcf927824113271FccECb007fC43B41ee",
+    "AgentRegistry": "0xF27f123D4b3148811d65E4b8AF02bf0767e944e5",
+    "TrustGate": "0xD7f66981364be30D42D7cA5373d690FEa1045628",
+    "SubjectStake": "0xF3713C3434B712C947bb849b4c4d81Ea539189aE",
+    "USDC": "0x3600000000000000000000000000000000000000"
+  },
+  "deployedAt": "2026-09-16T10:29:51.121Z",
+  "subjectStakeRedeployedAt": "2026-09-16T10:55:41.629Z"
+}

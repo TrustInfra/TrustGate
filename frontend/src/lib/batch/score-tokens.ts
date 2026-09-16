@@ -18,8 +18,7 @@ import { SCORING_VERSION } from "@/lib/scoring-version";
 import type { BatchScore, Tier } from "@/lib/discovery/types";
 import { scoreErc20ViaUpstream } from "@/lib/widget-payment";
 import { WidgetSpendLimitError } from "@/lib/widget-limit";
-
-const ARCSCAN_API = "https://testnet.arcscan.app";
+import { indexerGet } from "@/lib/indexer";
 
 interface ArcscanToken {
   name?: string | null;
@@ -30,16 +29,7 @@ interface ArcscanToken {
 }
 
 async function fetchTokenMeta(address: string): Promise<ArcscanToken | null> {
-  try {
-    const res = await fetch(`${ARCSCAN_API}/api/v2/tokens/${address}`, {
-      headers: { accept: "application/json" },
-      cache: "no-store",
-    });
-    if (!res.ok) return null;
-    return (await res.json()) as ArcscanToken;
-  } catch {
-    return null;
-  }
+  return indexerGet<ArcscanToken>(`/api/v2/tokens/${address}`);
 }
 
 function mapTier(tier: string, score: number): Tier {
@@ -134,12 +124,16 @@ export async function scoreTokenForBatch(address: string): Promise<BatchScore> {
 
     if (detection.kind === "nft" && detection.info) {
       const nft = await assembleAndScoreNft(address, detection.info, origin);
+      const { applySubjectConviction } = await import(
+        "@/lib/stake/conviction-apply"
+      );
+      const conviction = await applySubjectConviction(address, nft.score, 100);
       const conf = confidenceEnumToNumber(nft.confidence);
-      const flags = nft.flags ?? [];
+      const flags = [...(nft.flags ?? []), ...conviction.flags];
       recordIntelligence({
         subject: lower,
         subjectType: "token",
-        score: nft.score,
+        score: conviction.score,
         tier: nft.tier,
         confidence: conf,
         flags,
@@ -147,8 +141,8 @@ export async function scoreTokenForBatch(address: string): Promise<BatchScore> {
       });
       return {
         address: lower,
-        score: nft.score,
-        tier: mapTier(nft.tier, nft.score),
+        score: conviction.score,
+        tier: mapTier(nft.tier, conviction.score),
         confidence: conf,
         flags,
         state: "graduated",
@@ -162,22 +156,31 @@ export async function scoreTokenForBatch(address: string): Promise<BatchScore> {
         volume30d: 0,
         usdcThroughput: 0,
       });
+      const { applySubjectConviction } = await import(
+        "@/lib/stake/conviction-apply"
+      );
+      const conviction = await applySubjectConviction(
+        address,
+        scored.score,
+        100
+      );
       const conf = confidenceEnumToNumber(scored.confidence);
+      const flags = [...scored.flags, ...conviction.flags];
       recordIntelligence({
         subject: lower,
         subjectType: "contract",
-        score: scored.score,
+        score: conviction.score,
         tier: scored.tier,
         confidence: conf,
-        flags: scored.flags,
+        flags,
         scoringVersion: SCORING_VERSION,
       });
       return {
         address: lower,
-        score: scored.score,
-        tier: mapTier(scored.tier, scored.score),
+        score: conviction.score,
+        tier: mapTier(scored.tier, conviction.score),
         confidence: conf,
-        flags: scored.flags,
+        flags,
         state: "graduated",
       };
     }

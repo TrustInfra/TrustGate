@@ -102,7 +102,7 @@ export default function DocsOverview() {
         <QuickLink
           href="/docs/contracts"
           label="Contracts"
-          description="Deployed addresses on Arc Testnet and the role of each contract."
+          description="Deployed addresses on Arc Mainnet and the role of each contract."
         />
         <QuickLink
           href="/docs/api-reference"

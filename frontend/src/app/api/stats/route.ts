@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
+import { CONTRACT_ADDRESSES } from "@/lib/chain";
+import { indexerGet } from "@/lib/indexer";
 
-const ARCSCAN_API = "https://testnet.arcscan.app/api/v2";
+const ZERO = "0x0000000000000000000000000000000000000000";
 
 const CONTRACTS: readonly string[] = [
-  "0x52E17bC482d00776d73811680CbA9914e83E33CC",
-  "0x73d3cf7f2734C334927f991fe87D06d595d398b4",
-  "0xEb979Dc25396ba4be6cEA41EAfEa894C55772246",
-] as const;
+  CONTRACT_ADDRESSES.trustGate,
+  CONTRACT_ADDRESSES.agentRegistry,
+  CONTRACT_ADDRESSES.trustScoring,
+].filter((a) => a.toLowerCase() !== ZERO);
 
 const CACHE_TTL_MS = 5 * 60 * 1000;
 const MAX_PAGES_PER_CONTRACT = 200;
@@ -43,29 +45,13 @@ interface AddressTxPage {
   next_page_params?: Record<string, string | number> | null;
 }
 
-// Retry once after a 1s delay so a transient fetch failure (e.g. upstream
-// rate limiting) doesn't immediately surface as an error.
-async function fetchWithRetry(
-  url: string,
-  init: RequestInit
-): Promise<Response> {
-  try {
-    return await fetch(url, init);
-  } catch {
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    return await fetch(url, init);
-  }
-}
-
 async function fetchCount(address: string): Promise<number> {
-  const res = await fetchWithRetry(`${ARCSCAN_API}/addresses/${address}/counters`, {
-    headers: { accept: "application/json" },
-    cache: "no-store",
-  });
-  if (!res.ok) {
-    throw new Error(`counters ${address} HTTP ${res.status}`);
+  const data = await indexerGet<CountersResponse>(
+    `/api/v2/addresses/${address}/counters`
+  );
+  if (!data) {
+    throw new Error(`counters ${address} unavailable`);
   }
-  const data = (await res.json()) as CountersResponse;
   const parsed = parseInt(data.transactions_count ?? "0", 10);
   return Number.isFinite(parsed) ? parsed : 0;
 }
@@ -80,21 +66,13 @@ async function collectCallers(
 
   while (nextParams && page < MAX_PAGES_PER_CONTRACT) {
     const qs = nextParams.toString();
-    const url = qs
-      ? `${ARCSCAN_API}/addresses/${address}/transactions?${qs}`
-      : `${ARCSCAN_API}/addresses/${address}/transactions`;
-
-    const res = await fetchWithRetry(url, {
-      headers: { accept: "application/json" },
-      cache: "no-store",
-    });
-    if (!res.ok) {
-      throw new Error(
-        `transactions ${address} page ${page + 1} HTTP ${res.status}`
-      );
+    const path = qs
+      ? `/api/v2/addresses/${address}/transactions?${qs}`
+      : `/api/v2/addresses/${address}/transactions`;
+    const data = await indexerGet<AddressTxPage>(path);
+    if (!data) {
+      throw new Error(`transactions ${address} page ${page + 1} unavailable`);
     }
-
-    const data = (await res.json()) as AddressTxPage;
     const items = data.items ?? [];
 
     for (const tx of items) {

@@ -82,23 +82,24 @@ NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your_project_id`}</code></pre>
       <h2>Deploy your own contracts</h2>
       <p>
         The default frontend points at the canonical TrustGate deployment.
-        To deploy fresh contracts to Arc testnet:
+        To deploy fresh contracts to Arc mainnet:
       </p>
       <pre><code>{`# at repo root
 cp .env.example .env
 # add PRIVATE_KEY=<your deployer key>
 
-npx hardhat run scripts/deploy-arc.ts --network arcTestnet`}</code></pre>
+npx hardhat run scripts/deploy-arc.ts --network arcMainnet`}</code></pre>
       <p>
         The script deploys{" "}
-        <code>TrustScoringPlaintext</code>, <code>AgentRegistry</code>, and{" "}
-        <code>TrustGate</code>, then wires them together. Update{" "}
-        <code>frontend/src/lib/constants.ts</code> with the new addresses.
+        <code>TrustScoringPlaintext</code>, <code>AgentRegistry</code>,{" "}
+        <code>TrustGate</code>, and <code>SubjectStake</code>, then wires
+        them together. Update{" "}
+        <code>frontend/src/lib/chain.ts</code> with the new addresses.
       </p>
 
       <h2>Verify on Arcscan</h2>
       <pre><code>{`ETHERSCAN_API_KEY=arcscan npx hardhat verify \\
-  --network arcTestnet <ADDRESS> <...CTOR_ARGS>`}</code></pre>
+  --network arcMainnet <ADDRESS> <...CTOR_ARGS>`}</code></pre>
       <p>
         Arcscan accepts any non-empty API key. If verification fails on the
         first attempt, retry with <code>--force</code> — the explorer
@@ -120,14 +121,14 @@ npx hardhat run scripts/deploy-arc.ts --network arcTestnet`}</code></pre>
       <ul>
         <li>
           <strong>Wrong network</strong> — the dashboard prompts a network
-          switch automatically. If a wallet refuses, add Arc Testnet
-          manually with chain ID <code>5042002</code> and RPC{" "}
-          <code>https://rpc.testnet.arc.network</code>.
+          switch automatically. If a wallet refuses, add Arc
+          manually with chain ID <code>5042</code> and RPC{" "}
+          <code>https://rpc.mainnet.arc.io</code>.
         </li>
         <li>
           <strong>Insufficient gas</strong> — Arc uses USDC as native gas.
           The Register Agent and Calculate Score buttons stay disabled
-          below 0.01 USDC; refill via faucet.
+          below 0.01 USDC.
         </li>
         <li>
           <strong>Score returns 0</strong> — the wallet has zero Arc

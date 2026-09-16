@@ -192,6 +192,7 @@ async function proxy(
           score: rescored.score,
           tier: rescored.tier,
           recommendation: rescored.recommendation,
+          convictionDelta: rescored.convictionDelta ?? 0,
           confidence: intel.confidence,
           flags: rescored.flags,
           summary: intel.summary,

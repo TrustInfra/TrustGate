@@ -7,8 +7,7 @@ import "server-only";
 
 import { envNumber } from "@/lib/env-number";
 import { scoreNft, NftScoreInput, NftScoreResult } from "./nft-scoring";
-
-const ARCSCAN_API = "https://testnet.arcscan.app";
+import { indexerGet } from "./indexer";
 
 // Server-only scoring constant (no NEXT_PUBLIC_ prefix), read via Number().
 // Window size for the holder-concentration signal: how many top holders feed
@@ -44,16 +43,7 @@ export interface NftContractInfo {
 }
 
 async function arcscanGet<T>(path: string): Promise<T | null> {
-  try {
-    const res = await fetch(`${ARCSCAN_API}${path}`, {
-      headers: { accept: "application/json" },
-      cache: "no-store",
-    });
-    if (!res.ok) return null;
-    return (await res.json()) as T;
-  } catch {
-    return null;
-  }
+  return indexerGet<T>(path);
 }
 
 function toInt(value: string | number | null | undefined): number {

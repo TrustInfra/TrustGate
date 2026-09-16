@@ -27,23 +27,23 @@ import { privateKeyToAccount } from 'viem/accounts';
 
 // ---------- config ----------
 
-const ARC_RPC_URL = process.env.ARC_RPC_URL || 'https://rpc.testnet.arc.network';
+const ARC_RPC_URL = process.env.ARC_RPC_URL || 'https://rpc.mainnet.arc.io';
 const TRUSTGATE_CONTRACT = (process.env.TRUSTGATE_CONTRACT ||
-  '0x52E17bC482d00776d73811680CbA9914e83E33CC') as `0x${string}`;
+  '0x0000000000000000000000000000000000000000') as `0x${string}`;
 const SCORE_API_BASE =
-  process.env.SCORE_API_BASE || 'https://trustgated.vercel.app/api/arc-score';
-const ARCSCAN_BASE = process.env.ARCSCAN_BASE || 'https://testnet.arcscan.app';
+  process.env.SCORE_API_BASE || 'https://trustgated.xyz/api/arc-score';
+const ARCSCAN_BASE = process.env.ARCSCAN_BASE || 'https://explorer.arc.io';
 
 const CYCLE_INTERVAL_MS = Number(process.env.CYCLE_INTERVAL_MS || 30_000);
 const PER_AGENT_COOLDOWN_MS = Number(process.env.PER_AGENT_COOLDOWN_MS || 60_000);
 const HIGH_THRESHOLD = Number(process.env.HIGH_THRESHOLD || 75);
-const CHAIN_ID = 5042002;
+const CHAIN_ID = 5042;
 
-const arcTestnet = {
+const arcChain = {
   id: CHAIN_ID,
-  name: 'Arc Testnet',
-  network: 'arc-testnet',
-  nativeCurrency: { decimals: 18, name: 'Ether', symbol: 'ETH' },
+  name: 'Arc',
+  network: 'arc',
+  nativeCurrency: { decimals: 18, name: 'USDC', symbol: 'USDC' },
   rpcUrls: {
     default: { http: [ARC_RPC_URL] },
     public: { http: [ARC_RPC_URL] },
@@ -51,7 +51,7 @@ const arcTestnet = {
 } as const;
 
 const publicClient = createPublicClient({
-  chain: arcTestnet as any,
+  chain: arcChain as any,
   transport: http(ARC_RPC_URL),
 });
 
@@ -155,7 +155,7 @@ async function claimFor(agent: AgentRuntime): Promise<{ ok: boolean; txHash?: st
 
   const wallet = createWalletClient({
     account,
-    chain: arcTestnet as any,
+    chain: arcChain as any,
     transport: http(ARC_RPC_URL),
   });
 
@@ -191,7 +191,7 @@ async function claimFor(agent: AgentRuntime): Promise<{ ok: boolean; txHash?: st
       abi: TRUSTGATE_ABI,
       functionName: 'claimPayment',
       args: [depositor, amount],
-      chain: arcTestnet as any,
+      chain: arcChain as any,
       account,
     });
 

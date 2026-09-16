@@ -532,7 +532,7 @@ describe("TrustGate", function () {
     });
 
     it("should revert claim from deactivated agent", async function () {
-      await registry.connect(agentOwnerSigner).deactivateAgent(agent.address);
+      await registry.connect(agent).deactivateAgent(agent.address);
 
       await expect(
         trustGate.connect(agent).claim(depositor.address, usdc(100))

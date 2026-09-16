@@ -1,5 +1,7 @@
 import { HardhatUserConfig } from "hardhat/config";
-import "@nomicfoundation/hardhat-toolbox";
+import "@nomicfoundation/hardhat-ethers";
+import "@nomicfoundation/hardhat-chai-matchers";
+import "@nomicfoundation/hardhat-verify";
 import "hardhat-deploy";
 import "dotenv/config";
 
@@ -10,7 +12,9 @@ const SEPOLIA_RPC_URL =
 const MAINNET_RPC_URL =
   process.env.MAINNET_RPC_URL ?? "https://eth.llamarpc.com";
 const ARC_TESTNET_RPC_URL =
-  process.env.ARC_TESTNET_RPC_URL ?? "https://rpc.testnet.arc.network";
+  process.env.ARC_TESTNET_RPC_URL ?? "https://rpc.testnet.arc.io";
+const ARC_MAINNET_RPC_URL =
+  process.env.ARC_MAINNET_RPC_URL ?? "https://rpc.mainnet.arc.io";
 const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY ?? "";
 
 // Validate private key format for live networks
@@ -54,6 +58,11 @@ const config: HardhatUserConfig = {
       accounts: liveAccounts,
       chainId: 5042002,
     },
+    arcMainnet: {
+      url: ARC_MAINNET_RPC_URL,
+      accounts: liveAccounts,
+      chainId: 5042,
+    },
   },
   namedAccounts: {
     deployer: 0,
@@ -61,14 +70,23 @@ const config: HardhatUserConfig = {
   etherscan: {
     apiKey: {
       arcTestnet: ETHERSCAN_API_KEY,
+      arcMainnet: ETHERSCAN_API_KEY,
     },
     customChains: [
       {
         network: "arcTestnet",
         chainId: 5042002,
         urls: {
-          apiURL: "https://testnet.arcscan.app/api",
-          browserURL: "https://testnet.arcscan.app",
+          apiURL: "https://explorer.testnet.arc.io/api",
+          browserURL: "https://explorer.testnet.arc.io",
+        },
+      },
+      {
+        network: "arcMainnet",
+        chainId: 5042,
+        urls: {
+          apiURL: "https://explorer.arc.io/api",
+          browserURL: "https://explorer.arc.io",
         },
       },
     ],

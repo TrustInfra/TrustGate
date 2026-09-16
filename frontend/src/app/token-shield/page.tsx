@@ -9,7 +9,7 @@ import {
   useWriteContract,
 } from "wagmi";
 import { ConnectKitButton } from "connectkit";
-import { CONTRACT_ADDRESSES, arcTestnet } from "@/lib/constants";
+import { CONTRACT_ADDRESSES, X402_NETWORK, arc } from "@/lib/chain";
 import { erc20Abi } from "@/lib/abi/ERC20";
 import {
   HistoryEntry,
@@ -168,7 +168,7 @@ function phaseLabel(phase: QueryPhase): string {
     case "challenge":
       return "Requesting payment quote...";
     case "switch-network":
-      return "Switching to Arc Testnet...";
+      return "Switching to Arc...";
     case "sign":
       return "Awaiting wallet signature...";
     case "confirm":
@@ -226,11 +226,11 @@ export default function TokenShieldPage() {
 
   const { address: walletAddress, isConnected } = useAccount();
   const chainId = useChainId();
-  const publicClient = usePublicClient({ chainId: arcTestnet.id });
+  const publicClient = usePublicClient({ chainId: arc.id });
   const { switchChainAsync } = useSwitchChain();
   const { writeContractAsync } = useWriteContract();
 
-  const onArc = chainId === arcTestnet.id;
+  const onArc = chainId === arc.id;
   const busy = phase !== "idle" && phase !== "done" && phase !== "error";
   const validAddress = /^0x[0-9a-fA-F]{40}$/.test(address);
 
@@ -343,10 +343,10 @@ export default function TokenShieldPage() {
       if (!onArc) {
         setPhase("switch-network");
         try {
-          await switchChainAsync({ chainId: arcTestnet.id });
+          await switchChainAsync({ chainId: arc.id });
         } catch (err) {
           throw new Error(
-            `Switch to Arc Testnet (chain id ${arcTestnet.id}) to continue. ` +
+            `Switch to Arc (chain id ${arc.id}) to continue. ` +
               ((err as Error).message ?? "")
           );
         }
@@ -354,7 +354,7 @@ export default function TokenShieldPage() {
 
       setPhase("sign");
       const txHash = await writeContractAsync({
-        chainId: arcTestnet.id,
+        chainId: arc.id,
         address: USDC_ADDRESS,
         abi: erc20Abi,
         functionName: "transfer",
@@ -383,8 +383,8 @@ export default function TokenShieldPage() {
         txHash,
         nonce,
         from: walletAddress,
-        network: "Arc Testnet",
-        chainId: arcTestnet.id,
+        network: X402_NETWORK,
+        chainId: arc.id,
         amount: PAYMENT_AMOUNT_HUMAN,
         currency: "USDC",
         recipient: PAYMENT_RECIPIENT,
@@ -517,8 +517,8 @@ export default function TokenShieldPage() {
 
           {!isConnected && (
             <p className="mt-4 text-xs text-zinc-500">
-              Token Shield runs a real USDC transfer on Arc Testnet. Make sure your
-              wallet is on chain id {arcTestnet.id} and has at least{" "}
+              Token Shield runs a real USDC transfer on Arc. Make sure your
+              wallet is on chain id {arc.id} and has at least{" "}
               {PAYMENT_AMOUNT_HUMAN} USDC plus gas.
             </p>
           )}

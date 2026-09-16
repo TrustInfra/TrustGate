@@ -176,7 +176,7 @@ function mapVerdict(
  */
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const address = req.nextUrl.searchParams.get("address")?.trim() ?? "";
-  // Accepted but unused: TrustGate's scoring libraries are Arc Testnet only.
+  // Accepted but unused: TrustGate scoring is Arc Mainnet only.
   req.nextUrl.searchParams.get("chain");
 
   if (!ADDRESS_RE.test(address)) {

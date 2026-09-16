@@ -36,7 +36,14 @@ import {
 } from "viem";
 import { privateKeyToAccount, type PrivateKeyAccount } from "viem/accounts";
 import { erc20Abi } from "@/lib/abi/ERC20";
-import { arcTestnet, CONTRACT_ADDRESSES } from "@/lib/constants";
+import {
+  arc,
+  CONTRACT_ADDRESSES,
+  RPC_URL,
+  X402_NETWORK,
+  ARC_MIN_MAX_FEE_PER_GAS_WEI,
+  ARC_MIN_PRIORITY_FEE_WEI,
+} from "@/lib/chain";
 
 const ORACLE_BASE = (
   process.env.ORACLE_URL ||
@@ -89,12 +96,12 @@ function getWalletCtx(): WalletCtx {
   const account = privateKeyToAccount(pk as `0x${string}`);
   const walletClient = createWalletClient({
     account,
-    chain: arcTestnet,
-    transport: http(),
+    chain: arc,
+    transport: http(RPC_URL),
   });
   const publicClient = createPublicClient({
-    chain: arcTestnet,
-    transport: http(),
+    chain: arc,
+    transport: http(RPC_URL),
   });
   walletCtx = { account, walletClient, publicClient };
   return walletCtx;
@@ -113,11 +120,13 @@ async function payAndBuildHeader(): Promise<{
   const task = txChain.then(async () => {
     const txHash = await ctx.walletClient.writeContract({
       account: ctx.account,
-      chain: arcTestnet,
+      chain: arc,
       address: USDC,
       abi: erc20Abi,
       functionName: "transfer",
       args: [RECIPIENT, PAYMENT_AMOUNT_RAW],
+      maxFeePerGas: ARC_MIN_MAX_FEE_PER_GAS_WEI,
+      maxPriorityFeePerGas: ARC_MIN_PRIORITY_FEE_WEI,
     });
     const receipt = await ctx.publicClient.waitForTransactionReceipt({
       hash: txHash,
@@ -131,7 +140,7 @@ async function payAndBuildHeader(): Promise<{
     // users. UUIDs guarantee uniqueness.
     const payload = JSON.stringify({
       scheme: "exact",
-      network: "Arc Testnet",
+      network: X402_NETWORK,
       txHash,
       from: ctx.account.address,
       amount: PAYMENT_AMOUNT_USDC,
@@ -238,8 +247,21 @@ export async function scoreErc20ViaUpstream(
       assertWidgetPaymentBudget();
       const { header, txHash } = await payAndBuildHeader();
       const result = await fetchUpstream(address, header, txHash);
-      setCacheEntry(key, result);
-      return result;
+      const { applySubjectConviction } = await import(
+        "@/lib/stake/conviction-apply"
+      );
+      const conviction = await applySubjectConviction(
+        address,
+        result.score,
+        100
+      );
+      const combined: WidgetScore = {
+        ...result,
+        score: conviction.score,
+        flags: [...new Set([...result.flags, ...conviction.flags])],
+      };
+      setCacheEntry(key, combined);
+      return combined;
     } finally {
       inFlight.delete(key);
     }

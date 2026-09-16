@@ -208,7 +208,7 @@ describe("TrustGate — Integration", function () {
     });
 
     it("should permanently block claims after deactivation", async function () {
-      await registry.connect(agentOwnerSigner).deactivateAgent(highAgent.address);
+      await registry.connect(highAgent).deactivateAgent(highAgent.address);
 
       await expect(
         trustGate.connect(highAgent).claim(depositor.address, usdc(100))

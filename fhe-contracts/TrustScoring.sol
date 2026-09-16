@@ -7,6 +7,8 @@ import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step
 
 /**
  * @title TrustScoring
+ * @notice FHE scoring for Zama-capable chains. Not compiled in the Arc Hardhat
+ *         project (lives outside contracts/). Arc uses TrustScoringPlaintext.
  * @notice Manages encrypted EigenTrust reputation scores for payroll participants.
  *         Scores remain fully confidential on-chain. Tier classification (HIGH / MEDIUM / LOW)
  *         happens entirely within FHE, so neither the contract owner nor external observers

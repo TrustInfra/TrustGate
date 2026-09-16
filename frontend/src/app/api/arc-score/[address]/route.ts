@@ -2,9 +2,11 @@ import "server-only";
 import { NextRequest, NextResponse } from "next/server";
 import { envNumber } from "@/lib/env-number";
 
-const ARC_RPC = "https://rpc.testnet.arc.network";
-const ARCSCAN_API = "https://testnet.arcscan.app/api/v2";
-const USDC_ADDR = "0x3600000000000000000000000000000000000000";
+import { RPC_URL, USDC_ADDRESS } from "@/lib/chain";
+import { indexerGet } from "@/lib/indexer";
+
+const ARC_RPC = RPC_URL;
+const USDC_ADDR = USDC_ADDRESS;
 const USDC_DECIMALS = 6;
 const MAX_PAGES = 10;
 
@@ -122,22 +124,13 @@ async function getContractStats(
   let page = 0;
 
   while (nextParams && page < MAX_PAGES) {
-    const url = `${ARCSCAN_API}/addresses/${address}/transactions?${nextParams.toString()}`;
-    console.log(`[arc-score] fetching page ${page + 1}: ${url}`);
-
-    const res = await fetch(url, {
-      headers: { accept: "application/json" },
-      cache: "no-store",
-    });
-
-    if (!res.ok) {
-      console.log(
-        `[arc-score] arcscan responded ${res.status} on page ${page + 1} — stopping`
-      );
+    const data = await indexerGet<BlockscoutTxPage>(
+      `/api/v2/addresses/${address}/transactions?${nextParams.toString()}`
+    );
+    if (!data) {
+      console.log(`[arc-score] indexer miss on page ${page + 1} — stopping`);
       break;
     }
-
-    const data = (await res.json()) as BlockscoutTxPage;
     const items = data.items ?? [];
     scanned += items.length;
 
@@ -259,6 +252,12 @@ export async function GET(
     if (finalScore > 100) finalScore = 100;
     if (blocked) finalScore = 0;
 
+    const { applySubjectConviction } = await import(
+      "@/lib/stake/conviction-apply"
+    );
+    const conviction = await applySubjectConviction(address, finalScore, 100);
+    finalScore = conviction.score;
+
     const tier = tierFor(finalScore);
 
     console.log(
@@ -269,6 +268,7 @@ export async function GET(
     return NextResponse.json({
       score: finalScore,
       tier,
+      convictionDelta: conviction.delta,
       blocked,
       capped,
       breakdown: {

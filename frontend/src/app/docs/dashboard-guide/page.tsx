@@ -13,14 +13,9 @@ export default function DashboardGuidePage() {
       <h2>Connecting</h2>
       <p>
         The dashboard at <Link href="/dashboard">/dashboard</Link> requires
-        a wallet on Arc Testnet (Chain ID <code>5042002</code>). Use
+        a wallet on Arc (Chain ID <code>5042</code>). Use
         ConnectKit&apos;s wallet button in the top right; the app will prompt
-        to switch networks if a different chain is active. Get testnet USDC
-        from{" "}
-        <a href="https://faucet.circle.com" target="_blank" rel="noopener noreferrer">
-          faucet.circle.com
-        </a>
-        .
+        to switch networks if a different chain is active.
       </p>
 
       <h2>Depositor tab</h2>

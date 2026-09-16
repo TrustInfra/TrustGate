@@ -113,6 +113,9 @@ async function enrichTokenScore(
     // ignore
   }
   const staking = await deployerStakingBoost(detectionCreator);
+  const { applySubjectConviction } = await import(
+    "@/lib/stake/conviction-apply"
+  );
 
   const verifiedIssuer =
     typeof payload.tier === "string" &&
@@ -126,19 +129,32 @@ async function enrichTokenScore(
     temporal.scoreDelta,
     readTemporalScoreWeight()
   );
-  // VERIFIED issuer payloads have no numeric score — do not invent 50
-  const score = verifiedIssuer
+  const preConviction = verifiedIssuer
     ? 100
     : Math.max(
         0,
         Math.min(100, Math.round(baseScore + temporalContribution + staking.boost))
       );
+  const conviction = verifiedIssuer
+    ? {
+        score: preConviction,
+        delta: 0,
+        flags: [] as string[],
+        observations: [] as string[],
+      }
+    : await applySubjectConviction(rawAddress, preConviction, 100);
+  const score = conviction.score;
 
   const upstreamFlags = Array.isArray(payload.flags)
     ? (payload.flags as unknown[]).map(String)
     : [];
   const flags = [
-    ...new Set([...upstreamFlags, ...temporal.flags, ...staking.flags]),
+    ...new Set([
+      ...upstreamFlags,
+      ...temporal.flags,
+      ...staking.flags,
+      ...conviction.flags,
+    ]),
   ];
 
   if (flags.includes("EXIT_SYNC") && temporal.exitParticipants.length > 0) {
@@ -161,7 +177,11 @@ async function enrichTokenScore(
             ? "MEDIUM"
             : "LOW";
 
-  const observations = [...temporal.observations, ...staking.observations];
+  const observations = [
+    ...temporal.observations,
+    ...staking.observations,
+    ...conviction.observations,
+  ];
   const intel = recordIntelligence({
     subject: rawAddress,
     subjectType: "token",
@@ -189,6 +209,7 @@ async function enrichTokenScore(
   return {
     ...payload,
     score: verifiedIssuer ? (payload.score ?? null) : score,
+    convictionDelta: conviction.delta,
     tier,
     confidence: intel.confidence,
     flags,

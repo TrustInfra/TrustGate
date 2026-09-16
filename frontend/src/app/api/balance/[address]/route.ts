@@ -3,13 +3,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { createPublicClient, formatUnits, http, type Chain } from "viem";
 import { base, mainnet } from "viem/chains";
 import { erc20Abi } from "@/lib/abi/ERC20";
-import { arcTestnet } from "@/lib/constants";
+import { arc } from "@/lib/chain";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 const ADDRESS_RE = /^0x[a-fA-F0-9]{40}$/;
-const SUPPORTED_CHAIN_IDS = [1, 8453, 5042002] as const;
+const SUPPORTED_CHAIN_IDS = [1, 8453, 5042] as const;
 
 type SupportedChainId = (typeof SUPPORTED_CHAIN_IDS)[number];
 type HexAddress = `0x${string}`;
@@ -22,7 +22,7 @@ function parseChainId(raw: string | null): SupportedChainId | null {
   const value = raw == null || raw.trim() === "" ? "8453" : raw.trim();
   if (!/^[0-9]+$/.test(value)) return null;
   const n = Number(value);
-  if (n === 1 || n === 8453 || n === 5042002) return n;
+  if (n === 1 || n === 8453 || n === 5042) return n;
   return null;
 }
 
@@ -41,8 +41,8 @@ function chainAndTransport(chainId: SupportedChainId): {
   if (chainId === 8453) {
     return { chain: base, transport: transportFor("BASE_RPC_URL") };
   }
-  const arcRpc = arcTestnet.rpcUrls.default.http[0];
-  return { chain: arcTestnet, transport: http(arcRpc) };
+  const arcRpc = arc.rpcUrls.default.http[0];
+  return { chain: arc, transport: http(arcRpc) };
 }
 
 function sanitizeDetail(err: unknown): string {

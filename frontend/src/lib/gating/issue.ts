@@ -23,7 +23,7 @@ import type {
   TrustAttestation,
 } from "./types";
 import { GATING_DISCLAIMER } from "./types";
-import { arcTestnet } from "@/lib/constants";
+import { arc } from "@/lib/chain";
 
 const ORACLE_BASE = (
   process.env.ORACLE_URL ||
@@ -32,8 +32,8 @@ const ORACLE_BASE = (
 ).replace(/\/+$/, "");
 
 function environment(): ScoringEnvironment {
-  const e = (process.env.SCORING_ENVIRONMENT ?? "testnet").toLowerCase();
-  return e === "mainnet" ? "mainnet" : "testnet";
+  const e = (process.env.SCORING_ENVIRONMENT ?? "mainnet").toLowerCase();
+  return e === "testnet" ? "testnet" : "mainnet";
 }
 
 function scoringVersionLabel(): string {
@@ -117,6 +117,11 @@ async function rawTokenScore(address: string): Promise<{
     45 + applyTemporalScoreDelta(temporal.scoreDelta, readTemporalScoreWeight());
   if (det.info?.isVerified) score += 10;
   score = Math.max(0, Math.min(100, Math.round(score)));
+  const { applySubjectConviction } = await import(
+    "@/lib/stake/conviction-apply"
+  );
+  const conviction = await applySubjectConviction(address, score, 100);
+  score = conviction.score;
   const tier =
     score >= 80
       ? "HIGH_ELITE"
@@ -137,7 +142,7 @@ async function rawTokenScore(address: string): Promise<{
     score,
     tier,
     confidence,
-    flags: temporal.flags,
+    flags: [...temporal.flags, ...conviction.flags],
   };
 }
 
@@ -151,7 +156,7 @@ export async function issueWalletAttestation(opts: {
   return signAttestation({
     subject: opts.wallet,
     subjectType: "wallet",
-    chainId: opts.chainId ?? arcTestnet.id,
+    chainId: opts.chainId ?? arc.id,
     score: scored.score,
     tier: scored.tier,
     confidence: scored.confidence,
@@ -173,7 +178,7 @@ export async function issueTokenAttestation(opts: {
   return signAttestation({
     subject: opts.token,
     subjectType: "token",
-    chainId: opts.chainId ?? arcTestnet.id,
+    chainId: opts.chainId ?? arc.id,
     score: scored.score,
     tier: scored.tier,
     confidence: scored.confidence,

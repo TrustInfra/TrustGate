@@ -1,6 +1,7 @@
 import "server-only";
 
 import { envNumber } from "@/lib/env-number";
+import { indexerGet } from "../indexer";
 import {
   classifyPostDistributionVolume,
   countBidirectionalWashPairs,
@@ -13,7 +14,6 @@ import {
  * (sell≈0 vs buy after distribution), coordinated long-hold exit (sync of sells).
  */
 
-const ARCSCAN_API = "https://testnet.arcscan.app";
 const DAY_MS = 24 * 60 * 60 * 1000;
 const HOUR_MS = 60 * 60 * 1000;
 
@@ -78,16 +78,7 @@ interface TokenInfo {
 }
 
 async function arcscanGet<T>(path: string): Promise<T | null> {
-  try {
-    const res = await fetch(`${ARCSCAN_API}${path}`, {
-      headers: { accept: "application/json" },
-      cache: "no-store",
-    });
-    if (!res.ok) return null;
-    return (await res.json()) as T;
-  } catch {
-    return null;
-  }
+  return indexerGet<T>(path);
 }
 
 function addrOf(

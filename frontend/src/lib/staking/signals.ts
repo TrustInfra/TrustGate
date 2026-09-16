@@ -11,6 +11,7 @@ import {
   type StakePositionInput,
   type TokenTrustTier,
 } from "./formula";
+import { indexerGet } from "../indexer";
 
 /**
  * Staking Intelligence (Phase 3b — INTERNAL_ROADMAP).
@@ -18,7 +19,6 @@ import {
  * circular rings, stake age reset on coordinated exit / wash marks.
  */
 
-const ARCSCAN_API = "https://testnet.arcscan.app";
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 const ENV_STAKING = (process.env.STAKING_CONTRACT_ADDRESSES ?? "")
@@ -89,12 +89,10 @@ async function fetchTxs(address: string, pages = 3): Promise<ArcscanTx[]> {
   let params = new URLSearchParams({ limit: "50" });
   for (let i = 0; i < pages; i++) {
     try {
-      const res = await fetch(
-        `${ARCSCAN_API}/api/v2/addresses/${address}/transactions?${params}`,
-        { headers: { accept: "application/json" }, cache: "no-store" }
+      const data = await indexerGet<TxPage>(
+        `/api/v2/addresses/${address}/transactions?${params}`
       );
-      if (!res.ok) break;
-      const data = (await res.json()) as TxPage;
+      if (!data) break;
       const items = data.items ?? [];
       out.push(...items);
       if (!data.next_page_params) break;
@@ -228,12 +226,10 @@ async function isDeployerOf(
   contract: string
 ): Promise<boolean> {
   try {
-    const res = await fetch(`${ARCSCAN_API}/api/v2/addresses/${contract}`, {
-      headers: { accept: "application/json" },
-      cache: "no-store",
-    });
-    if (!res.ok) return false;
-    const data = (await res.json()) as { creator_address_hash?: string | null };
+    const data = await indexerGet<{ creator_address_hash?: string | null }>(
+      `/api/v2/addresses/${contract}`
+    );
+    if (!data) return false;
     return (data.creator_address_hash ?? "").toLowerCase() === wallet.toLowerCase();
   } catch {
     return false;

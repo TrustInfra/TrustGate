@@ -14,6 +14,9 @@
 │  or TrustScoringPlaintext   │
 │  (non-FHE chains like Arc)  │
 └────────────┬────────────────┘
+
+SubjectStake is independent: USDC lock for/against any subject
+(kind + canonical). 7-day unbond. Not wired into TrustGate.claim().
              │ getTrustTierPlaintext (0 / 1 / 2)
              │
 ┌────────────▼────────────────┐       ┌─────────────┐
@@ -121,7 +124,24 @@ Agent                    │                  │                │            
 4. **Wire-up** — `TrustScoring.setAgentRegistry(agentRegistryAddress)`
 5. **Oracle setup** — `TrustScoring.setOracle(oracleAddress, true)`
 
-## Arc Testnet Deployment
+## Arc Mainnet Deployment
+
+Addresses are written to `deployments/arcMainnet-addresses.json` by
+`npx hardhat run scripts/deploy-arc.ts --network arcMainnet`.
+
+| Contract | Address |
+|----------|---------|
+| TrustScoringPlaintext | `0x1c0fDF6Bcf927824113271FccECb007fC43B41ee` |
+| AgentRegistry | `0xF27f123D4b3148811d65E4b8AF02bf0767e944e5` |
+| TrustGate | `0xD7f66981364be30D42D7cA5373d690FEa1045628` |
+| SubjectStake | `0xF3713C3434B712C947bb849b4c4d81Ea539189aE` |
+| USDC (ERC-20) | `0x3600000000000000000000000000000000000000` |
+
+Explorer: https://explorer.arc.io
+Chain ID: 5042
+RPC: https://rpc.mainnet.arc.io
+
+## Arc Testnet (staging)
 
 | Contract | Address |
 |----------|---------|
@@ -130,4 +150,4 @@ Agent                    │                  │                │            
 | TrustGate | `0x52E17bC482d00776d73811680CbA9914e83E33CC` |
 | USDC (ERC-20) | `0x3600000000000000000000000000000000000000` |
 
-Explorer: https://testnet.arcscan.app
+Explorer: https://explorer.testnet.arc.io

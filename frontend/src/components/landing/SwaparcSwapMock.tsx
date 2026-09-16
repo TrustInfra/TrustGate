@@ -62,7 +62,7 @@ export default function SwaparcSwapMock({
           Swap
         </p>
         <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-text-muted">
-          Arc Testnet
+          Arc
         </span>
       </div>
 

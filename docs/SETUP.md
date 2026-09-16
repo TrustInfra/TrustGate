@@ -24,7 +24,7 @@ Copy the example and fill in your values:
 cp .env.example .env
 ```
 
-Required for Arc testnet deployment:
+Required for Arc mainnet deployment:
 
 ```
 PRIVATE_KEY=<your-deployer-private-key>
@@ -33,7 +33,8 @@ PRIVATE_KEY=<your-deployer-private-key>
 Optional overrides:
 
 ```
-ARC_TESTNET_RPC_URL=https://rpc.testnet.arc.network
+ARC_MAINNET_RPC_URL=https://rpc.mainnet.arc.io
+ARC_TESTNET_RPC_URL=https://rpc.testnet.arc.io
 ETHERSCAN_API_KEY=<for-contract-verification>
 ```
 
@@ -60,20 +61,19 @@ so the full suite runs on vanilla Hardhat without a coprocessor.
 npx hardhat coverage
 ```
 
-## Arc Testnet
+## Arc Mainnet
 
 ### Network Details
 
 | Property | Value |
 |----------|-------|
-| Network Name | Arc Testnet |
-| RPC URL | https://rpc.testnet.arc.network |
-| Chain ID | 5042002 |
+| Network Name | Arc |
+| RPC URL | https://rpc.mainnet.arc.io |
+| Chain ID | 5042 |
 | Native Gas Token | USDC (18 decimals native, 6 decimals ERC-20) |
 | USDC ERC-20 Address | `0x3600000000000000000000000000000000000000` |
-| EURC Address | `0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a` |
-| Block Explorer | https://testnet.arcscan.app |
-| Faucet | https://faucet.circle.com (select Arc Testnet + USDC) |
+| EURC Address | `0xbEf5f6d51CB62b58e6A8f77868681825C6fe21c1` |
+| Block Explorer | https://explorer.arc.io |
 
 ### Important: USDC Decimals
 
@@ -81,17 +81,12 @@ USDC is the native gas token on Arc. The native balance uses **18 decimals**,
 but the ERC-20 interface uses **6 decimals**. All contracts use the ERC-20
 interface exclusively. Never mix native balance reads with ERC-20 amounts.
 
-### Get Testnet USDC
+### Deploy to Arc Mainnet
 
-1. Visit https://faucet.circle.com
-2. Select **Arc Testnet** and **USDC**
-3. Enter your deployer wallet address
-4. Request funds
-
-### Deploy to Arc Testnet
+Fund the deployer with real Arc Mainnet USDC (gas). Then:
 
 ```bash
-npx hardhat run scripts/deploy-arc.ts --network arcTestnet
+npx hardhat run scripts/deploy-arc.ts --network arcMainnet
 ```
 
 The script deploys:
@@ -99,21 +94,12 @@ The script deploys:
 2. **AgentRegistry** — permissionless agent registration
 3. **TrustGate** — trust-gated USDC payment gateway
 
-Then wires them together and exports addresses to `deployments/arcTestnet-addresses.json`.
+Then wires them together, deploys SubjectStake, and exports addresses to `deployments/arcMainnet-addresses.json`.
 
-### Current Deployment
-
-| Contract | Address |
-|----------|---------|
-| TrustScoringPlaintext | `0xEb979Dc25396ba4be6cEA41EAfEa894C55772246` |
-| AgentRegistry | `0x73d3cf7f2734C334927f991fe87D06d595d398b4` |
-| TrustGate | `0x52E17bC482d00776d73811680CbA9914e83E33CC` |
-| USDC (ERC-20) | `0x3600000000000000000000000000000000000000` |
-
-### Verify on Arcscan (optional)
+### Verify (optional)
 
 ```bash
-npx hardhat verify --network arcTestnet <CONTRACT_ADDRESS> <CONSTRUCTOR_ARGS...>
+npx hardhat verify --network arcMainnet <CONTRACT_ADDRESS> <CONSTRUCTOR_ARGS...>
 ```
 
 ## Contract Interactions
@@ -159,6 +145,6 @@ await gate.connect(agentSigner).claim(depositorAddress, amount);
 |--------|-------------|
 | `npx hardhat compile` | Compile Solidity contracts |
 | `npx hardhat test` | Run all tests |
-| `npx hardhat run scripts/deploy-arc.ts --network arcTestnet` | Deploy to Arc testnet |
+| `npx hardhat run scripts/deploy-arc.ts --network arcMainnet` | Deploy to Arc mainnet |
 | `npx hardhat clean` | Remove build artifacts |
 | `npx hardhat coverage` | Generate test coverage report |

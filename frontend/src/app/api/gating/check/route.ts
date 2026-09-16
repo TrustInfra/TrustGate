@@ -6,7 +6,7 @@ import {
 } from "@/lib/gating/ladder";
 import type { GatingCheckRequest, LadderConfig } from "@/lib/gating/types";
 import { GATING_DISCLAIMER } from "@/lib/gating/types";
-import { arcTestnet } from "@/lib/constants";
+import { arc } from "@/lib/chain";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -89,7 +89,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         : undefined,
     tokenLadder: b.tokenLadder,
     useClass: b.useClass,
-    chainId: typeof b.chainId === "number" ? b.chainId : arcTestnet.id,
+    chainId: typeof b.chainId === "number" ? b.chainId : arc.id,
     requireMultiFactorAck: isMainnet || b.requireMultiFactorAck === true,
   };
 

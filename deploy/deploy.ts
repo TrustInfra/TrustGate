@@ -32,9 +32,9 @@ const deployAll: DeployFunction = async function (
   // ── Resolve USDC address ─────────────────────────────────────
   let usdcAddress: string;
 
-  if (hre.network.name === "arcTestnet") {
+  if (hre.network.name === "arcTestnet" || hre.network.name === "arcMainnet") {
     usdcAddress = ARC_TESTNET_USDC;
-    log(`  USDC (Arc Testnet ERC-20): ${usdcAddress}`);
+    log(`  USDC (Arc ERC-20): ${usdcAddress}`);
   } else if (isLive) {
     usdcAddress = process.env.USDC_ADDRESS ?? "";
     if (!usdcAddress) {

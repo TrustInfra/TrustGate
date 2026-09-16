@@ -55,14 +55,14 @@ export default function Contracts() {
   return (
     <DocShell
       eyebrow="Contracts"
-      title="Deployed on Arc Testnet"
-      lede="All TrustGate contracts are live and source-verified on Arcscan. Chain ID 5042002. Settlement asset is Circle USDC at 6 decimals."
+      title="Deployed on Arc"
+      lede="TrustGate contracts on Arc Mainnet. Chain ID 5042. Settlement asset is Circle USDC at 6 decimals."
     >
       <h2>Network parameters</h2>
-      <pre><code>{`Chain ID   : 5042002
-Name       : Arc Testnet
-RPC        : https://rpc.testnet.arc.network
-Explorer   : https://testnet.arcscan.app
+      <pre><code>{`Chain ID   : 5042
+Name       : Arc
+RPC        : https://rpc.mainnet.arc.io
+Explorer   : https://explorer.arc.io
 Gas asset  : USDC (used as native)
 Deployer   : 0x60C05e2d820CE989E944ED4e7bb33bAEB8705c62`}</code></pre>
 
@@ -93,8 +93,16 @@ owner         = 0x60C05e2d820CE989E944ED4e7bb33bAEB8705c62`}
       />
 
       <ContractRow
+        name="SubjectStake"
+        role="Lock USDC for or against any subject (wallet, token, social, website, URI). 7-day unbond."
+        address={CONTRACT_ADDRESSES.subjectStake}
+        constructorArgs={`usdc         = ${CONTRACT_ADDRESSES.usdc}
+initialOwner = 0x60C05e2d820CE989E944ED4e7bb33bAEB8705c62`}
+      />
+
+      <ContractRow
         name="USDC (ERC-20)"
-        role="Circle USDC on Arc Testnet, 6 decimals. The settlement asset for every claim and the gas token for every transaction."
+        role="Circle USDC on Arc, 6 decimals. The settlement asset for every claim and the gas token for every transaction."
         address={CONTRACT_ADDRESSES.usdc}
       />
 
@@ -105,21 +113,18 @@ owner         = 0x60C05e2d820CE989E944ED4e7bb33bAEB8705c62`}
         deployment:
       </p>
       <pre><code>{`ETHERSCAN_API_KEY=arcscan npx hardhat verify \\
-  --network arcTestnet <ADDRESS> <...CTOR_ARGS>`}</code></pre>
+  --network arcMainnet <ADDRESS> <...CTOR_ARGS>`}</code></pre>
       <p>
-        Arcscan does not currently issue API keys — any non-empty string is
-        accepted. The Etherscan v2 deprecation warning printed by
-        hardhat-verify is benign on this chain.
+        Verification depends on the explorer API being public. If
+        explorer.arc.io is gated, skip verify until Circle opens it.
       </p>
 
-      <h2>Faucet</h2>
+      <h2>Gas</h2>
       <p>
-        Get testnet USDC from{" "}
-        <a href="https://faucet.circle.com" target="_blank" rel="noopener noreferrer">
-          faucet.circle.com
-        </a>
-        . The same balance covers gas and claims — there is no second
-        currency to request.
+        Arc uses USDC as the native gas token. Fund the deployer with real
+        USDC on chain 5042. Transactions with maxFeePerGas below 20 gwei are
+        dropped by the mempool. The same balance covers gas and claims —
+        there is no second currency.
       </p>
     </DocShell>
   );

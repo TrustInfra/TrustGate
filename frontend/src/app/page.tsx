@@ -34,7 +34,7 @@ export default function HomePage() {
             >
               <StatusDot status="active" size="md" />
               <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-text-muted">
-                Arc Testnet
+                Arc Mainnet
               </span>
               <span className="text-text-muted/40 font-mono text-[10px]">/</span>
               <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-accent">
@@ -146,7 +146,7 @@ export default function HomePage() {
               </li>
               <li className="flex gap-3 text-sm text-text-secondary">
                 <span className="font-mono text-[11px] text-accent pt-0.5">03</span>
-                USDC / EURC / CircBTC read VERIFIED. SWPRC reads as a scored token.
+                USDC / EURC / USYC read VERIFIED.
               </li>
             </ol>
             <div className="flex flex-wrap items-center gap-3">
@@ -203,7 +203,7 @@ export default function HomePage() {
           <SectionHeader
             eyebrow="Workflow"
             title="How it works"
-            lede="From agent registration to tier-based settlement. Four steps, fully onchain on Arc Testnet."
+            lede="From agent registration to tier-based settlement. Four steps, fully onchain on Arc."
           />
           <StepTimeline />
         </div>
@@ -214,14 +214,14 @@ export default function HomePage() {
         <div className="max-w-6xl mx-auto flex flex-col lg:flex-row lg:items-center lg:justify-between gap-8">
           <div className="max-w-xl">
             <h2 className="text-xl sm:text-2xl font-display font-bold text-text tracking-tight">
-              Ready to test trust-gated payments?
+              Ready for trust-gated payments?
             </h2>
             <p className="mt-3 text-sm text-text-secondary leading-relaxed">
-              Connect your wallet, fund from the USDC faucet, register an agent,
+              Connect your wallet on Arc, fund with USDC, register an agent,
               and run the full payment flow end to end.
             </p>
             <p className="mt-4 font-mono text-[10px] uppercase tracking-[0.14em] text-text-muted">
-              Arc Testnet · Chain ID 5042002
+              Arc · Chain ID 5042
             </p>
           </div>
 

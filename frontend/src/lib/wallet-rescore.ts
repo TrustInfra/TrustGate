@@ -7,8 +7,10 @@ import { envNumber } from "@/lib/env-number";
 // public proxy is the final authority on wallet scores regardless of what
 // the upstream oracle returns.
 
-const ARCSCAN_API_URL = "https://testnet.arcscan.app";
-const ARC_RPC_URL = "https://rpc.testnet.arc.network";
+import { RPC_URL } from "./chain";
+import { indexerGet } from "./indexer";
+
+const ARC_RPC_URL = RPC_URL;
 
 // Sensitive scoring constants are sourced from server-only environment
 // variables (SCORING_WALLET_ prefix, no NEXT_PUBLIC_) so the thresholds, caps,
@@ -132,16 +134,7 @@ interface ArcscanTxPage {
 }
 
 async function arcscanGet<T>(path: string): Promise<T | null> {
-  try {
-    const res = await fetch(`${ARCSCAN_API_URL}${path}`, {
-      headers: { accept: "application/json" },
-      cache: "no-store",
-    });
-    if (!res.ok) return null;
-    return (await res.json()) as T;
-  } catch {
-    return null;
-  }
+  return indexerGet<T>(path);
 }
 
 async function rpcCall(
@@ -347,6 +340,8 @@ export interface RescoreResult {
   limitations: string[];
   /** Hard cap applied by the formula — marks/staking must not exceed it */
   appliedCap: number;
+  /** Signed claims delta already folded into score. */
+  convictionDelta?: number;
 }
 
 function computeConfidence(signals: Signals): Confidence {
@@ -622,6 +617,27 @@ export async function rescoreWallet(
   }
 
   score = Math.min(base.appliedCap, Math.max(0, score));
+
+  let convictionDelta = 0;
+  try {
+    const { applySubjectConviction } = await import(
+      "@/lib/stake/conviction-apply"
+    );
+    const conviction = await applySubjectConviction(
+      address,
+      score,
+      base.appliedCap
+    );
+    score = conviction.score;
+    convictionDelta = conviction.delta;
+    flags.push(...conviction.flags);
+  } catch (err) {
+    console.warn(
+      "[wallet-rescore] conviction failed:",
+      err instanceof Error ? err.message : err
+    );
+  }
+
   const tier = tierFor(score);
   return {
     ...base,
@@ -629,5 +645,6 @@ export async function rescoreWallet(
     tier,
     recommendation: recommendationFor(score),
     flags: [...new Set(flags)],
+    convictionDelta,
   };
 }
