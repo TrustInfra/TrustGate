@@ -20,6 +20,7 @@ import {
   arc,
 } from "@/lib/chain";
 import { isContractAddress } from "@/lib/contract-detect";
+import { ensureArcMainnet } from "@/lib/ensure-arc";
 import {
   canonicalizeSubject,
   type CanonicalSubject,
@@ -151,9 +152,7 @@ export default function StakePanel({
   }, [openClaimId, loadClaim]);
 
   async function ensureChain() {
-    if (chainId !== arc.id) {
-      await switchChainAsync({ chainId: arc.id });
-    }
+    await ensureArcMainnet({ chainId, switchChainAsync });
   }
 
   async function resolveSubject(): Promise<CanonicalSubject | null> {

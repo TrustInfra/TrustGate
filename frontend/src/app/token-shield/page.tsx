@@ -9,7 +9,14 @@ import {
   useWriteContract,
 } from "wagmi";
 import { ConnectKitButton } from "connectkit";
-import { CONTRACT_ADDRESSES, X402_NETWORK, arc } from "@/lib/chain";
+import {
+  ARC_MIN_MAX_FEE_PER_GAS_WEI,
+  ARC_MIN_PRIORITY_FEE_WEI,
+  CONTRACT_ADDRESSES,
+  X402_NETWORK,
+  arc,
+} from "@/lib/chain";
+import { ensureArcMainnet } from "@/lib/ensure-arc";
 import { erc20Abi } from "@/lib/abi/ERC20";
 import {
   HistoryEntry,
@@ -343,10 +350,10 @@ export default function TokenShieldPage() {
       if (!onArc) {
         setPhase("switch-network");
         try {
-          await switchChainAsync({ chainId: arc.id });
+          await ensureArcMainnet({ chainId, switchChainAsync });
         } catch (err) {
           throw new Error(
-            `Switch to Arc (chain id ${arc.id}) to continue. ` +
+            `Switch to Arc Mainnet (chain id ${arc.id}). Your wallet is on a different network. ` +
               ((err as Error).message ?? "")
           );
         }
@@ -359,6 +366,8 @@ export default function TokenShieldPage() {
         abi: erc20Abi,
         functionName: "transfer",
         args: [PAYMENT_RECIPIENT, PAYMENT_AMOUNT_RAW],
+        maxFeePerGas: ARC_MIN_MAX_FEE_PER_GAS_WEI,
+        maxPriorityFeePerGas: ARC_MIN_PRIORITY_FEE_WEI,
       });
       setPaymentTx(txHash);
 
