@@ -37,6 +37,22 @@ describe("mapIndexerPath", () => {
 });
 
 describe("normalizeIndexerBody", () => {
+  it("marks Arcscan v1 contracts as is_contract", () => {
+    const out = normalizeIndexerBody(
+      "/v1/address/0x7c7489163b1060333e71229bb7a9f8cb7094a7a9",
+      {
+        address: "0x7c7489163b1060333e71229bb7a9f8cb7094a7a9",
+        type: "contract",
+        token: { standard: "erc20", symbol: "FOCI" },
+        verified: true,
+        creation: { from: { address: "0xabc" } },
+      }
+    ) as { is_contract: boolean; token_type: string; creator_address_hash: string };
+    expect(out.is_contract).toBe(true);
+    expect(out.token_type).toBe("ERC-20");
+    expect(out.creator_address_hash).toBe("0xabc");
+  });
+
   it("flattens txs to Blockscout-like items", () => {
     const out = normalizeIndexerBody(
       "/v1/address/0x3600000000000000000000000000000000000000/txs",

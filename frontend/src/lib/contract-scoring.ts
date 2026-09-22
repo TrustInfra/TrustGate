@@ -214,23 +214,31 @@ export async function detectContractKind(
   const data = await arcscanGet<ArcscanAddress>(
     `/api/v2/addresses/${address}`
   );
-  if (!data) return { kind: "fetch-failed", info: null };
 
-  const tokenType = data.token?.type ?? data.token_type ?? null;
+  const tokenType = data?.token?.type ?? data?.token_type ?? null;
   const creationTxHash =
-    data.creation_tx_hash ?? data.creation_transaction_hash ?? null;
-  const creatorAddress = data.creator_address_hash ?? null;
+    data?.creation_tx_hash ?? data?.creation_transaction_hash ?? null;
+  const creatorAddress = data?.creator_address_hash ?? null;
 
-  // Contract markers: explicit is_contract flag, presence of a creation tx,
-  // a creator address, or a non-null token_type. Any of these mean the
-  // address is a contract on Arcscan's records.
-  const isContract =
-    data.is_contract === true ||
+  let isContract =
+    data?.is_contract === true ||
     creationTxHash !== null ||
     creatorAddress !== null ||
     tokenType !== null;
 
-  if (!isContract) return { kind: "not-contract", info: null };
+  // Arcscan v1 may omit Blockscout contract flags. RPC bytecode is authoritative.
+  if (!isContract) {
+    const code = await rpcCall("eth_getCode", [address, "latest"]);
+    const c = (code ?? "").toLowerCase();
+    if (c && c !== "0x" && c !== "0x0" && !c.startsWith("0xef0100")) {
+      isContract = true;
+    }
+  }
+
+  if (!isContract) {
+    if (!data) return { kind: "fetch-failed", info: null };
+    return { kind: "not-contract", info: null };
+  }
 
   let isErc721 = tokenType === "ERC-721";
   let isErc1155 = tokenType === "ERC-1155";
@@ -245,7 +253,7 @@ export async function detectContractKind(
 
   const info: ContractInfo = {
     isContract: true,
-    isVerified: data.is_verified === true,
+    isVerified: data?.is_verified === true,
     tokenType,
     creatorAddress,
     creationTxHash,

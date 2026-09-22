@@ -210,8 +210,10 @@ export function normalizeIndexerBody(mappedPath: string, body: unknown): unknown
   if (/^\/v1\/address\/0x[0-9a-fA-F]{40}$/i.test(path)) {
     const b = body as {
       address?: string;
+      type?: string | null;
       nonce?: number;
       verified?: boolean;
+      token?: { type?: string; standard?: string } | null;
       creation?: {
         from?: { address?: string };
         address?: string;
@@ -219,6 +221,7 @@ export function normalizeIndexerBody(mappedPath: string, body: unknown): unknown
       } | null;
       counts?: { txs?: number | null };
       creator_address_hash?: string | null;
+      is_contract?: boolean;
     };
     const creator =
       b.creator_address_hash ??
@@ -227,11 +230,24 @@ export function normalizeIndexerBody(mappedPath: string, body: unknown): unknown
       null;
     const txCount = b.counts?.txs ?? b.nonce ?? 0;
     const createdAt = isoFromUnix(b.creation?.timestamp ?? null);
+    const tokenType =
+      b.token?.type ??
+      (b.token?.standard
+        ? String(b.token.standard).toUpperCase().replace("ERC20", "ERC-20")
+        : null);
+    const isContract =
+      b.is_contract === true ||
+      b.type === "contract" ||
+      b.token != null ||
+      creator != null;
     return {
       ...b,
       hash: b.address,
       creator_address_hash: creator,
       is_verified: b.verified === true,
+      is_contract: isContract,
+      token_type: tokenType,
+      token: b.token ? { ...b.token, type: tokenType } : b.token,
       transactions_count: String(txCount),
       created_at: createdAt,
     };
