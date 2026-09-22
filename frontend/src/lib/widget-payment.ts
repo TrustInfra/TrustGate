@@ -128,11 +128,9 @@ async function payAndBuildHeader(): Promise<{
       maxFeePerGas: ARC_MIN_MAX_FEE_PER_GAS_WEI,
       maxPriorityFeePerGas: ARC_MIN_PRIORITY_FEE_WEI,
     });
-    const receipt = await ctx.publicClient.waitForTransactionReceipt({
-      hash: txHash,
-      confirmations: 1,
-    });
-    if (receipt.status !== "success") {
+    const { waitArcReceipt } = await import("@/lib/wait-arc-receipt");
+    const receiptStatus = await waitArcReceipt(txHash);
+    if (receiptStatus === "reverted") {
       throw new Error(`payment tx reverted on Arc: ${txHash}`);
     }
     // Fresh per-request opaque nonce. Nald's replay protection is a single

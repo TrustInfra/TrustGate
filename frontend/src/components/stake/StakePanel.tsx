@@ -21,6 +21,7 @@ import {
 } from "@/lib/chain";
 import { isContractAddress } from "@/lib/contract-detect";
 import { ensureArcMainnet } from "@/lib/ensure-arc";
+import { waitArcReceipt } from "@/lib/wait-arc-receipt";
 import {
   canonicalizeSubject,
   type CanonicalSubject,
@@ -188,7 +189,8 @@ export default function StakePanel({
       maxFeePerGas: ARC_MIN_MAX_FEE_PER_GAS_WEI,
       maxPriorityFeePerGas: ARC_MIN_PRIORITY_FEE_WEI,
     });
-    await publicClient.waitForTransactionReceipt({ hash, confirmations: 1 });
+    const st = await waitArcReceipt(hash);
+    if (st === "reverted") throw new Error("Transaction reverted");
   }
 
   async function onStakeIdentity(side: Side) {
@@ -290,7 +292,8 @@ export default function StakePanel({
       await approve(raw);
       setStatus("Staking");
       const hash = await write(raw);
-      await publicClient.waitForTransactionReceipt({ hash, confirmations: 1 });
+      const st = await waitArcReceipt(hash);
+    if (st === "reverted") throw new Error("Transaction reverted");
       setStatus("Staked");
       await loadIdentity();
       if (openClaimId) await loadClaim(openClaimId);

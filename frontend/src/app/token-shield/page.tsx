@@ -17,6 +17,7 @@ import {
   arc,
 } from "@/lib/chain";
 import { ensureArcMainnet } from "@/lib/ensure-arc";
+import { waitArcReceipt } from "@/lib/wait-arc-receipt";
 import { erc20Abi } from "@/lib/abi/ERC20";
 import {
   HistoryEntry,
@@ -372,11 +373,8 @@ export default function TokenShieldPage() {
       setPaymentTx(txHash);
 
       setPhase("confirm");
-      const receipt = await publicClient.waitForTransactionReceipt({
-        hash: txHash,
-        confirmations: 1,
-      });
-      if (receipt.status !== "success") {
+      const receiptStatus = await waitArcReceipt(txHash);
+      if (receiptStatus === "reverted") {
         throw new Error(`Payment transaction reverted on Arc. Hash: ${txHash}`);
       }
 
