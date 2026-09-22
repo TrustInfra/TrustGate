@@ -161,19 +161,18 @@ async function rpcCall(
 }
 
 async function fetchTxCount(address: string): Promise<number> {
-  // Prefer the Arcscan counters endpoint (consistent with the rest of the
-  // pipeline). Fall back to RPC nonce if Arcscan is unavailable.
+  let fromIndexer = 0;
   const counters = await arcscanGet<{ transactions_count?: string | number }>(
     `/api/v2/addresses/${address}/counters`
   );
   if (counters && counters.transactions_count !== undefined) {
     const n = Number(counters.transactions_count);
-    if (Number.isFinite(n)) return n;
+    if (Number.isFinite(n) && n > 0) fromIndexer = n;
   }
   const hex = await rpcCall("eth_getTransactionCount", [address, "latest"]);
-  if (!hex) return 0;
-  const n = parseInt(hex, 16);
-  return Number.isFinite(n) ? n : 0;
+  const fromRpc = hex ? parseInt(hex, 16) : 0;
+  const rpcN = Number.isFinite(fromRpc) ? fromRpc : 0;
+  return Math.max(fromIndexer, rpcN);
 }
 
 async function fetchWalletTxs(address: string): Promise<ArcscanTx[]> {
@@ -342,6 +341,9 @@ export interface RescoreResult {
   appliedCap: number;
   /** Signed claims delta already folded into score. */
   convictionDelta?: number;
+  txCount: number;
+  walletAgeDays: number;
+  deployments: number;
 }
 
 function computeConfidence(signals: Signals): Confidence {
@@ -505,6 +507,9 @@ function applyFormula(rawScore: number, signals: Signals): RescoreResult {
       score,
     }),
     appliedCap: cap,
+    txCount,
+    walletAgeDays,
+    deployments,
   };
 }
 

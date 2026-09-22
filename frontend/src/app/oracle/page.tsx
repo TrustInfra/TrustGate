@@ -81,6 +81,9 @@ interface ScoreResult {
   snapshotId?: string;
   scoringVersion?: string;
   limitations?: string[];
+  txCount?: number;
+  walletAgeDays?: number;
+  deployments?: number;
   breakdown?: {
     txPoints: number;
     usdcPoints: number;
@@ -686,6 +689,45 @@ function ScoreCard({ result }: { result: ScoreResult }) {
           ) : null}
         </p>
       </div>
+
+      {(result.txCount != null ||
+        result.walletAgeDays != null ||
+        result.deployments != null) && (
+        <div className="grid gap-3 sm:grid-cols-3">
+          {result.txCount != null && (
+            <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-3">
+              <p className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">
+                Transactions
+              </p>
+              <p className="mt-1 text-lg font-semibold tabular-nums">
+                {result.txCount.toLocaleString()}
+              </p>
+            </div>
+          )}
+          {result.walletAgeDays != null && (
+            <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-3">
+              <p className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">
+                Wallet age
+              </p>
+              <p className="mt-1 text-lg font-semibold tabular-nums">
+                {result.walletAgeDays < 1
+                  ? `${Math.round(result.walletAgeDays * 24)}h`
+                  : `${result.walletAgeDays.toFixed(1)}d`}
+              </p>
+            </div>
+          )}
+          {result.deployments != null && (
+            <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-3">
+              <p className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">
+                Deployments
+              </p>
+              <p className="mt-1 text-lg font-semibold tabular-nums">
+                {result.deployments.toLocaleString()}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
 
       {(result.confidence != null || result.scoreStability) && (
         <div className="grid gap-3 sm:grid-cols-3">

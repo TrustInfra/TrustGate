@@ -130,28 +130,48 @@ function deriveTierFromScore(score: number): string {
 // score-like field is present; derive the tier from the score when no band
 // field exists. Returns null only when no recognizable score field is found at
 // all, in which case the caller surfaces the unexpected-shape error.
-function normalizeTokenScore(value: unknown): TokenScoreResult | null {
+function unwrapTokenPayload(value: unknown): Record<string, unknown> | null {
   if (typeof value !== "object" || value === null) return null;
   const v = value as Record<string, unknown>;
+  if (v.data && typeof v.data === "object" && v.data !== null) {
+    return v.data as Record<string, unknown>;
+  }
+  return v;
+}
+
+function coerceScore(raw: unknown): number | null {
+  if (typeof raw === "number" && Number.isFinite(raw)) return raw;
+  if (typeof raw === "string" && raw.trim() !== "") {
+    const n = Number(raw);
+    if (Number.isFinite(n)) return n;
+  }
+  return null;
+}
+
+function normalizeTokenScore(value: unknown): TokenScoreResult | null {
+  const v = unwrapTokenPayload(value);
+  if (!v) return null;
 
   let score: number | null = null;
   for (const key of ["score", "trustScore", "trust_score"]) {
-    const raw = v[key];
-    if (typeof raw === "number" && Number.isFinite(raw)) {
-      score = raw;
-      break;
-    }
+    score = coerceScore(v[key]);
+    if (score !== null) break;
   }
-  if (score === null) return null;
 
   let tier: string | null = null;
-  for (const key of ["tier", "recommendation"]) {
+  for (const key of ["tier", "recommendation", "band"]) {
     const raw = v[key];
     if (typeof raw === "string" && raw.trim().length > 0) {
       tier = raw.trim();
       break;
     }
   }
+
+  const tierUpper = (tier ?? "").toUpperCase();
+  if (score === null && (tierUpper === "VERIFIED" || tierUpper === "TRUSTED")) {
+    score = 100;
+  }
+  if (score === null) return null;
 
   const result: TokenScoreResult = {
     score,
@@ -318,6 +338,12 @@ export default function TokenShieldPage() {
         });
         setPhase("done");
         return;
+      }
+
+      if (challenge.status === 202) {
+        throw new Error(
+          "Token score is still computing. Wait a few seconds and check again."
+        );
       }
 
       if (challenge.status !== 402) {

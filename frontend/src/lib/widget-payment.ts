@@ -172,15 +172,42 @@ async function fetchUpstream(
     );
   }
   const data: unknown = await res.json();
-  if (
-    typeof data !== "object" ||
-    data === null ||
-    typeof (data as { score?: unknown }).score !== "number" ||
-    typeof (data as { tier?: unknown }).tier !== "string"
-  ) {
+  const inner =
+    data &&
+    typeof data === "object" &&
+    "data" in data &&
+    typeof (data as { data?: unknown }).data === "object" &&
+    (data as { data?: unknown }).data !== null
+      ? (data as { data: Record<string, unknown> }).data
+      : (data as Record<string, unknown> | null);
+  const scoreRaw = inner?.score;
+  const score =
+    typeof scoreRaw === "number"
+      ? scoreRaw
+      : typeof scoreRaw === "string"
+        ? Number(scoreRaw)
+        : String(inner?.tier ?? "").toUpperCase() === "VERIFIED"
+          ? 100
+          : NaN;
+  const tier =
+    typeof inner?.tier === "string" && inner.tier.trim()
+      ? inner.tier
+      : Number.isFinite(score)
+        ? score >= 75
+          ? "HIGH"
+          : score >= 40
+            ? "MEDIUM"
+            : "LOW"
+        : "";
+  if (!inner || !Number.isFinite(score) || !tier) {
     throw new Error("upstream returned unexpected response shape");
   }
-  const d = data as {
+  const d = {
+    score,
+    tier,
+    contractType: inner.contractType,
+    flags: inner.flags,
+  } as {
     score: number;
     tier: string;
     contractType?: string;
