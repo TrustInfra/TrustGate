@@ -148,7 +148,20 @@ function coerceScore(raw: unknown): number | null {
   return null;
 }
 
+function isPendingTokenPayload(value: unknown): boolean {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  if (v.kind === "pending" || v.status === "pending") return true;
+  const inner = v.data;
+  if (inner && typeof inner === "object") {
+    const d = inner as Record<string, unknown>;
+    if (d.kind === "pending" || d.status === "pending") return true;
+  }
+  return false;
+}
+
 function normalizeTokenScore(value: unknown): TokenScoreResult | null {
+  if (isPendingTokenPayload(value)) return null;
   const v = unwrapTokenPayload(value);
   if (!v) return null;
 
@@ -323,11 +336,16 @@ export default function TokenShieldPage() {
 
       if (challenge.status === 200) {
         const data: unknown = await challenge.json();
-        // eslint-disable-next-line no-console
-        console.error("[token-shield] raw oracle response (200):", data);
+        if (isPendingTokenPayload(data)) {
+          throw new Error(
+            "Token score is still computing. Wait a few seconds and check again."
+          );
+        }
         const normalized = normalizeTokenScore(data);
         if (!normalized) {
-          throw new Error("Oracle returned an unexpected response shape.");
+          throw new Error(
+            `Oracle returned an unexpected response shape. ${JSON.stringify(data).slice(0, 240)}`
+          );
         }
         setResult(normalized);
         recordHistory({
@@ -449,11 +467,16 @@ export default function TokenShieldPage() {
         );
       }
       const data: unknown = await paid.json();
-      // eslint-disable-next-line no-console
-      console.error("[token-shield] raw oracle response (paid):", data);
+      if (isPendingTokenPayload(data)) {
+        throw new Error(
+          "Payment recorded. Token score is still computing. Wait a few seconds and check again (no extra payment if still pending)."
+        );
+      }
       const normalized = normalizeTokenScore(data);
       if (!normalized) {
-        throw new Error("Oracle returned an unexpected response shape.");
+        throw new Error(
+          `Oracle returned an unexpected response shape. ${JSON.stringify(data).slice(0, 240)}`
+        );
       }
       setResult(normalized);
       recordHistory({

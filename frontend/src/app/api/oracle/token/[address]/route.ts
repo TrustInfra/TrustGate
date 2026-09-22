@@ -208,7 +208,7 @@ async function enrichTokenScore(
 
   return {
     ...payload,
-    score: verifiedIssuer ? (payload.score ?? null) : score,
+    score: verifiedIssuer ? 100 : score,
     convictionDelta: conviction.delta,
     tier,
     confidence: intel.confidence,
@@ -266,16 +266,22 @@ async function forwardToTokenOracle(
     try {
       const text = new TextDecoder().decode(body);
       const parsed: unknown = JSON.parse(text);
-      if (
+      const inner =
+        parsed &&
         typeof parsed === "object" &&
         parsed !== null &&
-        (typeof (parsed as { score?: unknown }).score === "number" ||
-          (parsed as { tier?: string }).tier === "VERIFIED")
+        "data" in parsed &&
+        typeof (parsed as { data?: unknown }).data === "object" &&
+        (parsed as { data: unknown }).data !== null
+          ? (parsed as { data: Record<string, unknown> }).data
+          : (parsed as Record<string, unknown> | null);
+      if (
+        inner &&
+        (typeof inner.score === "number" ||
+          typeof inner.score === "string" ||
+          String(inner.tier ?? "").toUpperCase() === "VERIFIED")
       ) {
-        const enriched = await enrichTokenScore(
-          rawAddress,
-          parsed as Record<string, unknown>
-        );
+        const enriched = await enrichTokenScore(rawAddress, inner);
         const newBody = JSON.stringify(enriched);
         const newHeaders = new Headers(headers);
         newHeaders.set("content-type", "application/json; charset=utf-8");
@@ -345,11 +351,10 @@ async function proxy(
     return jsonResponse({ error: "Invalid address" }, 400);
   }
 
-  // Official issuer tokens skip detection, the upstream VPS oracle forward, and
-  // the x402 payment entirely. They get the dedicated VERIFIED tier with no
-  // numeric score, before any forwardToTokenOracle call can happen.
+  // Official issuer tokens skip detection, the upstream VPS oracle, and x402.
+  // Published as VERIFIED with score 100 so clients that require a number parse.
   if (isVerifiedIssuer(address)) {
-    return jsonResponse({ score: null, tier: "VERIFIED", label: "VERIFIED" }, 200);
+    return jsonResponse({ score: 100, tier: "VERIFIED", label: "VERIFIED" }, 200);
   }
 
   // Preflight via OPTIONS is handled separately; this branch only sees real
