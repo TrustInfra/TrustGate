@@ -4,7 +4,7 @@
  * Runs on Railway as a worker. Every CYCLE_INTERVAL_MS:
  *   1. For each agent in agents.json:
  *      - Fetch trust score from /api/arc-score/[address]
- *      - If score >= HIGH_THRESHOLD, call TrustGate.claimPayment()
+ *      - If score >= HIGH_THRESHOLD, call TrustGate.claim()
  *      - Log result + Arcscan link
  *   2. Print live summary table
  *
@@ -55,7 +55,7 @@ const publicClient = createPublicClient({
   transport: http(ARC_RPC_URL),
 });
 
-// ---------- TrustGate ABI (claimPayment) ----------
+// ---------- TrustGate ABI (claim) ----------
 
 const TRUSTGATE_ABI = [
   {
@@ -63,17 +63,24 @@ const TRUSTGATE_ABI = [
       { name: 'depositor', type: 'address' },
       { name: 'amount', type: 'uint256' },
     ],
-    name: 'claimPayment',
-    outputs: [],
+    name: 'claim',
+    outputs: [{ name: 'claimId', type: 'uint256' }],
     stateMutability: 'nonpayable',
     type: 'function',
   },
   {
     inputs: [
       { name: 'depositor', type: 'address' },
-      { name: 'recipient', type: 'address' },
+      { name: 'agent', type: 'address' },
     ],
-    name: 'claimableAmount',
+    name: 'allowances',
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [{ name: 'depositor', type: 'address' }],
+    name: 'deposits',
     outputs: [{ name: '', type: 'uint256' }],
     stateMutability: 'view',
     type: 'function',
@@ -164,12 +171,22 @@ async function claimFor(agent: AgentRuntime): Promise<{ ok: boolean; txHash?: st
 
   // Pre-check: does the agent actually have a claim available?
   try {
-    const claimable = (await publicClient.readContract({
-      address: TRUSTGATE_CONTRACT,
-      abi: TRUSTGATE_ABI,
-      functionName: 'claimableAmount',
-      args: [depositor, account.address],
-    })) as bigint;
+    // claim() needs both the agent's allowance and the depositor's balance
+    const [allowance, deposit] = await Promise.all([
+      publicClient.readContract({
+        address: TRUSTGATE_CONTRACT,
+        abi: TRUSTGATE_ABI,
+        functionName: 'allowances',
+        args: [depositor, account.address],
+      }),
+      publicClient.readContract({
+        address: TRUSTGATE_CONTRACT,
+        abi: TRUSTGATE_ABI,
+        functionName: 'deposits',
+        args: [depositor],
+      }),
+    ]);
+    const claimable = allowance < deposit ? allowance : deposit;
 
     if (claimable < amount) {
       return {
@@ -189,7 +206,7 @@ async function claimFor(agent: AgentRuntime): Promise<{ ok: boolean; txHash?: st
     const txHash = await wallet.writeContract({
       address: TRUSTGATE_CONTRACT,
       abi: TRUSTGATE_ABI,
-      functionName: 'claimPayment',
+      functionName: 'claim',
       args: [depositor, amount],
       chain: arcChain as any,
       account,

@@ -12,7 +12,7 @@ describe("canonicalizeSubject", () => {
     expect(b?.canonical).toBe("trustgated");
     expect(c?.canonical).toBe("trustgated");
     expect(a && b && subjectId(a.kind, a.canonical)).toBe(
-      subjectId(b.kind, b.canonical)
+      subjectId(b!.kind, b!.canonical)
     );
   });
 

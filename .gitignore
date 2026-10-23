@@ -68,3 +68,6 @@ docs/INTERNAL_ROADMAP.md
 # Internal AI prompt scratch (already leaked once; keep off public GitHub)
 docs/dev-docs-content.md
 docs/site-copy-updates.md
+
+# Local launch-video renders (never commit)
+brag-output*/

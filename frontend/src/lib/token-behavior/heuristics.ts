@@ -131,3 +131,126 @@ export function isWashWallet(flow: {
   if (peak <= 0) return false;
   return Math.min(flow.bought, flow.sold) / peak >= 0.7;
 }
+
+/** Last-N transfers of a large holder base are market tape, not a coordination study. */
+export const ESTABLISHED_HOLDER_FLOOR = 500;
+export const THIN_TRANSFER_SAMPLE = 150;
+
+export function thinSampleIsUnrepresentative(
+  holderCount: number,
+  transferSample: number
+): boolean {
+  if (!Number.isFinite(holderCount) || !Number.isFinite(transferSample)) {
+    return false;
+  }
+  return (
+    holderCount >= ESTABLISHED_HOLDER_FLOOR &&
+    transferSample <= THIN_TRANSFER_SAMPLE
+  );
+}
+
+/**
+ * Oracle wrote a LOW/0 fallback after failing to ingest holders, while the
+ * indexer now reports a real holder base.
+ */
+export function isDataStarvedOracleRead(
+  score: number,
+  flags: readonly string[],
+  holderCount: number
+): boolean {
+  if (!Number.isFinite(holderCount) || holderCount < 50) return false;
+  if (Number.isFinite(score) && score > 10) return false;
+  const codes = new Set(flags.map((f) => String(f).toUpperCase()));
+  if (codes.has("HONEYPOT_PATTERN")) return false;
+  return codes.has("LIQUIDITY_DATA_UNAVAILABLE");
+}
+
+export function scoreFromIndexerSignals(input: {
+  holderCount: number;
+  topHolderPct: number;
+  transferSample: number;
+  liquidityUsd: number | null;
+  verified: boolean;
+}): { score: number; flags: string[] } {
+  const flags: string[] = [];
+  let score = 40;
+  const holders = Math.max(0, Math.floor(input.holderCount));
+
+  if (holders > 0 && holders < 15) {
+    flags.push("LOW_HOLDER_QUALITY");
+  } else if (holders >= 10_000) score += 28;
+  else if (holders >= 1_000) score += 20;
+  else if (holders >= 100) score += 12;
+  else if (holders >= 15) score += 5;
+
+  const top = Number.isFinite(input.topHolderPct) ? input.topHolderPct : 0;
+  if (top >= 45) {
+    flags.push("HOLDER_CONCENTRATION");
+    score -= 15;
+  } else if (top >= 25) {
+    score -= 8;
+  }
+
+  const liq = input.liquidityUsd;
+  if (liq == null || !Number.isFinite(liq) || liq <= 0) {
+    flags.push("LIQUIDITY_DATA_UNAVAILABLE");
+  } else if (liq >= 100_000) score += 10;
+  else if (liq >= 10_000) score += 5;
+
+  if (!input.verified) {
+    flags.push("UNVERIFIED");
+    score -= 8;
+  }
+
+  if (input.transferSample >= 50) score += 5;
+
+  return {
+    score: Math.max(0, Math.min(100, Math.round(score))),
+    flags,
+  };
+}
+
+export function tierFromNumericScore(score: number): string {
+  if (score >= 80) return "HIGH_ELITE";
+  if (score >= 60) return "HIGH";
+  if (score >= 40) return "MEDIUM";
+  return "LOW";
+}
+
+/**
+ * Replaces a data-starved oracle read with the indexer fallback score.
+ * Returns null when the oracle read stands.
+ */
+export function recoverDataStarvedRead(
+  score: number,
+  flags: readonly string[],
+  metrics: {
+    holderCount: number;
+    topHolderPct: number;
+    transferSample: number;
+    liquidityUsd: number | null;
+    contractVerified: boolean;
+  }
+): { score: number; tier: string; flags: string[] } | null {
+  if (!isDataStarvedOracleRead(score, flags, metrics.holderCount)) return null;
+  // Holder counts are cheap to inflate with airdrops; only override when the
+  // indexer confirms the liquidity the oracle failed to see
+  const liq = metrics.liquidityUsd;
+  if (liq == null || !Number.isFinite(liq) || liq <= 0) return null;
+  const fallback = scoreFromIndexerSignals({
+    holderCount: metrics.holderCount,
+    topHolderPct: metrics.topHolderPct,
+    transferSample: metrics.transferSample,
+    liquidityUsd: metrics.liquidityUsd,
+    verified: metrics.contractVerified,
+  });
+  // The oracle's liquidity flag came from the failed ingest
+  const kept = flags.filter(
+    (f) => String(f).toUpperCase() !== "LIQUIDITY_DATA_UNAVAILABLE"
+  );
+  return {
+    score: fallback.score,
+    tier: tierFromNumericScore(fallback.score),
+    flags: [...new Set([...kept, ...fallback.flags])],
+  };
+}

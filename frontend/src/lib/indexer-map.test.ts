@@ -33,6 +33,13 @@ describe("mapIndexerPath", () => {
         "/api/v2/tokens/0x3600000000000000000000000000000000000000"
       )
     ).toBe("/v1/tokens/0x3600000000000000000000000000000000000000");
+    expect(
+      mapIndexerPath(
+        "/api/v2/tokens/0xeCe5cA8bf9220718E5727754026757512212cb3c/holders?limit=50"
+      )
+    ).toBe(
+      "/v1/tokens/0xeCe5cA8bf9220718E5727754026757512212cb3c/holders?limit=50"
+    );
   });
 });
 
@@ -85,5 +92,66 @@ describe("normalizeIndexerBody", () => {
     expect(out.items[0].transaction_types).toContain("contract_call");
     expect(out.items[0].timestamp).toContain("T");
     expect(out.next_page_params.cursor).toBe("cur");
+  });
+
+  it("maps Arcscan holders to Blockscout value/hash and keeps holder_count", () => {
+    const out = normalizeIndexerBody(
+      "/v1/tokens/0xece5ca8bf9220718e5727754026757512212cb3c/holders",
+      {
+        items: [
+          {
+            address: {
+              address: "0x000000000000000000000000000000000000dead",
+            },
+            balance: { raw: "63434308434603159736402356" },
+            share: "0.0634",
+            value: {
+              usd: "1113671",
+              price: { depth_usdc: "323233.99516" },
+            },
+          },
+        ],
+        holder_count: 19846,
+        page: { next: "cur", has_more: true },
+      }
+    ) as {
+      items: Array<{
+        address: { hash: string };
+        value: string;
+        share: string;
+        liquidity_usd: string;
+      }>;
+      holders_count: number;
+      next_page_params: { cursor: string };
+    };
+    expect(out.holders_count).toBe(19846);
+    expect(out.items[0].address.hash).toBe(
+      "0x000000000000000000000000000000000000dead"
+    );
+    expect(out.items[0].value).toBe("63434308434603159736402356");
+    expect(out.items[0].value).not.toBe("1113671");
+    expect(out.items[0].liquidity_usd).toBe("323233.99516");
+    expect(out.next_page_params.cursor).toBe("cur");
+  });
+
+  it("maps token holder_count and contract.verified", () => {
+    const out = normalizeIndexerBody(
+      "/v1/tokens/0xece5ca8bf9220718e5727754026757512212cb3c",
+      {
+        token: { name: "Argus", symbol: "ARGUS", decimals: 18, standard: "erc20" },
+        holders: 19845,
+        contract: { verified: false },
+        total_supply: { raw: "1000000000000000000000000000" },
+      }
+    ) as {
+      holders: number;
+      holders_count: number;
+      is_verified: boolean;
+      total_supply: string;
+    };
+    expect(out.holders).toBe(19845);
+    expect(out.holders_count).toBe(19845);
+    expect(out.is_verified).toBe(false);
+    expect(out.total_supply).toBe("1000000000000000000000000000");
   });
 });

@@ -3,8 +3,13 @@ import {
   applyTemporalScoreDelta,
   classifyPostDistributionVolume,
   countBidirectionalWashPairs,
+  isDataStarvedOracleRead,
   isWashWallet,
   readTemporalScoreWeight,
+  recoverDataStarvedRead,
+  scoreFromIndexerSignals,
+  thinSampleIsUnrepresentative,
+  tierFromNumericScore,
 } from "./heuristics";
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -119,5 +124,104 @@ describe("isWashWallet", () => {
     expect(
       isWashWallet({ buyCount: 4, sellCount: 4, bought: 100, sold: 95 })
     ).toBe(true);
+  });
+});
+
+describe("thinSampleIsUnrepresentative", () => {
+  it("treats 100 recent transfers of a 19k-holder token as tape", () => {
+    expect(thinSampleIsUnrepresentative(19845, 100)).toBe(true);
+  });
+
+  it("still studies thin tokens", () => {
+    expect(thinSampleIsUnrepresentative(40, 100)).toBe(false);
+  });
+});
+
+describe("isDataStarvedOracleRead", () => {
+  it("detects a 0 LOW fallback against a real holder base", () => {
+    expect(
+      isDataStarvedOracleRead(0, ["UNVERIFIED", "LIQUIDITY_DATA_UNAVAILABLE"], 19845)
+    ).toBe(true);
+  });
+
+  it("leaves a real score alone", () => {
+    expect(isDataStarvedOracleRead(62, ["UNVERIFIED"], 19845)).toBe(false);
+  });
+
+  it("does not override thin tokens", () => {
+    expect(isDataStarvedOracleRead(0, ["LIQUIDITY_DATA_UNAVAILABLE"], 12)).toBe(
+      false
+    );
+  });
+
+  it("does not override a honeypot just because the score is low", () => {
+    expect(
+      isDataStarvedOracleRead(8, ["HONEYPOT_PATTERN", "LIQUIDITY_DATA_UNAVAILABLE"], 80)
+    ).toBe(false);
+  });
+});
+
+describe("scoreFromIndexerSignals", () => {
+  it("scores ARGUS-scale holder and liquidity as HIGH, not 0", () => {
+    const out = scoreFromIndexerSignals({
+      holderCount: 19845,
+      topHolderPct: 6.34,
+      transferSample: 100,
+      liquidityUsd: 323233,
+      verified: false,
+    });
+    expect(out.score).toBeGreaterThanOrEqual(60);
+    expect(out.score).toBeLessThan(90);
+    expect(out.flags).toContain("UNVERIFIED");
+    expect(out.flags).not.toContain("LIQUIDITY_DATA_UNAVAILABLE");
+    expect(out.flags).not.toContain("EXIT_SYNC");
+    expect(out.flags).not.toContain("WASH_TRADING");
+  });
+});
+
+describe("tierFromNumericScore", () => {
+  it("maps ARGUS-scale fallback into HIGH", () => {
+    expect(tierFromNumericScore(75)).toBe("HIGH");
+    expect(tierFromNumericScore(40)).toBe("MEDIUM");
+    expect(tierFromNumericScore(10)).toBe("LOW");
+  });
+});
+
+describe("recoverDataStarvedRead", () => {
+  const argus = {
+    holderCount: 19845,
+    topHolderPct: 6.34,
+    transferSample: 100,
+    liquidityUsd: 323233,
+    contractVerified: false,
+  };
+
+  it("replaces a starved 0 LOW with the indexer score and drops the stale liquidity flag", () => {
+    const out = recoverDataStarvedRead(
+      0,
+      ["UNVERIFIED", "LIQUIDITY_DATA_UNAVAILABLE"],
+      argus
+    );
+    expect(out).not.toBeNull();
+    expect(out!.score).toBeGreaterThanOrEqual(60);
+    expect(out!.tier).toBe(tierFromNumericScore(out!.score));
+    expect(out!.flags).toContain("UNVERIFIED");
+    expect(out!.flags).not.toContain("LIQUIDITY_DATA_UNAVAILABLE");
+  });
+
+  it("keeps the oracle read when the indexer has no liquidity either", () => {
+    expect(
+      recoverDataStarvedRead(0, ["LIQUIDITY_DATA_UNAVAILABLE"], {
+        ...argus,
+        liquidityUsd: null,
+      })
+    ).toBeNull();
+  });
+
+  it("returns null for a real oracle score or a honeypot", () => {
+    expect(recoverDataStarvedRead(62, ["UNVERIFIED"], argus)).toBeNull();
+    expect(
+      recoverDataStarvedRead(0, ["HONEYPOT_PATTERN", "LIQUIDITY_DATA_UNAVAILABLE"], argus)
+    ).toBeNull();
   });
 });

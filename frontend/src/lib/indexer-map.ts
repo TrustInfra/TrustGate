@@ -73,6 +73,27 @@ function isoFromUnix(value: unknown): string | null {
   return null;
 }
 
+/** Arcscan amounts are `{ raw, decimals, formatted }`. Blockscout used a string. */
+function amountRaw(node: unknown): string | null {
+  if (node == null) return null;
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (typeof node === "object" && "raw" in node) {
+    const raw = (node as { raw?: unknown }).raw;
+    if (raw == null) return null;
+    return String(raw);
+  }
+  return null;
+}
+
+function depthUsdc(node: unknown): string | null {
+  if (!node || typeof node !== "object") return null;
+  const price = (node as { price?: { depth_usdc?: unknown } }).price;
+  const depth = price?.depth_usdc;
+  if (depth == null) return null;
+  const n = Number(depth);
+  return Number.isFinite(n) ? String(n) : null;
+}
+
 function party(
   node: unknown
 ): { hash?: string; is_contract?: boolean } | null {
@@ -120,10 +141,7 @@ function normalizeTx(tx: Record<string, unknown>): Record<string, unknown> {
   if (isCreation || created) types.push("contract_creation");
   else if (to?.is_contract) types.push("contract_call");
 
-  const value =
-    tx.value && typeof tx.value === "object"
-      ? (tx.value as { raw?: string }).raw
-      : tx.value;
+  const value = amountRaw(tx.value);
 
   const status = String(tx.status ?? "");
   return {
@@ -169,13 +187,43 @@ export function normalizeIndexerBody(mappedPath: string, body: unknown): unknown
         from: party(t.from),
         to: party(t.to),
         total: {
-          value:
-            t.amount && typeof t.amount === "object"
-              ? (t.amount as { raw?: string }).raw
-              : t.amount,
+          value: amountRaw(t.amount),
         },
         type: "token_transfer",
       })),
+      ...pageParams(b),
+    };
+  }
+
+  if (/^\/v1\/tokens\/0x[0-9a-fA-F]{40}\/holders$/i.test(path)) {
+    const b = body as {
+      items?: Record<string, unknown>[];
+      holder_count?: string | number | null;
+      holders?: string | number | null;
+      page?: { next?: string | null; has_more?: boolean };
+    };
+    const count = b.holder_count ?? b.holders ?? null;
+    return {
+      items: (b.items ?? []).map((h) => {
+        const addrNode = h.address;
+        const address =
+          party(addrNode) ??
+          (typeof addrNode === "string" ? { hash: addrNode } : null);
+        // Arcscan `value` is a USD quote object. Token balance is `balance.raw`.
+        const tokenValue =
+          amountRaw(h.balance) ??
+          (typeof h.value === "string" || typeof h.value === "number"
+            ? String(h.value)
+            : null);
+        return {
+          address,
+          value: tokenValue,
+          share: h.share,
+          liquidity_usd: depthUsdc(h.value),
+        };
+      }),
+      holders: count,
+      holders_count: count,
       ...pageParams(b),
     };
   }
@@ -188,22 +236,23 @@ export function normalizeIndexerBody(mappedPath: string, body: unknown): unknown
         decimals?: number;
         standard?: string;
       };
+      contract?: { verified?: boolean | null } | null;
       total_supply?: { raw?: string } | string | number | null;
       holders?: string | number | null;
+      holder_count?: string | number | null;
     };
-    const supply =
-      b.total_supply && typeof b.total_supply === "object"
-        ? b.total_supply.raw
-        : b.total_supply;
+    const supply = amountRaw(b.total_supply) ?? b.total_supply;
+    const holders = b.holders ?? b.holder_count ?? null;
     return {
       name: b.token?.name,
       symbol: b.token?.symbol,
       decimals: b.token?.decimals,
       type: b.token?.standard,
-      holders: b.holders,
-      holders_count: b.holders,
+      holders,
+      holders_count: holders,
       total_supply: supply,
       exchange_rate: null,
+      is_verified: b.contract?.verified === true,
     };
   }
 

@@ -252,6 +252,37 @@ function setCacheEntry(key: string, result: WidgetScore): void {
   cacheTimers.set(key, timer);
 }
 
+// Same data-starved override Token Shield applies, so widget and batch never
+// publish a different number for the same token.
+async function recoverStarvedUpstream(
+  address: string,
+  result: WidgetScore
+): Promise<WidgetScore> {
+  const { isDataStarvedOracleRead, recoverDataStarvedRead } = await import(
+    "@/lib/token-behavior/heuristics"
+  );
+  // Skip the Arcscan reads unless the score and flags already look starved
+  if (!isDataStarvedOracleRead(result.score, result.flags, Number.MAX_SAFE_INTEGER)) {
+    return result;
+  }
+  try {
+    const { analyzeTokenTemporal } = await import("@/lib/token-behavior/temporal");
+    const temporal = await analyzeTokenTemporal(address);
+    const recovered = recoverDataStarvedRead(
+      result.score,
+      result.flags,
+      temporal.metrics
+    );
+    return recovered ? { ...result, ...recovered } : result;
+  } catch (err) {
+    console.error(
+      "[widget-payment] starved-read recovery failed, keeping oracle score:",
+      err instanceof Error ? err.message : err
+    );
+    return result;
+  }
+}
+
 export async function scoreErc20ViaUpstream(
   address: string
 ): Promise<WidgetScore> {
@@ -271,7 +302,10 @@ export async function scoreErc20ViaUpstream(
     try {
       assertWidgetPaymentBudget();
       const { header, txHash } = await payAndBuildHeader();
-      const result = await fetchUpstream(address, header, txHash);
+      const result = await recoverStarvedUpstream(
+        address,
+        await fetchUpstream(address, header, txHash)
+      );
       const { applySubjectConviction } = await import(
         "@/lib/stake/conviction-apply"
       );

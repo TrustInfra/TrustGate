@@ -6,6 +6,7 @@ import {
   classifyPostDistributionVolume,
   countBidirectionalWashPairs,
   isWashWallet,
+  thinSampleIsUnrepresentative,
 } from "./heuristics";
 
 /**
@@ -48,12 +49,16 @@ export interface TemporalTokenResult {
     sellToBuyRatio: number | null;
     transferSample: number;
     washPairCount: number;
+    liquidityUsd: number | null;
+    contractVerified: boolean;
   };
 }
 
 interface HolderItem {
-  address?: { hash?: string } | string | null;
-  value?: string | null;
+  address?: { hash?: string; address?: string } | string | null;
+  value?: string | number | null;
+  share?: string | number | null;
+  liquidity_usd?: string | number | null;
 }
 
 interface HoldersPage {
@@ -75,6 +80,7 @@ interface TransfersPage {
 interface TokenInfo {
   holders?: string | number | null;
   holders_count?: string | number | null;
+  is_verified?: boolean | null;
 }
 
 async function arcscanGet<T>(path: string): Promise<T | null> {
@@ -82,17 +88,27 @@ async function arcscanGet<T>(path: string): Promise<T | null> {
 }
 
 function addrOf(
-  field: { hash?: string | null } | string | null | undefined
+  field:
+    | { hash?: string | null; address?: string | null }
+    | string
+    | null
+    | undefined
 ): string {
   if (!field) return "";
   if (typeof field === "string") return field.toLowerCase();
-  return (field.hash ?? "").toLowerCase();
+  return (field.hash ?? field.address ?? "").toLowerCase();
 }
 
-function parseAmount(raw: string | null | undefined): number {
-  if (!raw) return 0;
+function parseAmount(raw: string | number | null | undefined): number {
+  if (raw == null || raw === "") return 0;
   const n = Number(raw);
   return Number.isFinite(n) ? n : 0;
+}
+
+function sharePct(raw: string | number | null | undefined): number {
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  return n <= 1 ? n * 100 : n;
 }
 
 interface WalletFlow {
@@ -139,15 +155,25 @@ export async function analyzeTokenTemporal(
     holders.length,
     Number(tokenInfo?.holders ?? tokenInfo?.holders_count ?? 0) || 0
   );
+  const contractVerified = tokenInfo?.is_verified === true;
 
+  const sharePcts = holders.map((h) => sharePct(h.share)).filter((n) => n > 0);
   const balances = holders
     .map((h) => parseAmount(h.value ?? undefined))
     .filter((n) => n > 0);
   const totalBal = balances.reduce((a, b) => a + b, 0);
   const topHolderPct =
-    totalBal > 0 && balances.length > 0
-      ? (Math.max(...balances) / totalBal) * 100
-      : 0;
+    sharePcts.length > 0
+      ? Math.max(...sharePcts)
+      : totalBal > 0 && balances.length > 0
+        ? (Math.max(...balances) / totalBal) * 100
+        : 0;
+
+  let liquidityUsd: number | null = null;
+  for (const h of holders) {
+    const d = parseAmount(h.liquidity_usd ?? undefined);
+    if (d > (liquidityUsd ?? 0)) liquidityUsd = d;
+  }
 
   if (holderCount > 0 && holderCount < 15) {
     flags.push("LOW_HOLDER_QUALITY");
@@ -224,7 +250,9 @@ export async function analyzeTokenTemporal(
     scoreDelta -= 8;
   }
 
-  if (majorityExitWalletCount >= EXIT_SYNC_MIN_PARTICIPANTS) {
+  const thinTape = thinSampleIsUnrepresentative(holderCount, transfers.length);
+
+  if (!thinTape && majorityExitWalletCount >= EXIT_SYNC_MIN_PARTICIPANTS) {
     // Cluster majority exits in rolling window → pump/dump coordination
     majorityExitEvents.sort((a, b) => a.ts - b.ts);
     let best = 1;
@@ -274,6 +302,7 @@ export async function analyzeTokenTemporal(
       : null;
 
   if (
+    !thinTape &&
     averageHoldHours !== null &&
     averageHoldHours < SHORT_HOLD_HOURS &&
     holdHours.length >= 5
@@ -298,9 +327,10 @@ export async function analyzeTokenTemporal(
     if (isWashWallet(f)) washWallets += 1;
   }
   if (
-    circularPairs >= 2 ||
-    (transfers.length >= 20 && circularPairs >= 1) ||
-    washWallets >= 3
+    !thinTape &&
+    (circularPairs >= 2 ||
+      (transfers.length >= 20 && circularPairs >= 1) ||
+      washWallets >= 3)
   ) {
     flags.push("WASH_TRADING");
     observations.push("Circular or repeated buy/sell loops suggest wash activity");
@@ -312,7 +342,7 @@ export async function analyzeTokenTemporal(
     .map((f) => f.firstIn)
     .filter((t): t is number => t != null)
     .sort((a, b) => a - b);
-  if (receiveTimes.length >= 8) {
+  if (!thinTape && receiveTimes.length >= 8) {
     let maxCluster = 1;
     let j = 0;
     for (let i = 0; i < receiveTimes.length; i++) {
@@ -390,6 +420,8 @@ export async function analyzeTokenTemporal(
           : Math.round(sellToBuyRatio * 1000) / 1000,
       transferSample: transfers.length,
       washPairCount: circularPairs,
+      liquidityUsd,
+      contractVerified,
     },
   };
 }

@@ -3,6 +3,7 @@ import "@nomicfoundation/hardhat-ethers";
 import "@nomicfoundation/hardhat-chai-matchers";
 import "@nomicfoundation/hardhat-verify";
 import "hardhat-deploy";
+import "hardhat-gas-reporter";
 import "dotenv/config";
 
 // ── Environment variables (loaded from .env) ─────────────────────────

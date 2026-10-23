@@ -102,6 +102,7 @@ async function enrichTokenScore(
   const {
     applyTemporalScoreDelta,
     readTemporalScoreWeight,
+    recoverDataStarvedRead,
   } = await import("@/lib/token-behavior/heuristics");
 
   const temporal = await analyzeTokenTemporal(rawAddress);
@@ -122,8 +123,21 @@ async function enrichTokenScore(
     payload.tier.toUpperCase() === "VERIFIED" &&
     typeof payload.score !== "number";
 
-  const baseScore =
-    typeof payload.score === "number" ? payload.score : 50;
+  const oracleScore =
+    typeof payload.score === "number"
+      ? payload.score
+      : typeof payload.score === "string" &&
+          Number.isFinite(Number(payload.score))
+        ? Number(payload.score)
+        : 50;
+  const oracleFlags = Array.isArray(payload.flags)
+    ? (payload.flags as unknown[]).map(String)
+    : [];
+  const recovered = verifiedIssuer
+    ? null
+    : recoverDataStarvedRead(oracleScore, oracleFlags, temporal.metrics);
+  const baseScore = recovered ? recovered.score : oracleScore;
+  const upstreamFlags = recovered ? recovered.flags : oracleFlags;
   // scoreDelta still fully computed on temporal; weight 0 suppresses published impact until calibrated
   const temporalContribution = applyTemporalScoreDelta(
     temporal.scoreDelta,
@@ -145,9 +159,6 @@ async function enrichTokenScore(
     : await applySubjectConviction(rawAddress, preConviction, 100);
   const score = conviction.score;
 
-  const upstreamFlags = Array.isArray(payload.flags)
-    ? (payload.flags as unknown[]).map(String)
-    : [];
   const flags = [
     ...new Set([
       ...upstreamFlags,
@@ -166,8 +177,9 @@ async function enrichTokenScore(
       (temporal.metrics.transferSample >= 20 ? "HIGH" : "MEDIUM")
   );
 
+  // A recovered read discards the oracle's fallback tier along with its score
   const tier =
-    typeof payload.tier === "string"
+    typeof payload.tier === "string" && !recovered
       ? payload.tier
       : score >= 80
         ? "HIGH_ELITE"
