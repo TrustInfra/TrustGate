@@ -4,6 +4,7 @@ import { envNumber } from "@/lib/env-number";
 
 import { RPC_URL, USDC_ADDRESS } from "@/lib/chain";
 import { indexerGet } from "@/lib/indexer";
+import { allowScan, scanClientKey } from "@/lib/scan-rate-limit";
 
 const ARC_RPC = RPC_URL;
 const USDC_ADDR = USDC_ADDRESS;
@@ -91,7 +92,7 @@ async function rpcCall(method: string, params: unknown[]): Promise<string> {
 async function getTxCount(address: string): Promise<number> {
   const hex = await rpcCall("eth_getTransactionCount", [address, "latest"]);
   const count = parseInt(hex, 16);
-  console.log(`[arc-score] eth_getTransactionCount(${address}) = ${count}`);
+  if (!Number.isFinite(count)) throw new Error("Bad transaction count");
   return count;
 }
 
@@ -103,13 +104,7 @@ async function getUsdcBalance(address: string): Promise<bigint> {
     { to: USDC_ADDR, data },
     "latest",
   ]);
-  const balance = BigInt(result);
-  console.log(
-    `[arc-score] USDC balanceOf(${address}) raw=${balance.toString()} human=${
-      Number(balance) / 10 ** USDC_DECIMALS
-    }`
-  );
-  return balance;
+  return BigInt(result);
 }
 
 async function getContractStats(
@@ -127,10 +122,7 @@ async function getContractStats(
     const data = await indexerGet<BlockscoutTxPage>(
       `/api/v2/addresses/${address}/transactions?${nextParams.toString()}`
     );
-    if (!data) {
-      console.log(`[arc-score] indexer miss on page ${page + 1} — stopping`);
-      break;
-    }
+    if (!data) break;
     const items = data.items ?? [];
     scanned += items.length;
 
@@ -166,9 +158,6 @@ async function getContractStats(
     }
   }
 
-  console.log(
-    `[arc-score] scanned ${scanned} txs — interactions=${interactions} deployments=${deployments}`
-  );
   return { interactions, deployments, scanned };
 }
 
@@ -210,7 +199,7 @@ function tierFor(score: number): "BLOCKED" | "LOW" | "MEDIUM" | "HIGH" | "HIGH_E
 }
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: { address: string } }
 ) {
   const address = params.address;
@@ -222,7 +211,9 @@ export async function GET(
     );
   }
 
-  console.log(`\n[arc-score] ===== scoring ${address} =====`);
+  if (!allowScan(scanClientKey(req.ip))) {
+    return NextResponse.json({ error: "Too many scans" }, { status: 429 });
+  }
 
   try {
     const [txCount, usdcBalance, contractStats] = await Promise.all([
@@ -260,11 +251,6 @@ export async function GET(
 
     const tier = tierFor(finalScore);
 
-    console.log(
-      `[arc-score] points: tx=${txPoints} usdc=${usdcPoints} contract=${contractPoints} deploy=${deployPoints}`
-    );
-    console.log(`[arc-score] rawTotal=${rawTotal} capped=${capped} finalScore=${finalScore} tier=${tier}`);
-
     return NextResponse.json({
       score: finalScore,
       tier,
@@ -285,11 +271,10 @@ export async function GET(
       },
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "unknown error";
-    console.error(`[arc-score] FAILED for ${address}:`, message);
-    return NextResponse.json(
-      { error: `Arc scoring failed: ${message}` },
-      { status: 502 }
+    console.error(
+      "[arc-score] request failed",
+      err instanceof Error ? err.name : "Error"
     );
+    return NextResponse.json({ error: "Score unavailable" }, { status: 502 });
   }
 }

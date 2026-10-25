@@ -4,24 +4,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { isContractAddress } from '@/lib/contract-detect';
 import {
-  useAccount,
-  useChainId,
-  usePublicClient,
-  useSwitchChain,
-  useWriteContract,
-} from 'wagmi';
-import { ConnectKitButton } from 'connectkit';
-import {
-  ARC_MIN_MAX_FEE_PER_GAS_WEI,
-  ARC_MIN_PRIORITY_FEE_WEI,
-  CONTRACT_ADDRESSES,
-  X402_NETWORK,
-  arc,
-} from '@/lib/chain';
-import { ensureArcMainnet } from '@/lib/ensure-arc';
-import { waitArcReceipt } from '@/lib/wait-arc-receipt';
-import { erc20Abi } from '@/lib/abi/ERC20';
-import {
   HistoryEntry,
   loadHistory,
   maskAddress,
@@ -30,79 +12,26 @@ import {
   saveHistory,
 } from '@/lib/recent-history';
 import TrustSourceShell from '@/components/trust-source/TrustSourceShell';
+import {
+  toPublicScoreView,
+  type PublicScoreBody,
+  type PublicScoreView,
+} from '@/lib/public-score';
 
 const HISTORY_KEY = 'trustgate_oracle_history';
 const FAILURE_COOLDOWN_MS = 3000;
 
-// Browser calls go through the Next.js proxy at /api/oracle/* to avoid mixed
-// content issues — the upstream HTTP oracle URL only lives on the server.
+// Playground totals still come from the paid oracle proxy. Address scans
+// call /api/arc-score and do not go through this proxy.
 const ORACLE_PROXY = '/api/oracle';
 
-const PAYMENT_AMOUNT_RAW = 1000n; // 0.001 USDC at 6 decimals
-const PAYMENT_AMOUNT_HUMAN = '0.001';
-const PAYMENT_RECIPIENT = CONTRACT_ADDRESSES.trustGate;
-const USDC_ADDRESS = CONTRACT_ADDRESSES.usdc;
-
-type QueryPhase =
-  | 'idle'
-  | 'challenge'
-  | 'switch-network'
-  | 'sign'
-  | 'confirm'
-  | 'fetch'
-  | 'done'
-  | 'error';
+type QueryPhase = 'idle' | 'fetch' | 'done' | 'error';
 
 interface Stats {
   totalQueries: number;
   totalUsdcEarned: string;
   uniqueAddressesScored: number;
   averageScore: number;
-  tierDistribution: Record<string, number>;
-  recentQueries: Array<{
-    addressMasked: string;
-    score: number;
-    tier: string;
-    paid: boolean;
-    at: string;
-  }>;
-}
-
-interface ScoreResult {
-  address: string;
-  score: number;
-  tier: string;
-  recommendation: string;
-  confidence?: number;
-  flags?: string[];
-  summary?: string[];
-  scoreStability?: string;
-  directionDrivers?: string[];
-  snapshotId?: string;
-  scoringVersion?: string;
-  limitations?: string[];
-  txCount?: number;
-  walletAgeDays?: number;
-  deployments?: number;
-  breakdown?: {
-    txPoints: number;
-    usdcPoints: number;
-    contractPoints: number;
-    deploymentPoints: number;
-    txCount: number;
-    usdcBalance: number;
-    contractInteractions: number;
-    deployments: number;
-  };
-}
-
-interface PaymentRequirement {
-  amount?: string;
-  currency?: string;
-  recipient?: string;
-  network?: string;
-  memo?: string;
-  [k: string]: unknown;
 }
 
 const TIER_COLORS: Record<string, string> = {
@@ -110,34 +39,21 @@ const TIER_COLORS: Record<string, string> = {
   LOW: 'bg-orange-500/15 text-orange-300 border-orange-500/30',
   MEDIUM: 'bg-yellow-500/15 text-yellow-300 border-yellow-500/30',
   HIGH: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
-  HIGH_ELITE: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30',
+  HIGH_ELITE: 'bg-zinc-100/10 text-zinc-100 border-zinc-400/40',
 };
 
 function phaseLabel(phase: QueryPhase): string {
-  switch (phase) {
-    case 'challenge':
-      return 'Requesting payment quote…';
-    case 'switch-network':
-      return 'Switching to Arc…';
-    case 'sign':
-      return 'Awaiting wallet signature…';
-    case 'confirm':
-      return 'Confirming on Arc…';
-    case 'fetch':
-      return 'Fetching trust score…';
-    default:
-      return 'Query Trust Score (0.001 USDC)';
-  }
+  if (phase === 'fetch') return 'Reading onchain history…';
+  return 'Scan address';
 }
 
 export default function OraclePage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [address, setAddress] = useState('');
-  const [result, setResult] = useState<ScoreResult | null>(null);
+  const [result, setResult] = useState<PublicScoreView | null>(null);
   const [phase, setPhase] = useState<QueryPhase>('idle');
   const [error, setError] = useState<string | null>(null);
   const [contractDetected, setContractDetected] = useState(false);
-  const [paymentTx, setPaymentTx] = useState<`0x${string}` | null>(null);
   const [tab, setTab] = useState<'js' | 'py' | 'curl'>('js');
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [cooldownLeft, setCooldownLeft] = useState(0);
@@ -172,13 +88,65 @@ export default function OraclePage() {
     if (phase === 'done' || phase === 'error') setPhase('idle');
   };
 
-  const { address: walletAddress, isConnected } = useAccount();
-  const chainId = useChainId();
-  const publicClient = usePublicClient({ chainId: arc.id });
-  const { switchChainAsync } = useSwitchChain();
-  const { writeContractAsync } = useWriteContract();
+  const scan = async () => {
+    if (inFlightRef.current) return;
+    if (cooldownActive) return;
+    inFlightRef.current = true;
 
-  const onArc = chainId === arc.id;
+    try {
+      setContractDetected(false);
+      if (!/^0x[0-9a-fA-F]{40}$/.test(address)) {
+        setError('Enter a valid Arc wallet address');
+        setPhase('idle');
+        return;
+      }
+
+      setError(null);
+      setResult(null);
+      setPhase('fetch');
+
+      const contractCheck = await isContractAddress(address);
+      if (contractCheck.isContract) {
+        setContractDetected(true);
+        setPhase('error');
+        return;
+      }
+
+      const res = await fetch(`/api/arc-score/${encodeURIComponent(address)}`, {
+        cache: 'no-store',
+      });
+      if (res.status === 429) {
+        throw new Error('Too many scans. Try again in a minute.');
+      }
+      let body: PublicScoreBody;
+      try {
+        body = (await res.json()) as PublicScoreBody;
+      } catch {
+        throw new Error(`Score request failed (${res.status})`);
+      }
+      if (!res.ok || typeof body.score !== 'number' || typeof body.tier !== 'string') {
+        throw new Error(`Score request failed (${res.status})`);
+      }
+
+      const view = toPublicScoreView(address, body);
+      setResult(view);
+      recordHistory({
+        address,
+        score: view.score,
+        tier: view.tier,
+        at: new Date().toISOString(),
+      });
+      setPhase('done');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message);
+      setPhase('error');
+      setCooldownLeft(FAILURE_COOLDOWN_MS);
+    } finally {
+      inFlightRef.current = false;
+    }
+  };
+
   const busy = phase !== 'idle' && phase !== 'done' && phase !== 'error';
 
   useEffect(() => {
@@ -201,218 +169,18 @@ export default function OraclePage() {
     };
   }, []);
 
-  const query = async () => {
-    // Synchronous guard against double-submission. A ref flips immediately on
-    // entry so a second click before the next render is a no-op, even before
-    // React updates the disabled prop.
-    if (inFlightRef.current) return;
-    if (cooldownActive) return;
-    inFlightRef.current = true;
-
-    try {
-      setContractDetected(false);
-
-      if (!/^0x[0-9a-fA-F]{40}$/.test(address)) {
-        setError('Enter a valid Arc wallet address');
-        return;
-      }
-
-      // Contract addresses are not wallets. Catch them before asking the user to
-      // connect or pay, and point them at Token Shield instead.
-      setPhase('challenge');
-      const contractCheck = await isContractAddress(address);
-      if (contractCheck.isContract) {
-        setContractDetected(true);
-        setPhase('error');
-        return;
-      }
-
-      if (!isConnected || !walletAddress) {
-        setError('Connect your wallet first.');
-        setPhase('idle');
-        return;
-      }
-      if (!publicClient) {
-        setError('Arc public client unavailable. Try refreshing the page.');
-        setPhase('idle');
-        return;
-      }
-
-      setError(null);
-      setResult(null);
-      setPaymentTx(null);
-
-      // Step 1 — challenge the oracle, expect HTTP 402
-      const challenge = await fetch(`${ORACLE_PROXY}/${address}`, {
-        cache: 'no-store',
-      });
-
-      if (challenge.status === 200) {
-        // Dev-mode or already paid path — surface the result directly.
-        const data = (await challenge.json()) as ScoreResult;
-        setResult(data);
-        recordHistory({
-          address,
-          score: data.score,
-          tier: data.tier,
-          at: new Date().toISOString(),
-        });
-        setPhase('done');
-        return;
-      }
-
-      if (challenge.status === 400) {
-        const raw = await challenge.text();
-        let parsed: { code?: string } | null = null;
-        try {
-          parsed = JSON.parse(raw);
-        } catch {
-          // non-JSON 400, fall through to generic handling
-        }
-        if (parsed?.code === 'CONTRACT_NOT_WALLET') {
-          setContractDetected(true);
-          setPhase('error');
-          return;
-        }
-        throw new Error(`Oracle returned 400. ${raw}`.trim());
-      }
-
-      if (challenge.status !== 402) {
-        // Read the body once; a Response stream can only be consumed a single
-        // time. Try to pretty-print it as JSON, otherwise use the raw text.
-        const raw = await challenge.text();
-        let detail = raw;
-        try {
-          detail = JSON.stringify(JSON.parse(raw));
-        } catch {
-          // Non-JSON body — keep the raw text.
-        }
-        throw new Error(`Oracle returned ${challenge.status}. ${detail}`.trim());
-      }
-
-      // Read the payment requirement (logged for transparency / debugging).
-      const requirement = (await challenge.json()) as PaymentRequirement;
-      if (typeof window !== 'undefined') {
-        // eslint-disable-next-line no-console
-        console.log('[oracle] payment requirement:', requirement);
-      }
-
-      if (!onArc) {
-        setPhase('switch-network');
-        try {
-          await ensureArcMainnet({ chainId, switchChainAsync });
-        } catch (err) {
-          throw new Error(
-            `Switch to Arc Mainnet (chain id ${arc.id}). Your wallet is on a different network. ` +
-              ((err as Error).message ?? '')
-          );
-        }
-      }
-
-      // Step 3 — sign and broadcast the USDC transfer
-      setPhase('sign');
-      const txHash = await writeContractAsync({
-        chainId: arc.id,
-        address: USDC_ADDRESS,
-        abi: erc20Abi,
-        functionName: 'transfer',
-        args: [PAYMENT_RECIPIENT, PAYMENT_AMOUNT_RAW],
-        maxFeePerGas: ARC_MIN_MAX_FEE_PER_GAS_WEI,
-        maxPriorityFeePerGas: ARC_MIN_PRIORITY_FEE_WEI,
-      });
-      setPaymentTx(txHash);
-
-      setPhase('confirm');
-      const receiptStatus = await waitArcReceipt(txHash);
-      if (receiptStatus === 'reverted') {
-        throw new Error(
-          `Payment transaction reverted on Arc. Hash: ${txHash}`
-        );
-      }
-
-      // Step 5 — replay the oracle request with the proof header.
-      // The oracle expects X-Payment to be a base64-encoded JSON envelope
-      // with the payment tx hash, the sender, and a fresh opaque nonce.
-      setPhase('fetch');
-
-      // Nald's replay protection is a single global `usedNonces` set —
-      // wallet-local blockchain nonces collide across users. UUIDs are
-      // globally unique so every request is accepted.
-      const nonce = crypto.randomUUID();
-
-      const payload = JSON.stringify({
-        txHash,
-        nonce,
-        from: walletAddress,
-        network: X402_NETWORK,
-        chainId: arc.id,
-        amount: PAYMENT_AMOUNT_HUMAN,
-        currency: 'USDC',
-        recipient: PAYMENT_RECIPIENT,
-      });
-      const xPaymentHeader =
-        typeof btoa === 'function'
-          ? btoa(payload)
-          : Buffer.from(payload, 'utf-8').toString('base64');
-      const paid = await fetch(`${ORACLE_PROXY}/${address}`, {
-        cache: 'no-store',
-        headers: {
-          'X-Payment': xPaymentHeader,
-          'X-Payment-Tx': txHash,
-        },
-      });
-      if (!paid.ok) {
-        if (paid.status === 402) {
-          throw new Error(await format402Error(paid));
-        }
-        // Read the body once; a Response stream can only be consumed a single
-        // time. Try to pretty-print it as JSON, otherwise use the raw text.
-        const raw = await paid.text();
-        let detail = raw;
-        try {
-          detail = JSON.stringify(JSON.parse(raw));
-        } catch {
-          // Non-JSON body — keep the raw text.
-        }
-        throw new Error(
-          `Oracle rejected payment proof (${paid.status}). ${detail}`.trim()
-        );
-      }
-      const data = (await paid.json()) as ScoreResult;
-      setResult(data);
-      recordHistory({
-        address,
-        score: data.score,
-        tier: data.tier,
-        at: new Date().toISOString(),
-      });
-      setPhase('done');
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      // eslint-disable-next-line no-console
-      console.error('[oracle] query failed:', err);
-      setError(humaniseWalletError(message));
-      setPhase('error');
-      setCooldownLeft(FAILURE_COOLDOWN_MS);
-    } finally {
-      inFlightRef.current = false;
-    }
-  };
 
   const codeExamples = useMemo(
     () => ({
       js: `const response = await fetch(
-  'https://oracle.trustgated.xyz/oracle/0xYOUR_ADDRESS',
-  { headers: { 'X-Payment': x402Token } }
+  'https://www.trustgated.xyz/api/arc-score/0xYOUR_ADDRESS'
 )
 const trust = await response.json()`,
       py: `import requests
 response = requests.get(
-  'https://oracle.trustgated.xyz/oracle/0xYOUR_ADDRESS',
-  headers={'X-Payment': x402_token}
+  'https://www.trustgated.xyz/api/arc-score/0xYOUR_ADDRESS'
 )`,
-      curl: `curl -H "X-Payment: YOUR_TOKEN" \\
-  https://oracle.trustgated.xyz/oracle/0xYOUR_ADDRESS`,
+      curl: `curl https://www.trustgated.xyz/api/arc-score/0xYOUR_ADDRESS`,
     }),
     []
   );
@@ -436,25 +204,25 @@ response = requests.get(
             The Trust Layer for Arc
           </h1>
           <p className="mt-4 max-w-2xl text-lg text-zinc-400">
-            Pay 0.001 USDC, get an instant onchain trust score for any Arc address.
-            x402-compatible. Built for autonomous agents.
+            Paste any Arc address and read its onchain trust score. No wallet
+            and no payment. Built for people and for autonomous agents.
           </p>
         </header>
 
         {/* Live Stats */}
         <section className="mb-16 grid grid-cols-2 gap-4 md:grid-cols-4">
-          <StatCard label="Total Queries" value={stats?.totalQueries ?? '—'} />
-          <StatCard label="USDC Earned" value={stats ? `${stats.totalUsdcEarned}` : '—'} />
-          <StatCard label="Unique Addresses" value={stats?.uniqueAddressesScored ?? '—'} />
-          <StatCard label="Average Score" value={stats?.averageScore ?? '—'} />
+          <StatCard label="Total Queries" value={stats?.totalQueries ?? '-'} />
+          <StatCard label="USDC Earned" value={stats ? `${stats.totalUsdcEarned}` : '-'} />
+          <StatCard label="Unique Addresses" value={stats?.uniqueAddressesScored ?? '-'} />
+          <StatCard label="Average Score" value={stats?.averageScore ?? '-'} />
         </section>
 
         {/* Playground */}
         <section className="mb-16 rounded-2xl border border-zinc-800 bg-zinc-900/40 p-8">
           <h2 className="text-2xl font-semibold">Playground</h2>
           <p className="mt-1 text-sm text-zinc-400">
-            Query any Arc Mainnet address. Costs {PAYMENT_AMOUNT_HUMAN} USDC paid from
-            your wallet to the TrustGate contract.
+            Paste an Arc wallet address. The scan reads onchain behavior. A
+            contract address belongs on Token Shield.
           </p>
 
           <div className="mt-6 flex flex-col gap-3 md:flex-row">
@@ -467,52 +235,37 @@ response = requests.get(
                 if (phase === 'done' || phase === 'error') setPhase('idle');
               }}
               placeholder="0x..."
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !buttonDisabled) void scan();
+              }}
               className="flex-1 rounded-lg border border-zinc-800 bg-zinc-950 px-4 py-3 font-mono text-sm focus:border-emerald-500 focus:outline-none"
             />
-            {!isConnected ? (
-              <ConnectKitButton.Custom>
-                {({ show }) => (
-                  <button
-                    onClick={show}
-                    className="rounded-lg bg-emerald-500 px-5 py-3 text-sm font-semibold text-zinc-950 transition hover:bg-emerald-400"
-                  >
-                    Connect wallet to query
-                  </button>
-                )}
-              </ConnectKitButton.Custom>
-            ) : (
-              <button
-                onClick={query}
-                disabled={buttonDisabled}
-                className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-500 px-5 py-3 text-sm font-semibold text-zinc-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {busy && <Spinner />}
-                {buttonLabel}
-              </button>
-            )}
+            <button
+              onClick={() => void scan()}
+              disabled={buttonDisabled}
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-500 px-5 py-3 text-sm font-semibold text-zinc-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {busy && <Spinner />}
+              {buttonLabel}
+            </button>
           </div>
 
           {/* Phase progress */}
           {busy && (
             <div className="mt-4 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4">
               <p className="text-sm text-emerald-200">{phaseLabel(phase)}</p>
-              {paymentTx && (
-                <p className="mt-1 font-mono text-xs text-zinc-500 break-all">
-                  Payment tx: {paymentTx}
-                </p>
-              )}
             </div>
           )}
 
           {contractDetected && (
-            <div className="mt-4 rounded-lg border border-sky-500/30 bg-sky-500/10 p-4 text-sm text-sky-100">
+            <div className="mt-4 rounded-lg border border-zinc-700 bg-zinc-900 p-4 text-sm text-zinc-100">
               <p className="font-medium">That is a contract address.</p>
-              <p className="mt-1 text-sky-200/80">
+              <p className="mt-1 text-zinc-400">
                 The Oracle scores wallets. To check a token or contract, use Token Shield.
               </p>
               <Link
                 href="/token-shield"
-                className="mt-3 inline-block rounded-md bg-sky-500/20 px-3 py-1.5 font-medium text-sky-100 hover:bg-sky-500/30"
+                className="mt-3 inline-block rounded-md border border-zinc-700 px-3 py-1.5 font-medium text-zinc-100 hover:border-zinc-500"
               >
                 Open Token Shield
               </Link>
@@ -523,14 +276,6 @@ response = requests.get(
             <div className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-200">
               {error}
             </div>
-          )}
-
-          {!isConnected && (
-            <p className="mt-4 text-xs text-zinc-500">
-              The playground sends a real USDC transfer on Arc. Make sure your
-              wallet is on chain id {arc.id} and has at least{' '}
-              {PAYMENT_AMOUNT_HUMAN} USDC plus gas.
-            </p>
           )}
 
           {result && phase === 'done' && (
@@ -612,34 +357,6 @@ response = requests.get(
   );
 }
 
-function humaniseWalletError(message: string): string {
-  if (/user rejected|user denied|rejected the request/i.test(message)) {
-    return 'Wallet signature was rejected. Click the button again to retry.';
-  }
-  if (/insufficient funds|exceeds the balance/i.test(message)) {
-    return 'Insufficient USDC for the 0.001 USDC payment plus Arc gas.';
-  }
-  return message;
-}
-
-async function format402Error(response: Response): Promise<string> {
-  let body: { error?: unknown; reason?: unknown } = {};
-  try {
-    body = (await response.json()) as { error?: unknown; reason?: unknown };
-  } catch {
-    // Non-JSON body — fall through to the generic message.
-  }
-  const reason = typeof body.reason === 'string' ? body.reason.toLowerCase() : '';
-  const error = typeof body.error === 'string' ? body.error.toLowerCase() : '';
-  if (reason.includes('already used') || reason.includes('replay')) {
-    return 'This payment was already processed. Start a new query.';
-  }
-  if (error.includes('payment verification failed')) {
-    return 'Payment could not be verified. Please try again.';
-  }
-  return 'Query failed. Your USDC was not charged.';
-}
-
 function Spinner() {
   return (
     <svg
@@ -673,98 +390,38 @@ function StatCard({ label, value }: { label: string; value: string | number }) {
   );
 }
 
-function ScoreCard({ result }: { result: ScoreResult }) {
+function ScoreCard({ result }: { result: PublicScoreView }) {
   return (
     <div className="space-y-4">
       <div>
         <p className="text-4xl font-bold tabular-nums">{result.score}</p>
         <p className="mt-1 text-sm text-zinc-400">
           tier <span className="text-zinc-200">{result.tier}</span>
-          {result.recommendation ? (
-            <>
-              {' '}
-              · recommendation{' '}
-              <span className="text-zinc-200">{result.recommendation}</span>
-            </>
-          ) : null}
+          {' · recommendation '}
+          <span className="text-zinc-200">{result.recommendation}</span>
         </p>
       </div>
 
-      {(result.txCount != null ||
-        result.walletAgeDays != null ||
-        result.deployments != null) && (
-        <div className="grid gap-3 sm:grid-cols-3">
-          {result.txCount != null && (
-            <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-3">
-              <p className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">
-                Transactions
-              </p>
-              <p className="mt-1 text-lg font-semibold tabular-nums">
-                {result.txCount.toLocaleString()}
-              </p>
-            </div>
-          )}
-          {result.walletAgeDays != null && (
-            <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-3">
-              <p className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">
-                Wallet age
-              </p>
-              <p className="mt-1 text-lg font-semibold tabular-nums">
-                {result.walletAgeDays < 1
-                  ? `${Math.round(result.walletAgeDays * 24)}h`
-                  : `${result.walletAgeDays.toFixed(1)}d`}
-              </p>
-            </div>
-          )}
-          {result.deployments != null && (
-            <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-3">
-              <p className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">
-                Deployments
-              </p>
-              <p className="mt-1 text-lg font-semibold tabular-nums">
-                {result.deployments.toLocaleString()}
-              </p>
-            </div>
-          )}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-3">
+          <p className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">
+            Transactions
+          </p>
+          <p className="mt-1 text-lg font-semibold tabular-nums">
+            {result.txCount.toLocaleString()}
+          </p>
         </div>
-      )}
-
-      {(result.confidence != null || result.scoreStability) && (
-        <div className="grid gap-3 sm:grid-cols-3">
-          {result.confidence != null && (
-            <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-3">
-              <p className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">
-                Confidence
-              </p>
-              <p className="mt-1 text-lg font-semibold tabular-nums">
-                {result.confidence}%
-              </p>
-            </div>
-          )}
-          {result.scoreStability && (
-            <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-3">
-              <p className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">
-                Stability
-              </p>
-              <p className="mt-1 text-sm font-medium capitalize text-zinc-200">
-                {result.scoreStability.replace(/_/g, ' ')}
-              </p>
-            </div>
-          )}
-          {result.scoringVersion && (
-            <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-3">
-              <p className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">
-                Model
-              </p>
-              <p className="mt-1 font-mono text-sm text-zinc-200">
-                {result.scoringVersion}
-              </p>
-            </div>
-          )}
+        <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-3">
+          <p className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">
+            Deployments
+          </p>
+          <p className="mt-1 text-lg font-semibold tabular-nums">
+            {result.deployments.toLocaleString()}
+          </p>
         </div>
-      )}
+      </div>
 
-      {result.summary && result.summary.length > 0 && (
+      {result.summary.length > 0 && (
         <div>
           <p className="mb-2 text-[10px] font-mono uppercase tracking-wider text-zinc-500">
             Behavioral summary
@@ -772,57 +429,12 @@ function ScoreCard({ result }: { result: ScoreResult }) {
           <ul className="space-y-1.5 text-sm text-zinc-300">
             {result.summary.map((line) => (
               <li key={line} className="flex gap-2">
-                <span className="text-accent">·</span>
+                <span className="text-zinc-500">·</span>
                 <span>{line}</span>
               </li>
             ))}
           </ul>
         </div>
-      )}
-
-      {result.directionDrivers && result.directionDrivers.length > 0 && (
-        <div>
-          <p className="mb-2 text-[10px] font-mono uppercase tracking-wider text-zinc-500">
-            Direction drivers
-          </p>
-          <ul className="space-y-1 text-sm text-zinc-400">
-            {result.directionDrivers.map((d) => (
-              <li key={d}>{d}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {result.flags && result.flags.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {result.flags.map((f) => (
-            <span
-              key={f}
-              className="rounded border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 font-mono text-[11px] text-amber-200"
-            >
-              {f}
-            </span>
-          ))}
-        </div>
-      )}
-
-      {result.limitations && result.limitations.length > 0 && (
-        <div>
-          <p className="mb-2 text-[10px] font-mono uppercase tracking-wider text-zinc-500">
-            Limitations
-          </p>
-          <ul className="space-y-1 text-sm text-zinc-500">
-            {result.limitations.map((l) => (
-              <li key={l}>{l}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {result.snapshotId && (
-        <p className="font-mono text-[11px] text-zinc-600">
-          snapshot {result.snapshotId}
-        </p>
       )}
     </div>
   );
