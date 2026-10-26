@@ -28,6 +28,10 @@ import {
   saveHistory,
 } from "@/lib/recent-history";
 import TrustSourceShell from "@/components/trust-source/TrustSourceShell";
+import {
+  classifyPaidRead,
+  pendingBlocksScore,
+} from "@/lib/token-score-read";
 
 const TOKEN_ORACLE_PROXY = "/api/oracle/token";
 const TOKEN_STATS_PROXY = "/api/oracle/oracle/token/stats";
@@ -37,6 +41,12 @@ const PAYMENT_AMOUNT_RAW = 1000n;
 const PAYMENT_AMOUNT_HUMAN = "0.001";
 const PAYMENT_RECIPIENT = CONTRACT_ADDRESSES.trustGate;
 const USDC_ADDRESS = CONTRACT_ADDRESSES.usdc;
+const SCORE_POLL_LIMIT = 12;
+const SCORE_POLL_MS = 2_000;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 type QueryPhase =
   | "idle"
@@ -161,7 +171,7 @@ function isPendingTokenPayload(value: unknown): boolean {
 }
 
 function normalizeTokenScore(value: unknown): TokenScoreResult | null {
-  if (isPendingTokenPayload(value)) return null;
+  if (pendingBlocksScore(value)) return null;
   const v = unwrapTokenPayload(value);
   if (!v) return null;
 
@@ -336,13 +346,13 @@ export default function TokenShieldPage() {
 
       if (challenge.status === 200) {
         const data: unknown = await challenge.json();
-        if (isPendingTokenPayload(data)) {
-          throw new Error(
-            "Token score is still computing. Wait a few seconds and check again."
-          );
-        }
         const normalized = normalizeTokenScore(data);
         if (!normalized) {
+          if (isPendingTokenPayload(data)) {
+            throw new Error(
+              "Token score is still computing. Wait a few seconds and check again."
+            );
+          }
           throw new Error(
             `Oracle returned an unexpected response shape. ${JSON.stringify(data).slice(0, 240)}`
           );
@@ -445,37 +455,65 @@ export default function TokenShieldPage() {
           ? btoa(payload)
           : Buffer.from(payload, "utf-8").toString("base64");
 
-      const paid = await fetch(`${TOKEN_ORACLE_PROXY}/${address}`, {
-        cache: "no-store",
-        headers: {
-          "X-Payment": xPaymentHeader,
-          "X-Payment-Tx": txHash,
-        },
-      });
-      if (!paid.ok) {
-        // Read the body once; a Response stream can only be consumed a single
-        // time. Try to pretty-print it as JSON, otherwise use the raw text.
+      // The oracle often answers "pending" and finishes the score a few
+      // seconds later. Keep this same payment proof and read again. A new
+      // click would charge another 0.001 USDC.
+      let sawPending = false;
+      let normalized: TokenScoreResult | null = null;
+      for (let attempt = 0; attempt < SCORE_POLL_LIMIT; attempt += 1) {
+        const paid = await fetch(`${TOKEN_ORACLE_PROXY}/${address}`, {
+          cache: "no-store",
+          headers: {
+            "X-Payment": xPaymentHeader,
+            "X-Payment-Tx": txHash,
+          },
+        });
         const raw = await paid.text();
-        let detail = raw;
+        let data: unknown = null;
         try {
-          detail = JSON.stringify(JSON.parse(raw));
+          data = JSON.parse(raw);
         } catch {
-          // Non-JSON body — keep the raw text.
+          data = null;
+        }
+
+        if (paid.ok || paid.status === 202) {
+          const state = classifyPaidRead(paid.status, data);
+          if (state === "score") {
+            normalized = normalizeTokenScore(data);
+            if (!normalized) {
+              throw new Error(
+                `Oracle returned an unexpected response shape. ${raw.slice(0, 240)}`
+              );
+            }
+            break;
+          }
+          if (state === "pending") {
+            sawPending = true;
+            if (attempt < SCORE_POLL_LIMIT - 1) {
+              await sleep(SCORE_POLL_MS);
+              continue;
+            }
+            throw new Error(
+              "Payment recorded. The score was not ready in time. Do not pay again for this check."
+            );
+          }
+          throw new Error(
+            `Oracle returned an unexpected response shape. ${raw.slice(0, 240)}`
+          );
+        }
+
+        if (sawPending && (paid.status === 402 || paid.status === 409)) {
+          throw new Error(
+            "Payment recorded. The oracle will not return the finished score on this transaction. Do not pay again for this check."
+          );
         }
         throw new Error(
-          `Oracle rejected payment proof (${paid.status}). ${detail}`.trim()
+          `Oracle rejected payment proof (${paid.status}). ${raw.slice(0, 240)}`.trim()
         );
       }
-      const data: unknown = await paid.json();
-      if (isPendingTokenPayload(data)) {
-        throw new Error(
-          "Payment recorded. Token score is still computing. Wait a few seconds and check again (no extra payment if still pending)."
-        );
-      }
-      const normalized = normalizeTokenScore(data);
       if (!normalized) {
         throw new Error(
-          `Oracle returned an unexpected response shape. ${JSON.stringify(data).slice(0, 240)}`
+          "Payment recorded. The score was not ready in time. Do not pay again for this check."
         );
       }
       setResult(normalized);
