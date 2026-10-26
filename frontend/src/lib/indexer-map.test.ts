@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { mapIndexerPath, normalizeIndexerBody } from "./indexer-map";
+import {
+  blockscoutIndexerPath,
+  mapIndexerPath,
+  normalizeIndexerBody,
+  resolveIndexerPath,
+} from "./indexer-map";
 
 describe("mapIndexerPath", () => {
   it("maps Blockscout address txs onto Arcscan v1", () => {
@@ -153,5 +158,40 @@ describe("normalizeIndexerBody", () => {
     expect(out.holders_count).toBe(19845);
     expect(out.is_verified).toBe(false);
     expect(out.total_supply).toBe("1000000000000000000000000000");
+  });
+});
+
+describe("blockscout indexer paths", () => {
+  const argus = "0xeCe5cA8bf9220718E5727754026757512212cb3c";
+  const base = "https://explorer.arc.io";
+
+  it("keeps /api/v2 and drops holder limit", () => {
+    expect(
+      resolveIndexerPath(base, `/api/v2/tokens/${argus}/holders?limit=50`)
+    ).toBe(`/api/v2/tokens/${argus}/holders`);
+    expect(
+      blockscoutIndexerPath(`/api/v2/addresses/${argus}/counters`)
+    ).toBe(`/api/v2/addresses/${argus}/counters`);
+  });
+
+  it("leaves a non-Blockscout base on the Arcscan map", () => {
+    expect(
+      resolveIndexerPath(
+        "https://indexer.example",
+        `/api/v2/tokens/${argus}/holders?limit=50`
+      )
+    ).toBe(`/v1/tokens/${argus}/holders?limit=50`);
+  });
+
+  it("passes a Blockscout address body through unchanged", () => {
+    const body = {
+      is_contract: true,
+      is_verified: true,
+      token: { type: "ERC-20", symbol: "ARGUS" },
+      creation_transaction_hash: "0xabc",
+    };
+    expect(
+      normalizeIndexerBody(`/api/v2/addresses/${argus}`, body)
+    ).toBe(body);
   });
 });

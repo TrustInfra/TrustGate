@@ -47,11 +47,39 @@ function rpcUrl(): string {
   return fromEnv || "https://rpc.mainnet.arc.io";
 }
 
+/** Circle Blockscout. The Arcscan tunnel (api.arc-scan.org) does not answer. */
+export const LIVE_INDEXER_BASE = "https://explorer.arc.io";
+
+/**
+ * Indexer origin for server fetches.
+ * An empty value, a non-http(s) value, or the host arc-scan.org
+ * (including its subdomains) becomes
+ * LIVE_INDEXER_BASE. A deployment ARC_INDEXER_BASE left on the dead tunnel
+ * must not win over the live explorer.
+ */
+export function resolveIndexerBase(fromEnv: string | undefined | null): string {
+  const raw = (fromEnv ?? "").trim();
+  if (!raw) return LIVE_INDEXER_BASE;
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    return LIVE_INDEXER_BASE;
+  }
+  if (url.protocol !== "https:" && url.protocol !== "http:") {
+    return LIVE_INDEXER_BASE;
+  }
+  const host = url.hostname.toLowerCase();
+  if (host === "arc-scan.org" || host.endsWith(".arc-scan.org")) {
+    return LIVE_INDEXER_BASE;
+  }
+  return raw.replace(/\/+$/, "");
+}
+
 function indexerBase(): string {
   const fromEnv =
-    typeof process !== "undefined" ? process.env.ARC_INDEXER_BASE?.trim() : "";
-  // Official explorer.arc.io is not a public API. Arcscan REST is.
-  return fromEnv || "https://api.arc-scan.org";
+    typeof process !== "undefined" ? process.env.ARC_INDEXER_BASE : "";
+  return resolveIndexerBase(fromEnv);
 }
 
 export const CHAIN_ID = arc.id;

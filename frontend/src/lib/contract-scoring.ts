@@ -2,6 +2,7 @@ import "server-only";
 
 import { envNumber } from "@/lib/env-number";
 import { RPC_URL, VERIFIED_ISSUER_ADDRESSES } from "./chain";
+import { erc20ViewResultsMatch } from "./erc20-views";
 import { indexerGet } from "./indexer";
 
 // Trust scoring for non-ERC-20 contracts on Arc Mainnet.
@@ -19,6 +20,9 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 // and ERC-1155 balanceOf(address,uint256).
 const ERC721_OWNEROF_SELECTOR = "6352211e";
 const ERC1155_BALANCEOF_SELECTOR = "00fdd58e";
+const ERC20_DECIMALS_SELECTOR = "0x313ce567";
+const ERC20_SYMBOL_SELECTOR = "0x95d89b41";
+const ERC20_TOTAL_SUPPLY_SELECTOR = "0x18160ddd";
 
 // Sensitive scoring constants are sourced from server-only environment
 // variables (no NEXT_PUBLIC_ prefix) so the thresholds, caps, and weights never
@@ -191,9 +195,9 @@ async function rpcCall(
   }
 }
 
-// Fingerprint NFT contracts from deployed bytecode. Used only when Arcscan has
-// not classified the token type, so ERC-20 and Arcscan-classified contracts
-// avoid the extra RPC round-trip.
+// Fingerprint NFT contracts from deployed bytecode. Used only when the indexer
+// has not classified the token type, so labelled ERC-20 contracts avoid the
+// extra RPC round-trip.
 async function detectNftFromBytecode(
   address: string
 ): Promise<{ isErc721: boolean; isErc1155: boolean }> {
@@ -208,6 +212,19 @@ async function detectNftFromBytecode(
   };
 }
 
+// Indexer down or unlabeled. eth_call follows proxies, so a minimal proxy
+// whose runtime code does not contain ERC-20 selectors still classifies.
+async function detectErc20FromRpc(address: string): Promise<boolean> {
+  const call = (data: string) =>
+    rpcCall("eth_call", [{ to: address, data }, "latest"]);
+  const [decimals, symbol, supply] = await Promise.all([
+    call(ERC20_DECIMALS_SELECTOR),
+    call(ERC20_SYMBOL_SELECTOR),
+    call(ERC20_TOTAL_SUPPLY_SELECTOR),
+  ]);
+  return erc20ViewResultsMatch(decimals, symbol, supply);
+}
+
 export async function detectContractKind(
   address: string
 ): Promise<ContractKindResult> {
@@ -215,7 +232,7 @@ export async function detectContractKind(
     `/api/v2/addresses/${address}`
   );
 
-  const tokenType = data?.token?.type ?? data?.token_type ?? null;
+  let tokenType = data?.token?.type ?? data?.token_type ?? null;
   const creationTxHash =
     data?.creation_tx_hash ?? data?.creation_transaction_hash ?? null;
   const creatorAddress = data?.creator_address_hash ?? null;
@@ -243,12 +260,16 @@ export async function detectContractKind(
   let isErc721 = tokenType === "ERC-721";
   let isErc1155 = tokenType === "ERC-1155";
 
-  // Arcscan didn't classify the token type — fall back to a bytecode selector
-  // probe to catch unverified or unlabelled NFT contracts.
+  // Indexer didn't classify the token type. Bytecode catches unlabelled NFTs.
+  // ERC-20 views catch tokens the indexer missed, including proxies. Without
+  // this, a live ERC-20 is scored as a generic contract and published as 0.
   if (tokenType === null) {
     const probe = await detectNftFromBytecode(address);
     isErc721 = probe.isErc721;
     isErc1155 = probe.isErc1155;
+    if (!isErc721 && !isErc1155 && (await detectErc20FromRpc(address))) {
+      tokenType = "ERC-20";
+    }
   }
 
   const info: ContractInfo = {
@@ -554,17 +575,6 @@ export async function scoreContract(
     ageDays,
     signals.uniqueInteractors,
     deployerTier
-  );
-
-  console.log(
-    `[contract-score] ${address} verify=${verificationPts} age=${agePts} ` +
-      `(${ageDays.toFixed(1)}d) tx=${txPts} (${signals.txCount}) ` +
-      `interactors=${interactorPts} (${signals.uniqueInteractors} sampled) ` +
-      `deployer=${deployerPts} (${deployerTier ?? "unknown"}) ` +
-      `arc=${arcPts} volume=${volumePts} (weighted=${weightedVolume}) ` +
-      `throughput=${throughputPts} abandonment=-${abandonmentPts} ` +
-      `velocity=${velocityFlag} flags=[${flags.join(",")}] ` +
-      `confidence=${confidence} raw=${raw} cap=${cap} final=${score}`
   );
 
   return {

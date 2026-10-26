@@ -62,6 +62,49 @@ export function mapIndexerPath(pathAndQuery: string): string {
   return raw;
 }
 
+const BLOCKSCOUT_INDEXER_HOSTS = new Set([
+  "explorer.arc.io",
+  "explorer.testnet.arc.io",
+]);
+
+/** True when `base` is Circle's Blockscout and /api/v2 must not be rewritten. */
+export function indexerUsesBlockscout(base: string): boolean {
+  try {
+    const host = new URL(base).hostname.toLowerCase();
+    return BLOCKSCOUT_INDEXER_HOSTS.has(host);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Keep a Blockscout /api/v2 path. Holder lists reject `limit`
+ * ("Unexpected field: limit"), so that one parameter is dropped.
+ * Counters stay on /counters. Other query parameters are left as given.
+ */
+export function blockscoutIndexerPath(pathAndQuery: string): string {
+  const raw = pathAndQuery.startsWith("/") ? pathAndQuery : `/${pathAndQuery}`;
+  let url: URL;
+  try {
+    url = new URL(raw, "https://indexer.local");
+  } catch {
+    return raw;
+  }
+  const path = url.pathname.replace(/\/+$/, "") || "/";
+  if (!/^\/api\/v2\/tokens\/0x[0-9a-fA-F]{40}\/holders$/i.test(path)) {
+    return raw;
+  }
+  url.searchParams.delete("limit");
+  const q = url.searchParams.toString();
+  return q ? `${path}?${q}` : path;
+}
+
+/** Arcscan bases keep the /v1 map. Blockscout bases pass /api/v2 through. */
+export function resolveIndexerPath(base: string, pathAndQuery: string): string {
+  if (indexerUsesBlockscout(base)) return blockscoutIndexerPath(pathAndQuery);
+  return mapIndexerPath(pathAndQuery);
+}
+
 function isoFromUnix(value: unknown): string | null {
   if (typeof value === "number" && Number.isFinite(value)) {
     return new Date(value * 1000).toISOString();
